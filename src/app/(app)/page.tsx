@@ -78,7 +78,7 @@ export default function HomePage() {
           { href: "/products/new", label: "상품 등록", icon: Plus, tone: "bg-berry-100 text-berry-600" },
           { href: "/scan", label: "스캔", icon: ScanBarcode, tone: "bg-soda-100 text-soda-700" },
           { href: "/reorder", label: "발주", icon: PackagePlus, tone: "bg-butter-100 text-butter-700" },
-          { href: "/excel", label: "키오스크", icon: FileSpreadsheet, tone: "bg-matcha-100 text-matcha-700" },
+          { href: "/excel", label: "빅솔론", icon: FileSpreadsheet, tone: "bg-matcha-100 text-matcha-700" },
         ].map((a) => (
           <Link key={a.href} href={a.href} className="card flex flex-col items-center gap-1 py-3 active:scale-95">
             <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${a.tone}`}>
@@ -106,8 +106,8 @@ export default function HomePage() {
         <Link href="/excel" className="card flex items-center gap-3 border-soda-300 bg-soda-100 p-4">
           <FileSpreadsheet className="shrink-0 text-soda-700" />
           <div className="flex-1">
-            <p className="font-cute text-lg">키오스크에 반영할 상품 {stats.kiosk}개</p>
-            <p className="text-sm text-ink-soft">새로 등록·수정한 상품을 엑셀로 내보내세요</p>
+            <p className="font-cute text-lg">빅솔론에 반영할 상품 {stats.kiosk}개</p>
+            <p className="text-sm text-ink-soft">새로 등록·수정한 상품을 대량등록 엑셀로 내보내세요</p>
           </div>
           <ChevronRight className="text-ink-soft" />
         </Link>
@@ -206,7 +206,7 @@ export default function HomePage() {
           <Mascot mood="wink" size={56} />
           <div className="flex-1">
             <p className="font-cute text-lg">첫 상품을 등록해 볼까요?</p>
-            <p className="text-sm text-ink-soft">키오스크 엑셀이 있다면 ‘더보기 → 엑셀’에서 한 번에 가져올 수 있어요</p>
+            <p className="text-sm text-ink-soft">빅솔론 엑셀이 있다면 ‘더보기 → 엑셀’에서 한 번에 가져올 수 있어요</p>
           </div>
         </Link>
       )}

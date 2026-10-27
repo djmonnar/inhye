@@ -33,14 +33,14 @@ export default function MorePage() {
   const [reset, setReset] = useState<null | "sample" | "empty">(null);
 
   const items = [
-    { href: "/excel", icon: FileSpreadsheet, label: "엑셀 · 키오스크 연동", desc: "키오스크 등록용 엑셀 내보내기/가져오기, 백업" },
+    { href: "/excel", icon: FileSpreadsheet, label: "엑셀 · 빅솔론 대량등록", desc: "빅솔론 대량작업 엑셀 내보내기/가져오기, 백업" },
     { href: "/labels", icon: Printer, label: "바코드 라벨 · 가격표 인쇄", desc: "바코드 없는 상품에 붙일 라벨 만들기" },
     { href: "/suppliers", icon: Store, label: "구매처 관리", desc: "소품 산 곳 모아보기" },
     { href: "/history", icon: History, label: "입고 · 출고 기록", desc: "언제 무엇이 들어오고 나갔는지" },
     ...(user?.role === "admin"
       ? [{ href: "/members", icon: Users, label: "직원 계정 관리", desc: "알바생·가족 계정 만들기, 권한 바꾸기" }]
       : []),
-    { href: "/guide", icon: BookOpen, label: "빅솔론 · 히엘페이 연동 안내", desc: "키오스크·프린터와 함께 쓰는 방법" },
+    { href: "/guide", icon: BookOpen, label: "빅솔론 · 히엘페이 연동 안내", desc: "어디까지 연결되는지, 업체 문의 방법" },
   ];
 
   return (

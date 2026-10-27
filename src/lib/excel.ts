@@ -3,7 +3,7 @@ import { normalizeBarcode, parseNum } from "./format";
 import type { BulkProductRow, Product, Supplier } from "./types";
 
 /**
- * 키오스크 상품 일괄등록 양식 (업로드해 주신 엑셀과 같은 열 순서/색/서식).
+ * 빅솔론 상품 대량작업(엑셀 업로드) 양식 — 업로드해 주신 엑셀과 같은 열 순서/색/서식.
  * 노란색 = 필수, 주황색 = 선택.
  */
 export const KIOSK_COLUMNS = [
@@ -103,8 +103,8 @@ const BACKUP_COLUMNS: [string, (p: Product, s: Map<string, Supplier>) => string 
   ["구매링크", (p) => p.purchase_url ?? ""],
   ["구매처상품명", (p) => p.supplier_sku ?? ""],
   ["판매중(Y/N)", (p) => yn(p.is_active)],
-  ["키오스크재고사용(Y/N)", (p) => yn(p.kiosk_track_stock)],
-  ["키오스크코드", (p) => p.kiosk_code ?? ""],
+  ["빅솔론재고사용(Y/N)", (p) => yn(p.kiosk_track_stock)],
+  ["빅솔론상품코드", (p) => p.kiosk_code ?? ""],
   ["태그", (p) => p.tags.join(", ")],
   ["메모", (p) => p.memo ?? ""],
   ["상품명(영어)", (p) => p.name_en ?? ""],
@@ -194,7 +194,7 @@ type Field =
 function fieldFor(header: string): Field | null {
   const h = header.replace(/\s+/g, "").toLowerCase();
   if (!h) return null;
-  if (h.startsWith("상품코드") || h === "키오스크코드") return "kiosk_code";
+  if (h.startsWith("상품코드") || h === "키오스크코드" || h === "빅솔론상품코드") return "kiosk_code";
   if (h.startsWith("상품명(영") ) return "name_en";
   if (h.startsWith("상품명(중")) return "name_zh";
   if (h.startsWith("상품명(일")) return "name_ja";
@@ -205,7 +205,7 @@ function fieldFor(header: string): Field | null {
   if (h === "상품명" || h === "이름" || h === "품명") return "name";
   if (h.includes("분류") || h === "카테고리") return "category";
   if (h === "판매가" || h === "판매가격" || h === "가격") return "sale_price";
-  if (h.startsWith("재고사용") || h.startsWith("키오스크재고사용")) return "kiosk_track_stock";
+  if (h.startsWith("재고사용") || h.startsWith("키오스크재고사용") || h.startsWith("빅솔론재고사용")) return "kiosk_track_stock";
   if (h.startsWith("사용") || h.startsWith("판매중")) return "is_active";
   if (h === "재고수량" || h === "재고" || h === "수량") return "stock_qty";
   if (h === "바코드") return "barcode";

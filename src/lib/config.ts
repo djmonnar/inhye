@@ -10,8 +10,8 @@ export const IS_DEMO = !SUPABASE_URL || !SUPABASE_KEY;
 export const LOGIN_DOMAIN =
   process.env.NEXT_PUBLIC_LOGIN_EMAIL_DOMAIN || "inhye.local";
 
-export const APP_NAME = "몽실창고";
-export const SHOP_NAME = process.env.NEXT_PUBLIC_SHOP_NAME || "우리 소품샵";
+export const APP_NAME = "포포하우스";
+export const SHOP_NAME = process.env.NEXT_PUBLIC_SHOP_NAME || "포포하우스";
 
 export const IMAGE_BUCKET = "product-images";
 

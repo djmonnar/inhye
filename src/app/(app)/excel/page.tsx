@@ -54,7 +54,7 @@ export default function ExcelPage() {
   async function makeKioskFile() {
     const sorted = [...targets].sort((a, b) => a.category.localeCompare(b.category, "ko") || a.name.localeCompare(b.name, "ko"));
     const blob = await buildKioskWorkbook(sorted, unitPrice);
-    return { blob, ids: sorted.map((p) => p.id), name: `키오스크_상품등록_${stamp()}.xlsx` };
+    return { blob, ids: sorted.map((p) => p.id), name: `빅솔론_상품대량등록_${stamp()}.xlsx` };
   }
 
   async function exportKiosk(share: boolean) {
@@ -134,7 +134,7 @@ export default function ExcelPage() {
 
   return (
     <div>
-      <PageHeader back title="엑셀 · 키오스크" />
+      <PageHeader back title="엑셀 · 빅솔론" />
       <div className="space-y-4">
         {/* 내보내기 */}
         <section className="card space-y-4 p-4">
@@ -143,9 +143,9 @@ export default function ExcelPage() {
               <FileSpreadsheet size={22} />
             </span>
             <div>
-              <p className="font-cute text-lg">키오스크 등록용 엑셀 만들기</p>
+              <p className="font-cute text-lg">빅솔론 대량등록 엑셀 만들기</p>
               <p className="text-sm text-ink-soft">
-                보내주신 키오스크 양식(상품명·분류명·판매가·사용 …)과 똑같은 칸으로 만들어요.
+                빅솔론 대량작업 양식(상품명·분류명·판매가·사용 …)과 칸·색·서식까지 똑같이 만들어요.
               </p>
             </div>
           </div>
@@ -170,7 +170,7 @@ export default function ExcelPage() {
               ]}
             />
             <p className="mt-1 text-xs text-ink-soft">
-              양식에서 선택 칸이에요. 키오스크 업체마다 쓰임이 달라서, 처음엔 업체에 한번 확인해 보세요.
+              양식의 선택 칸이에요. 빅솔론 화면에서 ‘상품단가’가 어디에 쓰이는지 한 번 확인해 보세요.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -182,8 +182,8 @@ export default function ExcelPage() {
             </button>
           </div>
           <p className="rounded-2xl bg-cream p-3 text-xs text-ink-soft">
-            💡 키오스크 관리자 페이지의 ‘엑셀 일괄 등록’에 올리거나, 히엘페이처럼 상품 세팅을 대신 해주는 곳은 이 파일을
-            카톡/메일로 보내 요청하면 돼요.
+            💡 빅솔론 관리 프로그램의 대량 작업(엑셀 업로드)에 이 파일을 올리면 돼요. 폰에서 만들었다면 ‘카톡으로
+            보내기’로 PC에 옮기세요. 이미 빅솔론에 있는 상품은 ‘상품 코드’가 들어가야 새로 생기지 않고 수정돼요.
           </p>
         </section>
 
@@ -195,7 +195,7 @@ export default function ExcelPage() {
             </span>
             <div>
               <p className="font-cute text-lg">엑셀에서 상품 가져오기</p>
-              <p className="text-sm text-ink-soft">키오스크 양식, 이 앱 백업 파일 모두 돼요. 같은 상품은 수정돼요.</p>
+              <p className="text-sm text-ink-soft">빅솔론 양식, 이 앱 백업 파일 모두 돼요. 같은 상품은 수정돼요. 빅솔론에서 상품 목록을 내려받아 가져오면 상품 코드도 채워져요.</p>
             </div>
           </div>
           <label className="btn-soft w-full cursor-pointer">
@@ -218,7 +218,7 @@ export default function ExcelPage() {
                   checked={opts.updateExisting}
                   onChange={(v) => setOpts((o) => ({ ...o, updateExisting: v }))}
                   label="이미 있는 상품도 수정하기"
-                  desc="키오스크 코드 → 바코드 → 상품명 순서로 같은 상품을 찾아요"
+                  desc="빅솔론 상품 코드 → 바코드 → 상품명 순서로 같은 상품을 찾아요"
                 />
                 <Toggle
                   checked={opts.importCost}
@@ -295,7 +295,7 @@ export default function ExcelPage() {
               className="btn-soft btn-sm"
               onClick={async () => {
                 const blob = await buildBackupWorkbook(products, suppliers, (p) => store().imageUrl(p));
-                download(blob, `몽실창고_백업_${stamp()}.xlsx`);
+                download(blob, `포포하우스_백업_${stamp()}.xlsx`);
               }}
             >
               <Download size={16} /> 백업 받기
@@ -305,7 +305,7 @@ export default function ExcelPage() {
               className="btn-soft btn-sm"
               onClick={async () => {
                 const blob = await buildKioskWorkbook([], unitPrice);
-                download(blob, "키오스크_상품등록_빈양식.xlsx");
+                download(blob, "빅솔론_상품대량등록_빈양식.xlsx");
               }}
             >
               <FileSpreadsheet size={16} /> 빈 양식
@@ -317,13 +317,13 @@ export default function ExcelPage() {
       <ConfirmSheet
         open={exportedIds !== null}
         onClose={() => setExportedIds(null)}
-        title="키오스크에 반영했나요?"
-        desc={`반영 완료로 표시하면 ${exportedIds?.length ?? 0}개 상품의 ‘키오스크 반영 필요’ 표시가 사라져요. 다음에 수정하면 다시 떠요.`}
+        title="빅솔론에 반영했나요?"
+        desc={`반영 완료로 표시하면 ${exportedIds?.length ?? 0}개 상품의 ‘빅솔론 반영 필요’ 표시가 사라져요. 다음에 수정하면 다시 떠요.`}
         confirmText="반영 완료"
         onConfirm={async () => {
           await store().markKioskSynced(exportedIds ?? []);
           await refresh("products");
-          toast("키오스크 반영 완료!", "wow");
+          toast("빅솔론 반영 완료!", "wow");
         }}
       />
     </div>

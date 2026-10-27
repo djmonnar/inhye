@@ -76,7 +76,7 @@ function LabelsInner() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- portal target exists only after mount
     setMounted(true);
     try {
-      const saved = localStorage.getItem("mongsil.labelPreset");
+      const saved = localStorage.getItem("popo.labelPreset");
       if (saved && PRESETS.some((p) => p.id === saved)) setPresetId(saved);
     } catch {
       /* ignore */
@@ -185,7 +185,7 @@ function LabelsInner() {
                 onClick={() => {
                   setPresetId(p.id);
                   try {
-                    localStorage.setItem("mongsil.labelPreset", p.id);
+                    localStorage.setItem("popo.labelPreset", p.id);
                   } catch {
                     /* ignore */
                   }

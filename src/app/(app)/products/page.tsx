@@ -15,7 +15,7 @@ type Sort = "new" | "name" | "stock" | "margin" | "price";
 const STATUS: { value: Status; label: string }[] = [
   { value: "all", label: "전체" },
   { value: "low", label: "⚠️ 품절·임박" },
-  { value: "kiosk", label: "🖥️ 키오스크 미반영" },
+  { value: "kiosk", label: "🖥️ 빅솔론 미반영" },
   { value: "nosupplier", label: "구매처 없음" },
   { value: "nophoto", label: "사진 없음" },
   { value: "inactive", label: "판매 중지" },
@@ -39,7 +39,7 @@ function ProductsList() {
   useEffect(() => {
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- restore per-device preference after mount
-      if (localStorage.getItem("mongsil.view") === "grid") setView("grid");
+      if (localStorage.getItem("popo.view") === "grid") setView("grid");
     } catch {
       /* ignore */
     }
@@ -103,7 +103,7 @@ function ProductsList() {
               const next = view === "list" ? "grid" : "list";
               setView(next);
               try {
-                localStorage.setItem("mongsil.view", next);
+                localStorage.setItem("popo.view", next);
               } catch {
                 /* ignore */
               }
@@ -206,7 +206,7 @@ function ProductsList() {
                   </p>
                   <div className="mt-1 flex items-center gap-1">
                     <StockBadge product={p} />
-                    {needsKioskSync(p) && <span className="badge bg-soda-100 text-soda-700">키오스크</span>}
+                    {needsKioskSync(p) && <span className="badge bg-soda-100 text-soda-700">빅솔론</span>}
                   </div>
                 </div>
                 <div className="text-right">

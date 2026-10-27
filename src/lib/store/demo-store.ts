@@ -15,8 +15,8 @@ import { StoreError, type DataStore } from "./types";
  * tried right after deploying. Everything lives in this browser's IndexedDB.
  */
 
-const db = typeof indexedDB === "undefined" ? undefined : createStore("mongsil-demo", "kv");
-const USER_KEY = "mongsil.demo.user";
+const db = typeof indexedDB === "undefined" ? undefined : createStore("popo-demo", "kv");
+const USER_KEY = "popo.demo.user";
 
 const KIOSK_FIELDS: (keyof Product)[] = [
   "name", "category", "sale_price", "is_active", "kiosk_track_stock", "barcode", "cost_price",

@@ -1,5 +1,5 @@
 /**
- * 몽실이 — the app's own mascot: a round marshmallow critter drawn for this app.
+ * 포포 — 포포하우스's own mascot: a round marshmallow critter drawn for this app.
  */
 export type Mood = "happy" | "wow" | "sad" | "sleep" | "wink";
 

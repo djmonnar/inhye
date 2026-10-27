@@ -275,7 +275,7 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
               />
             )}
           </Field>
-          <Field label="카테고리" hint="키오스크의 ‘상품 분류명’으로 들어가요">
+          <Field label="카테고리" hint="빅솔론 엑셀의 ‘상품 분류명’으로 들어가요">
             {(id) => (
               <>
                 <input
@@ -484,22 +484,22 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
           </div>
         </section>
 
-        {/* 키오스크 */}
+        {/* 빅솔론 */}
         <section className="card space-y-2 p-4">
-          <p className="label">키오스크 설정</p>
+          <p className="label">빅솔론 설정</p>
           <Toggle
             checked={f.is_active}
             onChange={(v) => set("is_active", v)}
             label="판매 중"
-            desc="끄면 키오스크 엑셀에 ‘사용 N’으로 나가요"
+            desc="끄면 빅솔론 엑셀에 ‘사용 N’으로 나가요"
           />
           <Toggle
             checked={f.kiosk_track_stock}
             onChange={(v) => set("kiosk_track_stock", v)}
-            label="키오스크 재고 사용"
-            desc="키오스크에서도 재고를 차감할 때 켜요"
+            label="빅솔론 재고 사용"
+            desc="빅솔론 키오스크에서도 재고를 빼고 싶을 때 켜요"
           />
-          <Field label="키오스크 상품 코드" hint="키오스크에 이미 있는 상품을 수정할 때만 (예: S000005)" className="pt-2">
+          <Field label="빅솔론 상품 코드" hint="빅솔론에 이미 등록된 상품을 엑셀로 수정할 때만 (예: S000005)" className="pt-2">
             {(id) => (
               <input
                 id={id}

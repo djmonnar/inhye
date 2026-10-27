@@ -4,24 +4,34 @@ import { Copy } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/components/providers";
 import { PageHeader } from "@/components/ui";
+import { SHOP_NAME } from "@/lib/config";
 
-const HIEL_ASK = `안녕하세요, 히엘페이 키오스크를 사용 중인 매장입니다.
-상품 관리를 자체 프로그램으로 하고 있어서 아래 내용 문의드립니다.
+const BIXOLON_ASK = `안녕하세요, 빅솔론 키오스크를 사용 중인 소품샵(${SHOP_NAME})입니다.
+상품 관리를 별도 프로그램으로 하고 있어서 몇 가지 여쭤봅니다.
 
-1. 상품을 엑셀로 일괄 등록/수정할 수 있는 관리자 페이지가 있나요? (양식의 ‘상품단가’ 칸 의미도 궁금합니다)
-2. 매출·판매 내역을 엑셀로 내려받거나, API(또는 웹훅)로 받아볼 수 있나요?
-3. 키오스크 상품 목록을 엑셀로 내려받을 수 있나요? (상품 코드 포함)
-
-답변 부탁드립니다. 감사합니다.`;
-
-const BIXOLON_ASK = `안녕하세요, 빅솔론 제품을 사용 중인 매장입니다.
-웹 브라우저에서 바코드 라벨을 바로 인쇄하려고 합니다.
-
-1. 제 기기 모델(___)이 Web Print SDK를 지원하나요?
-2. 안드로이드 폰/태블릿에서도 Web Print SDK 앱으로 인쇄할 수 있나요?
-3. 한글 상품명을 라벨에 인쇄하려면 어떤 폰트 설정이 필요한가요?
+1. 판매 내역을 상품별(상품코드/바코드, 수량, 금액, 일시)로 엑셀 다운로드할 수 있나요?
+2. 등록된 상품 목록을 상품 코드 포함해서 엑셀로 내려받을 수 있나요?
+3. 상품·판매 데이터를 API나 웹훅으로 받을 수 있나요?
+4. 대량작업 양식의 ‘상품단가’ 칸은 원가인가요, 판매 단가인가요?
 
 감사합니다.`;
+
+const HIEL_ASK = `안녕하세요, 히엘페이 결제를 사용 중인 소품샵(${SHOP_NAME})입니다.
+
+1. 카드 승인·정산 내역을 엑셀로 내려받을 수 있는 가맹점 페이지가 있나요?
+2. 결제 내역을 API나 웹훅으로 받아볼 수 있나요?
+3. 결제 내역에 키오스크 주문 번호나 상품 정보가 함께 남나요?
+
+감사합니다.`;
+
+const STATUS = [
+  { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "앱에서 등록·수정 → 빅솔론 대량등록 엑셀 → 빅솔론에 업로드" },
+  { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "빅솔론 상품 목록 엑셀 → 앱으로 가져오기 (상품 코드 맞추기)" },
+  { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "바코드 라벨 · 가격표 → 빅솔론 프린터로 인쇄" },
+  { tone: "bg-butter-100 text-butter-700", mark: "파일만 주시면", text: "빅솔론 판매내역 엑셀 → 재고 자동 차감 + 매출 통계" },
+  { tone: "bg-butter-100 text-butter-700", mark: "파일만 주시면", text: "히엘페이 정산 엑셀 → 일/월 카드 매출 · 수수료" },
+  { tone: "bg-berry-100 text-berry-700", mark: "업체 협조 필요", text: "엑셀 없이 실시간 자동 연동 (빅솔론·히엘페이 모두 공개 API 없음)" },
+];
 
 export default function GuidePage() {
   const toast = useToast();
@@ -38,64 +48,78 @@ export default function GuidePage() {
     <div>
       <PageHeader back title="연동 안내" sub="빅솔론 · 히엘페이" />
       <div className="space-y-4 text-[15px] leading-relaxed">
+        <section className="card space-y-2 p-4">
+          <p className="font-cute text-xl">한눈에 보기</p>
+          <ul className="space-y-2">
+            {STATUS.map((s) => (
+              <li key={s.text} className="flex items-start gap-2 text-sm">
+                <span className={`badge mt-0.5 shrink-0 ${s.tone}`}>{s.mark}</span>
+                <span>{s.text}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
         <section className="card space-y-3 p-4">
-          <p className="font-cute text-xl">💳 히엘페이 (결제 · 키오스크)</p>
-          <div className="rounded-2xl bg-butter-100 p-3 text-sm">
-            <b>조사 결과:</b> 공개된 개발자 API 문서는 찾지 못했어요. 히엘페이 홈페이지에서도 상품 등록은 “문자 · 카카오톡 ·
-            이메일로 요청하면 히엘페이가 세팅해 준다”고 안내하고 있어요.
+          <p className="font-cute text-xl">🖥️ 빅솔론 (키오스크 · 상품 관리)</p>
+          <div className="rounded-2xl bg-soda-100 p-3 text-sm">
+            <b>조사 결과:</b> 빅솔론은 키오스크(K1 등)와 프린터를 만드는 회사예요. 상품·매출 데이터를 주고받는 공개 API나
+            개발자 문서는 찾지 못했어요 (공개된 개발 도구는 프린터 인쇄용 Web Print SDK뿐이에요). 그래서{" "}
+            <b>대량작업 엑셀이 공식 연결 통로</b>예요.
           </div>
-          <p className="font-cute">그래서 이 앱에서는 이렇게 연결해요</p>
+          <p className="font-cute">상품 올리는 순서</p>
           <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-soft">
-            <li>상품을 이 앱에 등록하면 ‘키오스크 반영 필요’ 표시가 붙어요.</li>
+            <li>이 앱에서 상품을 등록·수정하면 ‘빅솔론 반영 필요’ 표시가 붙어요.</li>
             <li>
               <Link href="/excel" className="font-semibold text-berry-600 underline">
                 엑셀 화면
               </Link>
-              에서 보내주신 키오스크 양식 그대로 엑셀을 만들어요.
+              에서 대량등록 엑셀을 받아요 (보내주신 양식과 칸·색·서식 동일).
             </li>
-            <li>관리자 페이지에 업로드하거나, ‘카톡으로 보내기’로 히엘페이에 바로 보내요.</li>
-            <li>반영되면 ‘반영 완료’를 눌러 표시를 지워요.</li>
+            <li>빅솔론 관리 프로그램의 대량 작업에 업로드해요.</li>
+            <li>‘반영 완료’를 누르면 표시가 사라져요. 다음에 가격 등을 고치면 다시 떠요.</li>
           </ol>
-          <p className="text-sm text-ink-soft">
-            매출 데이터를 자동으로 받아와 재고를 빼는 기능은, 히엘페이가 매출 엑셀이나 API를 주면 추가할 수 있어요. 아래
-            문구로 문의해 보세요.
+          <div className="rounded-2xl bg-cream p-3 text-sm text-ink-soft">
+            <b className="text-ink">상품 코드 팁</b> · 이미 빅솔론에 있는 상품은 빅솔론이 붙인 상품 코드(예: S000005)가 엑셀에
+            들어가야 새로 생기지 않고 수정돼요. 빅솔론에서 상품 목록을 엑셀로 내려받아 앱에서 ‘가져오기’ 하면 코드가 자동으로
+            채워져요.
+          </div>
+          <div className="rounded-2xl bg-butter-100 p-3 text-sm">
+            <b>판매 → 재고 자동 차감</b> · 빅솔론에서 <b>상품별 판매내역 엑셀</b>을 받을 수 있으면, 그 파일 하나만 보내주세요.
+            올리기만 하면 팔린 만큼 재고가 빠지고 많이 팔린 상품·일별 매출이 보이게 붙여 드릴게요.
+          </div>
+          <div className="rounded-2xl border-2 border-dashed border-line bg-cream p-3 text-xs whitespace-pre-wrap text-ink-soft">
+            {BIXOLON_ASK}
+          </div>
+          <button type="button" className="btn-soft btn-sm w-full" onClick={() => copy(BIXOLON_ASK)}>
+            <Copy size={16} /> 빅솔론(설치 업체) 문의 문구 복사
+          </button>
+          <p className="text-xs text-ink-soft">
+            🖨️ 라벨 인쇄: 빅솔론 프린터 드라이버가 깔린 PC에서{" "}
+            <Link href="/labels" className="font-semibold text-berry-600 underline">
+              라벨 · 가격표 인쇄
+            </Link>{" "}
+            → 인쇄 창에서 빅솔론 프린터를 고르면 돼요. 바코드 없는 소품은 ‘매장용 바코드’를 만들어 붙이면 키오스크 스캐너로
+            찍혀요.
           </p>
+        </section>
+
+        <section className="card space-y-3 p-4">
+          <p className="font-cute text-xl">💳 히엘페이 (카드 결제)</p>
+          <div className="rounded-2xl bg-butter-100 p-3 text-sm">
+            <b>조사 결과:</b> 공개된 개발자 API 문서는 없어요. 결제는 키오스크 안에서 끝나기 때문에 이 앱이 결제에 직접 붙을
+            일은 거의 없어요.
+          </div>
+          <div className="rounded-2xl bg-cream p-3 text-sm text-ink-soft">
+            <b className="text-ink">꼭 알아둘 점</b> · 카드 승인 내역에는 <b className="text-ink">‘얼마’</b>만 있고{" "}
+            <b className="text-ink">‘무슨 상품’</b>은 없어요. 그래서 재고를 빼려면 히엘페이가 아니라 <b className="text-ink">빅솔론 판매내역</b>
+            이 필요해요. 히엘페이 정산 엑셀은 일·월 매출과 카드 수수료를 보는 데 쓸 수 있어요.
+          </div>
           <div className="rounded-2xl border-2 border-dashed border-line bg-cream p-3 text-xs whitespace-pre-wrap text-ink-soft">
             {HIEL_ASK}
           </div>
           <button type="button" className="btn-soft btn-sm w-full" onClick={() => copy(HIEL_ASK)}>
             <Copy size={16} /> 히엘페이 문의 문구 복사
-          </button>
-        </section>
-
-        <section className="card space-y-3 p-4">
-          <p className="font-cute text-xl">🖨️ 빅솔론 (프린터 · 키오스크 기기)</p>
-          <div className="rounded-2xl bg-soda-100 p-3 text-sm">
-            <b>조사 결과:</b> 빅솔론은 영수증·라벨 프린터와 키오스크(BIXPOS) 기기를 만드는 회사예요. 웹에서 쓸 수 있는 공식
-            도구로 <b>Web Print SDK</b>(자바스크립트)가 있어요. 기기에 ‘Web Print SDK’ 앱(윈도우 · 안드로이드 · iOS)을 깔면,
-            브라우저가 그 앱(<code>127.0.0.1:18080</code>)으로 인쇄를 요청하는 방식이에요.
-          </div>
-          <p className="font-cute">지금 바로 되는 것</p>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-ink-soft">
-            <li>
-              <Link href="/labels" className="font-semibold text-berry-600 underline">
-                라벨 · 가격표 인쇄
-              </Link>
-              : 빅솔론 드라이버가 깔린 PC에서 인쇄 창 → 빅솔론 프린터 선택하면 바로 인쇄돼요.
-            </li>
-            <li>바코드 없는 소품은 ‘매장용 바코드’(200으로 시작하는 EAN-13)를 만들어 붙이면 키오스크 스캐너로 찍혀요.</li>
-            <li>USB · 블루투스 바코드 스캐너를 PC에 꽂고 아무 화면에서나 찍으면 그 상품이 바로 떠요.</li>
-          </ul>
-          <p className="font-cute">다음 단계로 할 수 있는 것</p>
-          <p className="text-sm text-ink-soft">
-            쓰고 계신 빅솔론 기기 <b>모델명</b>(기기 뒷면 스티커, 예: SLP-TX400, XD3-40d, BK3-3)을 알려주시면 Web Print SDK로 인쇄
-            창 없이 버튼 한 번에 라벨이 나오게 연결해 드릴게요.
-          </p>
-          <div className="rounded-2xl border-2 border-dashed border-line bg-cream p-3 text-xs whitespace-pre-wrap text-ink-soft">
-            {BIXOLON_ASK}
-          </div>
-          <button type="button" className="btn-soft btn-sm w-full" onClick={() => copy(BIXOLON_ASK)}>
-            <Copy size={16} /> 빅솔론 문의 문구 복사
           </button>
         </section>
       </div>

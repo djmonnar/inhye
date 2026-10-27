@@ -25,7 +25,7 @@ export default function LoginPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- read device preference once mounted
     setRemember(getRemember());
     try {
-      const last = localStorage.getItem("mongsil.lastId");
+      const last = localStorage.getItem("popo.lastId");
       if (last) setId(last);
     } catch {
       /* ignore */
@@ -47,7 +47,7 @@ export default function LoginPage() {
     try {
       await store().signIn(id, pw, remember);
       try {
-        localStorage.setItem("mongsil.lastId", id.trim());
+        localStorage.setItem("popo.lastId", id.trim());
       } catch {
         /* ignore */
       }
@@ -71,7 +71,7 @@ export default function LoginPage() {
             </span>
           </div>
           <h1 className="mt-2 font-cute text-4xl text-berry-600">{APP_NAME}</h1>
-          <p className="mt-1 text-sm text-ink-soft">우리 소품샵 상품 · 구매처 · 재고를 한 곳에</p>
+          <p className="mt-1 text-sm text-ink-soft">소품 · 구매처 · 재고를 한 곳에</p>
         </div>
 
         <form onSubmit={submit} className="card space-y-4 p-5">

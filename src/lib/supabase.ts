@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { LOGIN_DOMAIN, SUPABASE_KEY, SUPABASE_URL } from "./config";
 
-const REMEMBER_KEY = "mongsil.remember";
+const REMEMBER_KEY = "popo.remember";
 
 /** 자동 로그인: on → session lives in localStorage, off → only this tab (sessionStorage). */
 export function setRemember(on: boolean) {
@@ -60,7 +60,7 @@ export function supabase(): SupabaseClient {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: false,
-        storageKey: "mongsil.auth",
+        storageKey: "popo.auth",
         storage: typeof window === "undefined" ? undefined : rememberAwareStorage,
       },
     });

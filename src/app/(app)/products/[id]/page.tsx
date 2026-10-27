@@ -114,7 +114,7 @@ export default function ProductDetailPage() {
             <div className="flex flex-wrap items-center gap-1.5">
               <StockBadge product={product} />
               {!product.is_active && <span className="badge bg-ink/10 text-ink-soft">판매 중지</span>}
-              {needsKioskSync(product) && <span className="badge bg-soda-100 text-soda-700">키오스크 반영 필요</span>}
+              {needsKioskSync(product) && <span className="badge bg-soda-100 text-soda-700">빅솔론 반영 필요</span>}
               {product.tags.map((t) => (
                 <span key={t} className="badge bg-berry-50 text-berry-600">
                   #{t}
@@ -245,14 +245,14 @@ export default function ProductDetailPage() {
           </div>
         </section>
 
-        {/* 메모 / 키오스크 */}
+        {/* 메모 / 빅솔론 */}
         {(product.memo || product.kiosk_code || product.description) && (
           <section className="card space-y-2 p-4 text-sm">
             {product.memo && <p className="whitespace-pre-wrap">📝 {product.memo}</p>}
             {product.description && <p className="whitespace-pre-wrap text-ink-soft">{product.description}</p>}
             {product.kiosk_code && (
               <p className="text-ink-soft">
-                키오스크 코드 <span className="font-mono text-ink">{product.kiosk_code}</span>
+                빅솔론 상품 코드 <span className="font-mono text-ink">{product.kiosk_code}</span>
               </p>
             )}
           </section>
