@@ -1,0 +1,35 @@
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { LOGIN_DOMAIN, SUPABASE_KEY, SUPABASE_URL } from "../config";
+
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY ?? "";
+
+export const hasServiceKey = () => Boolean(SUPABASE_URL && SERVICE_KEY);
+
+export function adminClient(): SupabaseClient {
+  return createClient(SUPABASE_URL, SERVICE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+export function emailFor(username: string): string {
+  return `${username.trim().toLowerCase()}@${LOGIN_DOMAIN}`;
+}
+
+export function json(body: unknown, status = 200) {
+  return Response.json(body, { status });
+}
+
+/** Returns the caller's id when the bearer token belongs to an admin. */
+export async function requireAdmin(req: Request): Promise<string | Response> {
+  if (!hasServiceKey()) {
+    return json({ error: "서버에 SUPABASE_SERVICE_ROLE_KEY가 설정되지 않았어요. Vercel 환경변수를 확인해 주세요." }, 501);
+  }
+  const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (!token) return json({ error: "로그인이 필요해요." }, 401);
+  const anon = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+  const { data, error } = await anon.auth.getUser(token);
+  if (error || !data.user) return json({ error: "로그인이 만료됐어요. 다시 로그인해 주세요." }, 401);
+  const { data: profile } = await adminClient().from("profiles").select("role").eq("id", data.user.id).maybeSingle();
+  if (profile?.role !== "admin") return json({ error: "관리자만 할 수 있어요." }, 403);
+  return data.user.id;
+}

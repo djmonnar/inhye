@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --font-cute: "Jua", "Pretendard Variable", sans-serif;
+
+  --color-cream: #fff8ef;
+  --color-cream-deep: #fcefe1;
+  --color-ink: #4a3a30;
+  --color-ink-soft: #8a7566;
+  --color-ink-faint: #b9a797;
+  --color-line: #f0dfd1;
+
+  --color-berry-50: #fff3f6;
+  --color-berry-100: #ffe3eb;
+  --color-berry-200: #ffcbd9;
+  --color-berry-300: #ffb0c4;
+  --color-berry-400: #ff94af;
+  --color-berry-500: #f2789a;
+  --color-berry-600: #d95f82;
+  --color-berry-700: #b44a69;
+
+  --color-soda-100: #e3f3fc;
+  --color-soda-300: #a9d9f2;
+  --color-soda-500: #4fa7d6;
+  --color-soda-700: #2f7aa3;
+
+  --color-butter-100: #fff6d6;
+  --color-butter-300: #ffe38a;
+  --color-butter-500: #e9b52c;
+  --color-butter-700: #a37a10;
+
+  --color-matcha-100: #e2f7ec;
+  --color-matcha-300: #a8e6c4;
+  --color-matcha-500: #3fae78;
+  --color-matcha-700: #2a7d55;
+
+  --color-danger: #e0526a;
+
+  --radius-blob: 1.75rem;
+  --shadow-pop: 0 3px 0 0 #f0d7c6;
+  --shadow-pop-berry: 0 3px 0 0 #d95f82;
+  --shadow-soft: 0 6px 24px -10px rgb(74 58 48 / 0.18);
+
+  --animate-wiggle: wiggle 0.6s ease-in-out;
+  --animate-pop-in: pop-in 0.28s cubic-bezier(0.2, 1.4, 0.4, 1);
+  --animate-slide-up: slide-up 0.28s cubic-bezier(0.2, 1, 0.3, 1);
+  --animate-float: float 3s ease-in-out infinite;
+
+  @keyframes wiggle {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-8deg); }
+    75% { transform: rotate(8deg); }
+  }
+  @keyframes pop-in {
+    from { transform: scale(0.85); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  @keyframes slide-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+}
+
+:root {
+  color-scheme: light;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-sans);
+  min-height: 100dvh;
+  overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
+  word-break: keep-all;
+}
+
+@layer base {
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+/* iOS zooms into inputs under 16px — deliberately unlayered so it always wins */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+@utility btn {
+  @apply inline-flex select-none items-center justify-center gap-1.5 rounded-2xl border-2 px-4 font-cute text-[15px] transition active:translate-y-[2px] disabled:pointer-events-none disabled:opacity-50;
+  min-height: 2.75rem;
+}
+
+@layer components {
+  .card {
+    @apply rounded-3xl border-2 border-line bg-white;
+    box-shadow: var(--shadow-pop);
+  }
+
+  .btn-primary {
+    @apply btn border-berry-600 bg-berry-500 text-white;
+    box-shadow: var(--shadow-pop-berry);
+  }
+  .btn-primary:active {
+    box-shadow: 0 1px 0 0 var(--color-berry-600);
+  }
+  .btn-soft {
+    @apply btn border-line bg-white text-ink;
+    box-shadow: var(--shadow-pop);
+  }
+  .btn-soft:active {
+    box-shadow: 0 1px 0 0 #f0d7c6;
+  }
+  .btn-ghost {
+    @apply btn border-transparent bg-transparent text-ink-soft;
+  }
+  .btn-danger {
+    @apply btn border-danger/30 bg-white text-danger;
+  }
+  .btn-sm {
+    min-height: 2.25rem;
+    @apply rounded-xl px-3 text-sm;
+  }
+
+  .input {
+    @apply w-full rounded-2xl border-2 border-line bg-white px-4 py-2.5 outline-none transition placeholder:text-ink-faint focus:border-berry-300 focus:ring-4 focus:ring-berry-100;
+  }
+
+  .label {
+    @apply mb-1.5 block font-cute text-[15px] text-ink;
+  }
+
+  .chip {
+    @apply inline-flex shrink-0 items-center gap-1 rounded-full border-2 border-line bg-white px-3 py-1 text-sm text-ink-soft transition;
+  }
+  .chip[data-on="true"] {
+    @apply border-berry-400 bg-berry-100 text-berry-700;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-semibold;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .pb-nav {
+    padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+  }
+
+  .dotted-bg {
+    background-image: radial-gradient(var(--color-berry-200) 1.2px, transparent 1.2px);
+    background-size: 18px 18px;
+  }
+}
+
+/* Printing: only the label sheet (#print-root, portaled into <body>) is printed. */
+#print-root {
+  display: none;
+}
+@media print {
+  body > :not(#print-root) {
+    display: none !important;
+  }
+  #print-root {
+    display: block;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+}
