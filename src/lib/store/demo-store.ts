@@ -2,6 +2,7 @@ import { createStore, get, set } from "idb-keyval";
 import { setRemember, getRemember } from "../supabase";
 import type {
   AppUser,
+  PrintJob,
   Product,
   ProductInput,
   StockMove,
@@ -281,6 +282,58 @@ export function createDemoStore(): DataStore {
 
     async deleteMember() {
       throw new StoreError("체험 모드에서는 사용할 수 없어요.");
+    },
+
+    async listPrintJobs(which) {
+      const jobs = await load<PrintJob[]>("printJobs", []);
+      return which === "pending"
+        ? jobs.filter((j) => j.status === "pending" || j.status === "printing").sort((a, b) => a.created_at.localeCompare(b.created_at))
+        : jobs
+            .filter((j) => j.status === "done" || j.status === "failed")
+            .sort((a, b) => (b.printed_at ?? "").localeCompare(a.printed_at ?? ""))
+            .slice(0, 30);
+    },
+
+    async addPrintJobs(items, requestedBy) {
+      const jobs = await load<PrintJob[]>("printJobs", []);
+      const now = new Date().toISOString();
+      for (const i of items) {
+        jobs.push({
+          ...i, id: crypto.randomUUID(), status: "pending", requested_by_name: requestedBy, error: null,
+          created_at: now, claimed_at: null, printed_at: null,
+        });
+      }
+      await save("printJobs", jobs);
+    },
+
+    async claimPrintJobs() {
+      const jobs = await load<PrintJob[]>("printJobs", []);
+      const now = new Date();
+      const stale = (j: PrintJob) => j.status === "printing" && j.claimed_at && now.getTime() - new Date(j.claimed_at).getTime() > 120000;
+      const claimed: PrintJob[] = [];
+      const next = jobs.map((j) => {
+        if (j.status !== "pending" && !stale(j)) return j;
+        const c = { ...j, status: "printing" as const, claimed_at: now.toISOString(), error: null };
+        claimed.push(c);
+        return c;
+      });
+      await save("printJobs", next);
+      return claimed.sort((a, b) => a.created_at.localeCompare(b.created_at));
+    },
+
+    async finishPrintJobs(ids, ok, errorText) {
+      const set_ = new Set(ids);
+      const jobs = await load<PrintJob[]>("printJobs", []);
+      const now = new Date().toISOString();
+      await save(
+        "printJobs",
+        jobs.map((j) => (set_.has(j.id) ? { ...j, status: ok ? "done" : "failed", printed_at: now, error: ok ? null : errorText ?? null } : j)),
+      );
+    },
+
+    async deletePrintJob(id) {
+      const jobs = await load<PrintJob[]>("printJobs", []);
+      await save("printJobs", jobs.filter((j) => j.id !== id));
     },
   };
   return store;

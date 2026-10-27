@@ -100,3 +100,25 @@ export interface MemberInput {
 }
 
 export type BulkProductRow = Partial<ProductInput> & { id?: string; name: string };
+
+export type PrintStyle = "label" | "price";
+export type PrintStatus = "pending" | "printing" | "done" | "failed";
+
+export interface PrintJob {
+  id: string;
+  product_id: string;
+  copies: number;
+  style: PrintStyle;
+  status: PrintStatus;
+  requested_by_name: string | null;
+  error: string | null;
+  created_at: string;
+  claimed_at: string | null;
+  printed_at: string | null;
+}
+
+export interface PrintRequest {
+  product_id: string;
+  copies: number;
+  style: PrintStyle;
+}

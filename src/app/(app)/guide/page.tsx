@@ -28,6 +28,7 @@ const STATUS = [
   { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "앱에서 등록·수정 → 빅솔론 대량등록 엑셀 → 빅솔론에 업로드" },
   { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "빅솔론 상품 목록 엑셀 → 앱으로 가져오기 (상품 코드 맞추기)" },
   { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "바코드 라벨 · 가격표 → Xprinter로 인쇄 (PC 인쇄 창 · 안드로이드 USB 직접)" },
+  { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "폰(아이폰 포함)에서 보내면 노트북 인쇄 스테이션이 자동 인쇄" },
   { tone: "bg-butter-100 text-butter-700", mark: "파일만 주시면", text: "빅솔론 판매내역 엑셀 → 재고 자동 차감 + 매출 통계" },
   { tone: "bg-butter-100 text-butter-700", mark: "파일만 주시면", text: "히엘페이 정산 엑셀 → 일/월 카드 매출 · 수수료" },
   { tone: "bg-berry-100 text-berry-700", mark: "업체 협조 필요", text: "엑셀 없이 실시간 자동 연동 (빅솔론·히엘페이 모두 공개 API 없음)" },
@@ -111,13 +112,21 @@ export default function GuidePage() {
               에서 ‘인쇄 창 (PC)’ → 프린터는 Xprinter, 용지는 라벨 크기로 선택.
             </li>
             <li>
+              <b className="text-ink">노트북에 꽂아두고 폰으로 보내기 (아이폰도 OK)</b> · 노트북에서{" "}
+              <Link href="/print-station" className="font-semibold text-berry-600 underline">
+                인쇄 스테이션
+              </Link>
+              을 띄우고 ‘자동 인쇄’ 켜기 → 폰에서 상품 화면 ‘노트북으로 라벨 보내기’ 또는 라벨 화면 ‘📡 노트북으로’. 새 상품 등록할 때
+              ‘등록하면 라벨도 보내기’를 켜두면 재고만큼 자동으로 나와요.
+            </li>
+            <li>
               <b className="text-ink">안드로이드 폰·태블릿에 꽂기</b> · OTG 젠더(C타입 → USB-A)로 연결 → 크롬으로 이 앱 열기 →
               라벨 화면 ‘USB 바로 (폰)’ → 연결 → 바로 인쇄. 드라이버 없이 한글 상품명도 그대로 찍혀요.
             </li>
           </ol>
           <div className="rounded-2xl bg-cream p-3 text-sm text-ink-soft">
-            <b className="text-ink">안 되는 것</b> · 아이폰(사파리는 USB 기기 연결이 안 돼요) · 무선 인쇄(이 모델엔 블루투스·와이파이가
-            없어요). 무선이 꼭 필요하면 같은 계열 LAN·와이파이 모델이 있지만, 웹앱에서 쓰려면 결국 PC 드라이버를 거쳐야 해요.
+            <b className="text-ink">안 되는 것</b> · 아이폰에 프린터 직접 꽂기(아이폰은 모든 브라우저가 USB 연결을 막아요 → 대신 노트북으로
+            보내기) · 무선 인쇄(이 모델엔 블루투스·와이파이가 없어요). 무선이 꼭 필요하면 같은 계열 LAN·와이파이 모델이 있지만, 웹앱에서 쓰려면 결국 PC 드라이버를 거쳐야 해요.
           </div>
           <p className="text-xs text-ink-soft">
             처음 한 번은 ‘USB 바로 → 인쇄 설정 → 테스트 라벨’로 위치와 간격을 맞춰 주세요. 바코드 없는 소품은 ‘매장용 바코드’를

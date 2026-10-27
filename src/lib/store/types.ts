@@ -4,6 +4,8 @@ import type {
   Member,
   MemberInput,
   MoveInput,
+  PrintJob,
+  PrintRequest,
   Product,
   ProductInput,
   Role,
@@ -42,6 +44,14 @@ export interface DataStore {
   createMember(input: MemberInput): Promise<void>;
   updateMember(id: string, patch: { role?: Role; password?: string; display_name?: string }): Promise<void>;
   deleteMember(id: string): Promise<void>;
+
+  /** "pending" = waiting or being printed; "recent" = finished (newest first). */
+  listPrintJobs(which: "pending" | "recent"): Promise<PrintJob[]>;
+  addPrintJobs(items: PrintRequest[], requestedBy: string): Promise<void>;
+  /** Atomically takes waiting jobs (pending → printing) so two stations never double-print. */
+  claimPrintJobs(): Promise<PrintJob[]>;
+  finishPrintJobs(ids: string[], ok: boolean, error?: string): Promise<void>;
+  deletePrintJob(id: string): Promise<void>;
 }
 
 export class StoreError extends Error {}

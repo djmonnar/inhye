@@ -35,6 +35,7 @@ export default function MorePage() {
   const items = [
     { href: "/excel", icon: FileSpreadsheet, label: "엑셀 · 빅솔론 대량등록", desc: "빅솔론 대량작업 엑셀 내보내기/가져오기, 백업" },
     { href: "/labels", icon: Printer, label: "바코드 라벨 · 가격표 인쇄", desc: "바코드 없는 상품에 붙일 라벨 만들기" },
+    { href: "/print-station", icon: Printer, label: "인쇄 스테이션 (노트북)", desc: "폰에서 보낸 라벨을 노트북이 자동으로 인쇄" },
     { href: "/suppliers", icon: Store, label: "구매처 관리", desc: "소품 산 곳 모아보기" },
     { href: "/history", icon: History, label: "입고 · 출고 기록", desc: "언제 무엇이 들어오고 나갔는지" },
     ...(user?.role === "admin"

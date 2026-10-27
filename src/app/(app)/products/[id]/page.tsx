@@ -10,6 +10,7 @@ import {
   Phone,
   Plus,
   Printer,
+  Send,
   ShoppingBasket,
   Trash2,
 } from "lucide-react";
@@ -18,6 +19,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { BarcodeSvg } from "@/components/BarcodeSvg";
 import { useAuth, useToast } from "@/components/providers";
+import { SendLabelSheet } from "@/components/SendLabelSheet";
 import { StockSheet } from "@/components/StockSheet";
 import { KIND_LABEL, KIND_STYLE } from "@/components/SupplierSheet";
 import {
@@ -45,6 +47,7 @@ export default function ProductDetailPage() {
   const suppliers = useSupplierMap();
   const { data: moves = [] } = useMoves(id, 30);
   const [stockOpen, setStockOpen] = useState<null | "in" | "out" | "set">(null);
+  const [sendOpen, setSendOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [quickBusy, setQuickBusy] = useState(false);
 
@@ -291,6 +294,9 @@ export default function ProductDetailPage() {
           )}
         </section>
 
+        <button type="button" className="btn-soft w-full border-soda-300 bg-soda-100 text-soda-700" onClick={() => setSendOpen(true)}>
+          <Send size={18} /> 노트북으로 라벨 보내기
+        </button>
         <div className="grid grid-cols-2 gap-2">
           <Link href={`/labels?ids=${product.id}`} className="btn-soft">
             <Printer size={18} /> 라벨 인쇄
@@ -314,6 +320,7 @@ export default function ProductDetailPage() {
         </p>
       </div>
 
+      <SendLabelSheet product={product} open={sendOpen} onClose={() => setSendOpen(false)} />
       <StockSheet
         product={product}
         open={stockOpen !== null}

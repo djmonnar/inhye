@@ -20,6 +20,15 @@ export function useMoves(productId?: string, limit = 100) {
   });
 }
 
+export function usePrintJobs(which: "pending" | "recent", pollMs: number | false = false) {
+  return useQuery({
+    queryKey: ["print-jobs", which],
+    queryFn: () => store().listPrintJobs(which),
+    refetchInterval: pollMs,
+    refetchIntervalInBackground: true,
+  });
+}
+
 export function useProduct(id: string | undefined): { product: Product | undefined; isLoading: boolean } {
   const { data, isLoading } = useProducts();
   return { product: data?.find((p) => p.id === id), isLoading };
@@ -43,7 +52,7 @@ export function useCategories(): string[] {
 export function useRefresh() {
   const qc = useQueryClient();
   return useCallback(
-    (...keys: ("products" | "suppliers" | "moves" | "members")[]) =>
+    (...keys: ("products" | "suppliers" | "moves" | "members" | "print-jobs")[]) =>
       Promise.all(keys.map((k) => qc.invalidateQueries({ queryKey: [k] }))),
     [qc],
   );

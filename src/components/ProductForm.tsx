@@ -20,7 +20,8 @@ import { useCategories, useProducts, useRefresh, useSuppliers } from "@/lib/quer
 import { store } from "@/lib/store";
 import type { Product, ProductInput, Supplier, SupplierInput } from "@/lib/types";
 import { BarcodeScanner } from "./BarcodeScanner";
-import { useToast } from "./providers";
+import { readPref, writePref } from "./labels";
+import { useAuth, useToast } from "./providers";
 import { SupplierSheet } from "./SupplierSheet";
 import { Field, MoneyInput, PageHeader, Sheet, Stepper, Toggle } from "./ui";
 
@@ -77,6 +78,8 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
 
   const [f, setF] = useState<ProductInput>(() => (product ? toInput(product) : emptyProduct(initial)));
   const [initialStock, setInitialStock] = useState(initial?.stock_qty ?? 0);
+  const { user } = useAuth();
+  const [sendLabel, setSendLabel] = useState(false);
   const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [photoRemoved, setPhotoRemoved] = useState(false);
   const [compressing, setCompressing] = useState(false);
@@ -90,6 +93,11 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
   useEffect(() => () => {
     if (photo) URL.revokeObjectURL(photo.url);
   }, [photo]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- remembered per device
+    if (!product) setSendLabel(readPref("popo.autoSendLabel") === "1");
+  }, [product]);
 
   const m = margin(f.cost_price, f.sale_price);
   const duplicate = useMemo(() => {
@@ -175,8 +183,18 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
         });
       }
       if (oldImage && oldImage !== image_path) await store().removeImage(oldImage).catch(() => {});
-      await refresh("products", "moves");
-      toast(product ? "수정했어요!" : "새 상품을 등록했어요!", "wow");
+      let sent = 0;
+      if (!product && sendLabel && saved.barcode) {
+        sent = Math.min(500, Math.max(1, initialStock));
+        await store()
+          .addPrintJobs([{ product_id: saved.id, copies: sent, style: "label" }], user?.display_name ?? "")
+          .catch(() => (sent = 0));
+      }
+      await refresh("products", "moves", "print-jobs");
+      toast(
+        product ? "수정했어요!" : sent ? `등록 완료! 라벨 ${sent}장 노트북으로 보냈어요` : "새 상품을 등록했어요!",
+        "wow",
+      );
       router.replace(`/products/${saved.id}`);
     } catch (e) {
       if (uploaded) await store().removeImage(uploaded).catch(() => {});
@@ -482,6 +500,17 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
               {(id) => <Stepper id={id} value={f.safety_stock} onChange={(v) => set("safety_stock", v)} />}
             </Field>
           </div>
+          {!product && (
+            <Toggle
+              checked={sendLabel}
+              onChange={(v) => {
+                setSendLabel(v);
+                writePref("popo.autoSendLabel", v ? "1" : "0");
+              }}
+              label="등록하면 라벨도 노트북으로 보내기"
+              desc={f.barcode ? `처음 재고만큼 (${Math.max(1, initialStock)}장)` : "바코드가 있을 때만 보내요"}
+            />
+          )}
         </section>
 
         {/* 빅솔론 */}

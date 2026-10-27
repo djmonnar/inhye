@@ -256,6 +256,62 @@ drop policy if exists "moves delete" on public.stock_moves;
 create policy "moves delete" on public.stock_moves for delete to authenticated using (public.is_admin());
 
 -- ---------------------------------------------------------------------
+-- 5-1. 라벨 인쇄 대기열 (폰에서 보내면 노트북 ‘인쇄 스테이션’이 뽑아요)
+-- ---------------------------------------------------------------------
+create table if not exists public.print_jobs (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid not null references public.products (id) on delete cascade,
+  copies integer not null default 1 check (copies between 1 and 500),
+  style text not null default 'label' check (style in ('label', 'price')),
+  status text not null default 'pending' check (status in ('pending', 'printing', 'done', 'failed')),
+  requested_by_name text,
+  error text,
+  created_by uuid default auth.uid() references auth.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  claimed_at timestamptz,
+  printed_at timestamptz
+);
+
+create index if not exists print_jobs_status_idx on public.print_jobs (status, created_at);
+
+alter table public.print_jobs enable row level security;
+grant select, insert, update, delete on public.print_jobs to authenticated;
+
+drop policy if exists "print jobs read" on public.print_jobs;
+create policy "print jobs read" on public.print_jobs for select to authenticated using (public.is_member());
+drop policy if exists "print jobs insert" on public.print_jobs;
+create policy "print jobs insert" on public.print_jobs for insert to authenticated with check (public.is_member());
+drop policy if exists "print jobs update" on public.print_jobs;
+create policy "print jobs update" on public.print_jobs for update to authenticated
+  using (public.is_member()) with check (public.is_member());
+drop policy if exists "print jobs delete" on public.print_jobs;
+create policy "print jobs delete" on public.print_jobs for delete to authenticated using (public.is_member());
+
+-- 대기 중인 인쇄를 한 번에 가져가요. 인쇄 스테이션이 두 대여도 같은 라벨을 두 번 뽑지 않아요.
+-- (2분 넘게 ‘인쇄 중’으로 멈춘 건 다시 가져가요)
+create or replace function public.claim_print_jobs(p_limit integer default 50)
+returns setof public.print_jobs
+language plpgsql security invoker set search_path = public as $$
+begin
+  if not public.is_member() then
+    raise exception '권한이 없어요';
+  end if;
+  return query
+  update public.print_jobs j
+     set status = 'printing', claimed_at = now(), error = null
+   where j.id in (
+     select id from public.print_jobs
+      where status = 'pending' or (status = 'printing' and claimed_at < now() - interval '2 minutes')
+      order by created_at
+      limit p_limit
+      for update skip locked
+   )
+  returning j.*;
+end $$;
+
+grant execute on function public.claim_print_jobs(integer) to authenticated;
+
+-- ---------------------------------------------------------------------
 -- 6. 상품 사진 저장소 (공개 읽기, 직원만 업로드)
 -- ---------------------------------------------------------------------
 insert into storage.buckets (id, name, public)

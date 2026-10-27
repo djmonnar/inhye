@@ -5,6 +5,7 @@ import type {
   AppUser,
   BulkProductRow,
   Member,
+  PrintJob,
   Product,
   ProductInput,
   Supplier,
@@ -241,6 +242,45 @@ export function createSupabaseStore(): DataStore {
 
     async deleteMember(id) {
       await api("/api/members", "DELETE", { id });
+    },
+
+    async listPrintJobs(which) {
+      let q = sb.from("print_jobs").select("*");
+      q =
+        which === "pending"
+          ? q.in("status", ["pending", "printing"]).order("created_at", { ascending: true })
+          : q.in("status", ["done", "failed"]).order("printed_at", { ascending: false }).limit(30);
+      const { data, error } = await q;
+      if (error) fail(error);
+      return data as PrintJob[];
+    },
+
+    async addPrintJobs(items, requestedBy) {
+      if (!items.length) return;
+      const { error } = await sb
+        .from("print_jobs")
+        .insert(items.map((i) => ({ ...i, requested_by_name: requestedBy })));
+      if (error) fail(error);
+    },
+
+    async claimPrintJobs() {
+      const { data, error } = await sb.rpc("claim_print_jobs", { p_limit: 50 });
+      if (error) fail(error);
+      return (data ?? []) as PrintJob[];
+    },
+
+    async finishPrintJobs(ids, ok, errorText) {
+      if (!ids.length) return;
+      const { error } = await sb
+        .from("print_jobs")
+        .update({ status: ok ? "done" : "failed", printed_at: new Date().toISOString(), error: ok ? null : errorText ?? null })
+        .in("id", ids);
+      if (error) fail(error);
+    },
+
+    async deletePrintJob(id) {
+      const { error } = await sb.from("print_jobs").delete().eq("id", id);
+      if (error) fail(error);
     },
   };
 }

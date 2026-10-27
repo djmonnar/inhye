@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, FileSpreadsheet, PackagePlus, Plus, ScanBarcode, TriangleAlert } from "lucide-react";
+import { ChevronRight, FileSpreadsheet, PackagePlus, Plus, Printer, ScanBarcode, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import { Mascot } from "@/components/Mascot";
@@ -8,7 +8,7 @@ import { useAuth } from "@/components/providers";
 import { Loading, ProductThumb } from "@/components/ui";
 import { SHOP_NAME } from "@/lib/config";
 import { needsKioskSync, num, relTime, stockLevel, won } from "@/lib/format";
-import { useMoves, useProducts } from "@/lib/queries";
+import { useMoves, usePrintJobs, useProducts } from "@/lib/queries";
 
 function greeting() {
   const h = new Date().getHours();
@@ -21,6 +21,8 @@ export default function HomePage() {
   const { user } = useAuth();
   const { data: products, isLoading } = useProducts();
   const { data: moves = [] } = useMoves(undefined, 300);
+  const { data: printJobs = [] } = usePrintJobs("pending");
+  const printWaiting = printJobs.reduce((n, j) => n + j.copies, 0);
 
   const stats = useMemo(() => {
     const list = products ?? [];
@@ -98,6 +100,16 @@ export default function HomePage() {
             <p className="text-sm text-ink-soft">
               품절 {stats.out}개 · 품절 임박 {stats.low}개
             </p>
+          </div>
+          <ChevronRight className="text-ink-soft" />
+        </Link>
+      )}
+      {printWaiting > 0 && (
+        <Link href="/print-station" className="card flex items-center gap-3 border-berry-200 bg-berry-50 p-4">
+          <Printer className="shrink-0 text-berry-600" />
+          <div className="flex-1">
+            <p className="font-cute text-lg">라벨 인쇄 대기 {printWaiting}장</p>
+            <p className="text-sm text-ink-soft">노트북 인쇄 스테이션에서 뽑아요</p>
           </div>
           <ChevronRight className="text-ink-soft" />
         </Link>
