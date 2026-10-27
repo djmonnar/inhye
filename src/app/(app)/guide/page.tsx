@@ -27,7 +27,7 @@ const HIEL_ASK = `안녕하세요, 히엘페이 결제를 사용 중인 소품�
 const STATUS = [
   { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "앱에서 등록·수정 → 빅솔론 대량등록 엑셀 → 빅솔론에 업로드" },
   { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "빅솔론 상품 목록 엑셀 → 앱으로 가져오기 (상품 코드 맞추기)" },
-  { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "바코드 라벨 · 가격표 → 빅솔론 프린터로 인쇄" },
+  { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "바코드 라벨 · 가격표 → Xprinter로 인쇄 (PC 인쇄 창 · 안드로이드 USB 직접)" },
   { tone: "bg-butter-100 text-butter-700", mark: "파일만 주시면", text: "빅솔론 판매내역 엑셀 → 재고 자동 차감 + 매출 통계" },
   { tone: "bg-butter-100 text-butter-700", mark: "파일만 주시면", text: "히엘페이 정산 엑셀 → 일/월 카드 매출 · 수수료" },
   { tone: "bg-berry-100 text-berry-700", mark: "업체 협조 필요", text: "엑셀 없이 실시간 자동 연동 (빅솔론·히엘페이 모두 공개 API 없음)" },
@@ -94,13 +94,34 @@ export default function GuidePage() {
           <button type="button" className="btn-soft btn-sm w-full" onClick={() => copy(BIXOLON_ASK)}>
             <Copy size={16} /> 빅솔론(설치 업체) 문의 문구 복사
           </button>
+        </section>
+
+        <section className="card space-y-3 p-4">
+          <p className="font-cute text-xl">🏷️ 바코드 프린터 (Xprinter XP-T4501B)</p>
+          <div className="rounded-2xl bg-matcha-100 p-3 text-sm">
+            <b>이 기기는 USB 전용</b>이에요 (뒷면 라벨: INTERFACE USB+Cutter). 같은 계열에 랜·와이파이·블루투스 버전이 따로
+            있는데, 이 제품은 USB만 있어요. 그래도 USB로 두 가지 방법이 돼요.
+          </div>
+          <ol className="list-decimal space-y-1.5 pl-5 text-sm text-ink-soft">
+            <li>
+              <b className="text-ink">PC에 꽂기</b> · Xprinter 드라이버 설치 →{" "}
+              <Link href="/labels" className="font-semibold text-berry-600 underline">
+                라벨 화면
+              </Link>
+              에서 ‘인쇄 창 (PC)’ → 프린터는 Xprinter, 용지는 라벨 크기로 선택.
+            </li>
+            <li>
+              <b className="text-ink">안드로이드 폰·태블릿에 꽂기</b> · OTG 젠더(C타입 → USB-A)로 연결 → 크롬으로 이 앱 열기 →
+              라벨 화면 ‘USB 바로 (폰)’ → 연결 → 바로 인쇄. 드라이버 없이 한글 상품명도 그대로 찍혀요.
+            </li>
+          </ol>
+          <div className="rounded-2xl bg-cream p-3 text-sm text-ink-soft">
+            <b className="text-ink">안 되는 것</b> · 아이폰(사파리는 USB 기기 연결이 안 돼요) · 무선 인쇄(이 모델엔 블루투스·와이파이가
+            없어요). 무선이 꼭 필요하면 같은 계열 LAN·와이파이 모델이 있지만, 웹앱에서 쓰려면 결국 PC 드라이버를 거쳐야 해요.
+          </div>
           <p className="text-xs text-ink-soft">
-            🖨️ 라벨 인쇄: 빅솔론 프린터 드라이버가 깔린 PC에서{" "}
-            <Link href="/labels" className="font-semibold text-berry-600 underline">
-              라벨 · 가격표 인쇄
-            </Link>{" "}
-            → 인쇄 창에서 빅솔론 프린터를 고르면 돼요. 바코드 없는 소품은 ‘매장용 바코드’를 만들어 붙이면 키오스크 스캐너로
-            찍혀요.
+            처음 한 번은 ‘USB 바로 → 인쇄 설정 → 테스트 라벨’로 위치와 간격을 맞춰 주세요. 바코드 없는 소품은 ‘매장용 바코드’를
+            만들어 붙이면 키오스크 스캐너로 찍혀요.
           </p>
         </section>
 
