@@ -1,7 +1,16 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { LOGIN_DOMAIN, SUPABASE_KEY, SUPABASE_URL } from "../config";
 
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY ?? "";
+/** Also accepts prefixed names from the Vercel integration (e.g. STORAGE_SUPABASE_SERVICE_ROLE_KEY). */
+const SERVICE_KEY = (() => {
+  const names = ["SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY"];
+  for (const n of names) if (process.env[n]) return process.env[n] as string;
+  for (const n of names) {
+    const key = Object.keys(process.env).find((k) => k.endsWith(n) && process.env[k]);
+    if (key) return process.env[key] as string;
+  }
+  return "";
+})();
 
 export const hasServiceKey = () => Boolean(SUPABASE_URL && SERVICE_KEY);
 
