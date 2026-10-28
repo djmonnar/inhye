@@ -110,29 +110,34 @@ export default function SetupPage() {
                 지금은 <b>체험 모드</b>라 이 기기에만 저장돼요. 폰·PC 여러 대에서 같이 쓰려면 무료 Supabase를 연결해요.
               </p>
               <div className="rounded-2xl bg-cream p-3">
-                <p className="font-cute">가장 쉬운 방법 (Vercel에서 클릭 몇 번)</p>
+                <p className="font-cute">Supabase에서 만든 경우 (값 3개 옮기기)</p>
                 <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-ink-soft">
-                  <li>Vercel 대시보드 → 이 프로젝트 → <b>Storage</b> 탭</li>
                   <li>
-                    <b>Supabase</b> → Create → 지역은 <b>Seoul</b> 선택
+                    Supabase 프로젝트 화면 위쪽 <b>Connect</b> → App Frameworks → <b>Next.js</b>에 나오는 두 줄 복사
                   </li>
-                  <li>프로젝트에 연결(Connect)하면 환경변수가 자동으로 들어가요</li>
                   <li>
-                    <b>Deployments → Redeploy</b> 한 번 누르기
+                    <b>Project Settings → API Keys</b>에서 비밀 키(<b>secret</b> 또는 legacy의 <b>service_role</b>) 복사
+                  </li>
+                  <li>
+                    Vercel → inhye → <b>Settings → Environment Variables</b>에 아래 이름으로 저장 (환경은 전부 체크)
+                  </li>
+                  <li>
+                    <b>Deployments</b> → 최신 배포 ⋯ → <b>Redeploy</b>
                   </li>
                 </ol>
+                <pre className="mt-2 overflow-x-auto rounded-xl bg-white p-2 text-xs">
+{`NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=(anon 또는 publishable 키)
+SUPABASE_SERVICE_ROLE_KEY=(service_role 또는 secret 키)`}
+                </pre>
+                <p className="mt-1 text-xs text-ink-soft">💡 Vercel 입력칸에 위처럼 여러 줄을 한 번에 붙여넣으면 알아서 나눠져요.</p>
               </div>
               <div className="rounded-2xl bg-cream p-3">
-                <p className="font-cute">직접 넣는 방법</p>
+                <p className="font-cute">Vercel에서 새로 만드는 경우</p>
                 <p className="mt-1 text-ink-soft">
-                  supabase.com → 새 프로젝트 → Project Settings → API 에서 값을 복사해 Vercel → Settings → Environment
-                  Variables에 넣고 Redeploy:
+                  vercel.com/marketplace/supabase → Install → 지역 <b>Seoul</b> → 다 만들어지면 <b>Connect Project</b>에서 inhye 선택 →
+                  Redeploy. 값은 자동으로 들어가요.
                 </p>
-                <pre className="mt-2 overflow-x-auto rounded-xl bg-white p-2 text-xs">
-{`NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY`}
-                </pre>
               </div>
               <Link href="/login" className="btn-soft w-full">
                 일단 체험 모드로 둘러보기
