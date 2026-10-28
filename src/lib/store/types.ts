@@ -1,5 +1,6 @@
 import type {
   AiProductDraft,
+  AiReport,
   AppUser,
   BulkProductRow,
   Member,
@@ -9,6 +10,9 @@ import type {
   PrintRequest,
   Product,
   ProductInput,
+  PromoDraft,
+  PromoRequest,
+  ReportFacts,
   Role,
   StockMove,
   Supplier,
@@ -42,6 +46,10 @@ export interface DataStore {
   imageUrl(path: string | null | undefined): string | null;
   /** Reads a product photo with AI (server-side OpenAI call) and drafts the form fields. */
   describeProduct(image: Blob, context: { categories: string[]; hint?: string }): Promise<AiProductDraft>;
+  /** Reads a supplier's product page with AI; also drafts cost and the seller's product name. */
+  readProductLink(url: string, context: { categories: string[] }): Promise<AiProductDraft>;
+  writePromo(input: PromoRequest, image: Blob | null): Promise<PromoDraft>;
+  writeReport(facts: ReportFacts): Promise<AiReport>;
 
   listMembers(): Promise<Member[]>;
   createMember(input: MemberInput): Promise<void>;

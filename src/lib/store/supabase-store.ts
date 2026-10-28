@@ -4,12 +4,14 @@ import { blobToDataUrl } from "../image";
 import { loginEmail, setRemember, supabase } from "../supabase";
 import type {
   AiProductDraft,
+  AiReport,
   AppUser,
   BulkProductRow,
   Member,
   PrintJob,
   Product,
   ProductInput,
+  PromoDraft,
   Supplier,
   SupplierInput,
 } from "../types";
@@ -223,6 +225,27 @@ export function createSupabaseStore(): DataStore {
         hint: context.hint ?? "",
       });
       return draft;
+    },
+
+    async readProductLink(url, context) {
+      const { draft } = await api<{ draft: AiProductDraft }>("/api/ai/link", "POST", {
+        url,
+        categories: context.categories,
+      });
+      return draft;
+    },
+
+    async writePromo(input, image) {
+      const { promo } = await api<{ promo: PromoDraft }>("/api/ai/promo", "POST", {
+        ...input,
+        image: image ? await blobToDataUrl(image) : null,
+      });
+      return promo;
+    },
+
+    async writeReport(facts) {
+      const { report } = await api<{ report: AiReport }>("/api/ai/report", "POST", { facts });
+      return report;
     },
 
     async listMembers() {

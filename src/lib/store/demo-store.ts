@@ -18,6 +18,7 @@ import { StoreError, type DataStore } from "./types";
 
 const db = typeof indexedDB === "undefined" ? undefined : createStore("popo-demo", "kv");
 const USER_KEY = "popo.demo.user";
+const AI_IN_DEMO = "체험 모드에서는 AI 기능을 쓸 수 없어요. Supabase를 연결해 주세요.";
 
 const KIOSK_FIELDS: (keyof Product)[] = [
   "name", "category", "sale_price", "is_active", "kiosk_track_stock", "barcode", "cost_price",
@@ -268,7 +269,19 @@ export function createDemoStore(): DataStore {
     },
 
     async describeProduct() {
-      throw new StoreError("체험 모드에서는 AI 채우기를 쓸 수 없어요. Supabase를 연결해 주세요.");
+      throw new StoreError(AI_IN_DEMO);
+    },
+
+    async readProductLink() {
+      throw new StoreError(AI_IN_DEMO);
+    },
+
+    async writePromo() {
+      throw new StoreError(AI_IN_DEMO);
+    },
+
+    async writeReport() {
+      throw new StoreError(AI_IN_DEMO);
     },
 
     async listMembers() {

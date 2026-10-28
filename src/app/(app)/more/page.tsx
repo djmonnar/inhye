@@ -9,6 +9,7 @@ import {
   Printer,
   RefreshCw,
   Smartphone,
+  Sparkles,
   Store,
   Users,
 } from "lucide-react";
@@ -33,6 +34,7 @@ export default function MorePage() {
   const [reset, setReset] = useState<null | "sample" | "empty">(null);
 
   const items = [
+    { href: "/report", icon: Sparkles, label: "AI 가게 리포트", desc: "기간 정리, 발주 추천, 이번 주 할 일, 신상 소개 글" },
     { href: "/excel", icon: FileSpreadsheet, label: "엑셀 · 빅솔론 대량등록", desc: "빅솔론 대량작업 엑셀 내보내기/가져오기, 백업" },
     { href: "/labels", icon: Printer, label: "바코드 라벨 · 가격표 인쇄", desc: "바코드 없는 상품에 붙일 라벨 만들기" },
     { href: "/print-station", icon: Printer, label: "인쇄 스테이션 (노트북)", desc: "폰에서 보낸 라벨을 노트북이 자동으로 인쇄" },

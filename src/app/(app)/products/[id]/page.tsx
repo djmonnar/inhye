@@ -12,12 +12,14 @@ import {
   Printer,
   Send,
   ShoppingBasket,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { BarcodeSvg } from "@/components/BarcodeSvg";
+import { PromoSheet } from "@/components/PromoSheet";
 import { useAuth, useToast } from "@/components/providers";
 import { SendLabelSheet } from "@/components/SendLabelSheet";
 import { StockSheet } from "@/components/StockSheet";
@@ -48,6 +50,7 @@ export default function ProductDetailPage() {
   const { data: moves = [] } = useMoves(id, 30);
   const [stockOpen, setStockOpen] = useState<null | "in" | "out" | "set">(null);
   const [sendOpen, setSendOpen] = useState(false);
+  const [promoOpen, setPromoOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [quickBusy, setQuickBusy] = useState(false);
 
@@ -294,6 +297,9 @@ export default function ProductDetailPage() {
           )}
         </section>
 
+        <button type="button" className="btn-soft w-full border-berry-200 bg-berry-50 text-berry-600" onClick={() => setPromoOpen(true)}>
+          <Sparkles size={18} /> 홍보 글 쓰기 (인스타 · 당근 · 카톡)
+        </button>
         <button type="button" className="btn-soft w-full border-soda-300 bg-soda-100 text-soda-700" onClick={() => setSendOpen(true)}>
           <Send size={18} /> 노트북으로 라벨 보내기
         </button>
@@ -321,6 +327,7 @@ export default function ProductDetailPage() {
       </div>
 
       <SendLabelSheet product={product} open={sendOpen} onClose={() => setSendOpen(false)} />
+      <PromoSheet product={product} open={promoOpen} onClose={() => setPromoOpen(false)} />
       <StockSheet
         product={product}
         open={stockOpen !== null}

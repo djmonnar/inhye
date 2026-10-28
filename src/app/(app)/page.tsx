@@ -1,6 +1,15 @@
 "use client";
 
-import { ChevronRight, FileSpreadsheet, PackagePlus, Plus, Printer, ScanBarcode, TriangleAlert } from "lucide-react";
+import {
+  ChevronRight,
+  FileSpreadsheet,
+  PackagePlus,
+  Plus,
+  Printer,
+  ScanBarcode,
+  Sparkles,
+  TriangleAlert,
+} from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import { Mascot } from "@/components/Mascot";
@@ -120,6 +129,17 @@ export default function HomePage() {
           <div className="flex-1">
             <p className="font-cute text-lg">빅솔론에 반영할 상품 {stats.kiosk}개</p>
             <p className="text-sm text-ink-soft">새로 등록·수정한 상품을 대량등록 엑셀로 내보내세요</p>
+          </div>
+          <ChevronRight className="text-ink-soft" />
+        </Link>
+      )}
+
+      {stats.total > 0 && (
+        <Link href="/report" className="card flex items-center gap-3 border-berry-200 bg-berry-50 p-4">
+          <Sparkles className="shrink-0 text-berry-600" />
+          <div className="flex-1">
+            <p className="font-cute text-lg">AI 가게 리포트</p>
+            <p className="text-sm text-ink-soft">이번 주 정리 · 발주 추천 · 신상 소개 글</p>
           </div>
           <ChevronRight className="text-ink-soft" />
         </Link>

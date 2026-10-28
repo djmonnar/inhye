@@ -89,7 +89,9 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
   const [aiDraft, setAiDraft] = useState<AiProductDraft | null>(null);
+  const [aiFrom, setAiFrom] = useState<"photo" | "link">("photo");
   const foreignRef = useRef<HTMLDetailsElement>(null);
 
   const set =<K extends keyof ProductInput>(k: K, v: ProductInput[K]) => setF((p) => ({ ...p, [k]: v }));
@@ -148,10 +150,26 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
             throw new Error("저장된 사진을 불러오지 못했어요. 사진을 다시 찍어 주세요.");
           }));
       setAiDraft(await store().describeProduct(image, { categories, hint: f.name.trim() || undefined }));
+      setAiFrom("photo");
     } catch (e) {
       setError(e instanceof Error ? e.message : "AI가 사진을 읽지 못했어요.");
     } finally {
       setAiBusy(false);
+    }
+  }
+
+  async function fillFromLink() {
+    if (!f.purchase_url) return;
+    setError("");
+    setLinkBusy(true);
+    try {
+      setAiDraft(await store().readProductLink(ensureUrl(f.purchase_url.trim()), { categories }));
+      setAiFrom("link");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "링크를 읽지 못했어요.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } finally {
+      setLinkBusy(false);
     }
   }
 
@@ -494,6 +512,16 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
               </div>
             )}
           </Field>
+          {f.purchase_url && hostOf(f.purchase_url) && (
+            <button
+              type="button"
+              className="btn-soft btn-sm w-full text-berry-600"
+              onClick={fillFromLink}
+              disabled={linkBusy}
+            >
+              <Sparkles size={16} /> {linkBusy ? "AI가 상품 페이지 읽는 중..." : "링크에서 상품 정보 가져오기"}
+            </button>
+          )}
           {f.purchase_url && !supplierByHost && !f.supplier_id && hostOf(f.purchase_url) && (
             <button
               type="button"
@@ -668,6 +696,7 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
       <AiFillSheet
         draft={aiDraft}
         current={f}
+        title={aiFrom === "link" ? "✨ 링크에서 읽은 내용" : "✨ AI가 읽은 내용"}
         onClose={() => setAiDraft(null)}
         onApply={(patch, keys) => {
           setF((p) => ({ ...p, ...patch }));
