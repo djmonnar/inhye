@@ -1,7 +1,9 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { IMAGE_BUCKET, SUPABASE_URL } from "../config";
+import { blobToDataUrl } from "../image";
 import { loginEmail, setRemember, supabase } from "../supabase";
 import type {
+  AiProductDraft,
   AppUser,
   BulkProductRow,
   Member,
@@ -212,6 +214,15 @@ export function createSupabaseStore(): DataStore {
       if (!path) return null;
       if (path.startsWith("data:") || path.startsWith("http")) return path;
       return `${SUPABASE_URL}/storage/v1/object/public/${IMAGE_BUCKET}/${path}`;
+    },
+
+    async describeProduct(image, context) {
+      const { draft } = await api<{ draft: AiProductDraft }>("/api/ai/product", "POST", {
+        image: await blobToDataUrl(image),
+        categories: context.categories,
+        hint: context.hint ?? "",
+      });
+      return draft;
     },
 
     async listMembers() {

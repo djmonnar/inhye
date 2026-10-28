@@ -3,7 +3,7 @@
 import { Camera, ImagePlus, Link2, Plus, ScanBarcode, Sparkles, Star, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { compressImage } from "@/lib/image";
 import {
   ensureUrl,
@@ -18,7 +18,8 @@ import {
 } from "@/lib/format";
 import { useCategories, useProducts, useRefresh, useSuppliers } from "@/lib/queries";
 import { store } from "@/lib/store";
-import type { Product, ProductInput, Supplier, SupplierInput } from "@/lib/types";
+import type { AiProductDraft, Product, ProductInput, Supplier, SupplierInput } from "@/lib/types";
+import { AiFillSheet, FOREIGN_KEYS } from "./AiFillSheet";
 import { BarcodeScanner } from "./BarcodeScanner";
 import { readPref, writePref } from "./labels";
 import { useAuth, useToast } from "./providers";
@@ -87,8 +88,11 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
   const [supplierSheet, setSupplierSheet] = useState<Partial<SupplierInput> | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiDraft, setAiDraft] = useState<AiProductDraft | null>(null);
+  const foreignRef = useRef<HTMLDetailsElement>(null);
 
-  const set = <K extends keyof ProductInput>(k: K, v: ProductInput[K]) => setF((p) => ({ ...p, [k]: v }));
+  const set =<K extends keyof ProductInput>(k: K, v: ProductInput[K]) => setF((p) => ({ ...p, [k]: v }));
 
   useEffect(() => () => {
     if (photo) URL.revokeObjectURL(photo.url);
@@ -128,6 +132,26 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
       toast("사진을 불러오지 못했어요", "sad");
     } finally {
       setCompressing(false);
+    }
+  }
+
+  async function fillWithAi() {
+    if (!previewUrl) return;
+    setError("");
+    setAiBusy(true);
+    try {
+      const image =
+        photo?.blob ??
+        (await fetch(previewUrl)
+          .then((r) => (r.ok ? r.blob() : Promise.reject()))
+          .catch(() => {
+            throw new Error("저장된 사진을 불러오지 못했어요. 사진을 다시 찍어 주세요.");
+          }));
+      setAiDraft(await store().describeProduct(image, { categories, hint: f.name.trim() || undefined }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "AI가 사진을 읽지 못했어요.");
+    } finally {
+      setAiBusy(false);
     }
   }
 
@@ -237,6 +261,12 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
             {compressing && (
               <div className="absolute inset-0 flex items-center justify-center bg-white/70 font-cute">사진 줄이는 중...</div>
             )}
+            {aiBusy && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/70 font-cute">
+                <Sparkles size={28} className="animate-pulse text-berry-500" />
+                AI가 사진 보는 중...
+              </div>
+            )}
             {previewUrl && (
               <button
                 type="button"
@@ -277,6 +307,16 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
                 }}
               />
             </label>
+            {previewUrl && (
+              <button
+                type="button"
+                className="btn-primary col-span-2"
+                onClick={fillWithAi}
+                disabled={aiBusy || compressing}
+              >
+                <Sparkles size={18} /> {aiBusy ? "AI가 읽는 중..." : "AI로 상품 정보 채우기"}
+              </button>
+            )}
           </div>
         </section>
 
@@ -538,7 +578,7 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
               />
             )}
           </Field>
-          <details className="group pt-2">
+          <details ref={foreignRef} className="group pt-2">
             <summary className="cursor-pointer list-none font-cute text-[15px] text-berry-600">
               🌏 외국어 이름 · 설명 <span className="text-xs text-ink-soft">(선택)</span>
             </summary>
@@ -624,6 +664,18 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
         )}
         <p className="mt-3 text-center text-sm text-ink-soft">바코드를 네모 칸 안에 맞춰 주세요</p>
       </Sheet>
+
+      <AiFillSheet
+        draft={aiDraft}
+        current={f}
+        onClose={() => setAiDraft(null)}
+        onApply={(patch, keys) => {
+          setF((p) => ({ ...p, ...patch }));
+          setAiDraft(null);
+          if (keys.some((k) => FOREIGN_KEYS.includes(k)) && foreignRef.current) foreignRef.current.open = true;
+          toast(`${keys.length}칸 채웠어요! 확인하고 저장해 주세요`, "wow");
+        }}
+      />
 
       <SupplierSheet
         open={supplierSheet !== null}

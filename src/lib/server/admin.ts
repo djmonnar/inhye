@@ -28,8 +28,8 @@ export function json(body: unknown, status = 200) {
   return Response.json(body, { status });
 }
 
-/** Returns the caller's id when the bearer token belongs to an admin. */
-export async function requireAdmin(req: Request): Promise<string | Response> {
+/** Returns the caller's id when the bearer token belongs to one of `roles`. */
+async function requireRole(req: Request, roles: string[], denied: string): Promise<string | Response> {
   if (!hasServiceKey()) {
     return json({ error: "서버에 SUPABASE_SERVICE_ROLE_KEY가 설정되지 않았어요. Vercel 환경변수를 확인해 주세요." }, 501);
   }
@@ -39,6 +39,12 @@ export async function requireAdmin(req: Request): Promise<string | Response> {
   const { data, error } = await anon.auth.getUser(token);
   if (error || !data.user) return json({ error: "로그인이 만료됐어요. 다시 로그인해 주세요." }, 401);
   const { data: profile } = await adminClient().from("profiles").select("role").eq("id", data.user.id).maybeSingle();
-  if (profile?.role !== "admin") return json({ error: "관리자만 할 수 있어요." }, 403);
+  if (!roles.includes(profile?.role ?? "")) return json({ error: denied }, 403);
   return data.user.id;
 }
+
+export const requireAdmin = (req: Request) => requireRole(req, ["admin"], "관리자만 할 수 있어요.");
+
+/** Admins and approved staff — not accounts still waiting for approval. */
+export const requireMember = (req: Request) =>
+  requireRole(req, ["admin", "staff"], "승인된 직원만 쓸 수 있어요. 관리자에게 승인을 요청해 주세요.");

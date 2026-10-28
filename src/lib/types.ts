@@ -62,6 +62,22 @@ export type ProductInput = Omit<
   "id" | "created_at" | "updated_at" | "kiosk_synced_at" | "kiosk_changed_at"
 >;
 
+/** What the AI read from a product photo. Prices and barcodes are never guessed. */
+export interface AiProductDraft {
+  name: string;
+  category: string;
+  tags: string[];
+  description: string;
+  name_en: string;
+  name_zh: string;
+  name_ja: string;
+  description_en: string;
+  description_zh: string;
+  description_ja: string;
+  /** Something the owner should double-check (empty when there's nothing to flag). */
+  note: string;
+}
+
 export type MoveKind = "in" | "out" | "adjust" | "sale";
 
 export interface StockMove {

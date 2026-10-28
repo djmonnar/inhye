@@ -267,6 +267,10 @@ export function createDemoStore(): DataStore {
       return path ?? null;
     },
 
+    async describeProduct() {
+      throw new StoreError("체험 모드에서는 AI 채우기를 쓸 수 없어요. Supabase를 연결해 주세요.");
+    },
+
     async listMembers() {
       const u = readUser();
       return u ? [{ ...u, created_at: new Date().toISOString() }] : [];

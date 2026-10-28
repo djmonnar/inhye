@@ -1,4 +1,5 @@
 import type {
+  AiProductDraft,
   AppUser,
   BulkProductRow,
   Member,
@@ -39,6 +40,8 @@ export interface DataStore {
   uploadImage(file: Blob): Promise<string>;
   removeImage(path: string): Promise<void>;
   imageUrl(path: string | null | undefined): string | null;
+  /** Reads a product photo with AI (server-side OpenAI call) and drafts the form fields. */
+  describeProduct(image: Blob, context: { categories: string[]; hint?: string }): Promise<AiProductDraft>;
 
   listMembers(): Promise<Member[]>;
   createMember(input: MemberInput): Promise<void>;
