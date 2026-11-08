@@ -1,0 +1,85 @@
+# 빅솔론 (키오스크 · 매장솔루션 ASP)
+
+포포하우스는 빅솔론 키오스크를 쓰고, 상품·매출은 빅솔론 매장솔루션 관리자 사이트(ASP)에서 관리해요.
+
+- 관리자 사이트: `https://www.bixolon-pos.com` (매장 계정으로 로그인)
+- 관리자 사이트가 부르는 API: `https://api.bixolon-pos.com`
+- 공식 매뉴얼(노션): https://asp-manual.notion.site/ — 메뉴별 설명. **외부 연결 관리·API 설명은 없음.** 모든 목록 화면에 ‘엑셀 다운로드’가 있다고 안내.
+- 매장솔루션 지원센터: **1877-1125** (평일 09–22시, 주말 09–21시)
+- 포포하우스 매장 식별값 (비밀 아님): `shop-id` **434**, `brand-id` 124, `hq-id` 111, `agency-id` 67
+
+## 1. 상품 대량작업 엑셀 (✅ 연동 중)
+
+사용자가 준 양식 기준. 앱의 **엑셀 화면**이 이 양식과 칸·색·서식까지 똑같이 내보내고(`src/lib/excel.ts`의 `KIOSK_COLUMNS`), 가져오기도 해요.
+
+| 열 | 머리글 | 필수 | 앱 항목 |
+| --- | --- | --- | --- |
+| A | `상품 코드\n(상품 수정시에만 입력)` | | `kiosk_code` (예: S000005) |
+| B | 상품명 | ✔ | name |
+| C | 상품 분류명 | ✔ | category |
+| D | 판매가 | ✔ | sale_price |
+| E | 사용(Y/N) | ✔ | is_active |
+| F | 재고 사용(Y/N) | | kiosk_track_stock |
+| G | 재고 수량 | | stock_qty (재고 사용 N이면 0) |
+| H | 바코드 | | barcode |
+| I | 상품단가 | | 원가/판매가/비우기 중 선택 — **의미 미확인** |
+| J–L | 상품명(영어/중국어/일본어) | | name_en / name_zh / name_ja |
+| M–P | 상품 설명, 상품 설명(영어/중국어/일본어) | | description* |
+
+- 필수 머리글 배경 노랑 `FFFFFF00`, 선택 주황 `FFFFC000`. 모든 셀 텍스트 서식(`@`), 맑은 고딕 9pt, 가운데, 얇은 테두리. 빈칸은 진짜 빈 셀.
+- 원본 파일은 확장자가 `.xls`지만 내용은 xlsx. 앱은 `.xlsx`로 저장해요.
+- 이미 빅솔론에 있는 상품은 **상품 코드**가 있어야 새로 생기지 않고 수정돼요. 빅솔론 상품 목록 엑셀을 앱에서 ‘가져오기’ 하면 코드가 채워져요.
+- 앱에서 바꾼 상품은 ‘빅솔론 반영 필요’ 표시(`kiosk_changed_at > kiosk_synced_at`). 재고 수량만 바뀐 건 표시 안 함(DB 트리거 `touch_product`).
+
+## 2. ASP ‘외부 연결 관리’ 메뉴 (공지사항/기타 아래)
+
+- **외부 연결 정보 등록**: 업체 드롭다운에 **‘생협’만** 있고 API 키(8자 이상, 영문·숫자·특수문자)를 입력 → 빅솔론과 계약한 연동 업체 전용으로 보임. 우리 앱은 목록에 없음.
+- **연동 키 발급**: “새로운 연동 키가 생성되었습니다” 창에 **매장 ID(434)** 와 **생성된 API 키**가 나옴(창을 닫으면 다시 못 봄).
+  - 이 키는 채팅에 일부 노출된 적이 있어 **재발급 권장**. 값은 Vercel `BIXOLON_API_KEY`에만 저장.
+
+## 3. 매출 API 조사 (HAR, 2026-11-08)
+
+사용자가 관리자 화면에서 HAR을 떠서 줬어요(쿠키·인증 값은 브라우저가 지운 상태).
+
+| 화면 | 요청 |
+| --- | --- |
+| 상품별 매출 분석 | `GET /api/v2/sales/analysis/goods?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` |
+| 결제수단별 매출 분석 | `GET /api/v2/sales/summary/payment?startDate&endDate` |
+| 카드사별 매출 분석 | `GET /api/v2/sales/summary/payment/card?startDate&endDate&cardType=ACQUIRER` |
+
+- 요청 헤더: `shop-id`, `brand-id`, `hq-id`, `agency-id`, `authorization` (CORS 허용 헤더도 정확히 이 5개).
+- 관리자 화면의 `authorization`은 **로그인 세션 토큰**으로 보임(HAR에서 값 삭제됨).
+- `sales/analysis/goods` 응답: 배열, 상품별 합계
+  `shopName, categoryId, categoryName, goodsId, goodsCode, goodsName, sellingPrice, unitCost, salesQty, salesAmount, paymentAmount, goodsAmount, optionAmount, discountAmount`
+  — `goodsCode`가 대량작업 엑셀의 ‘상품 코드’(S000171 등)와 같아요.
+- `sales/summary/payment` 응답: `shopId, shopName, paymentType, paymentAmount, paymentCount, returnAmount, returnCount`
+- `sales/summary/payment/card` 응답: `shopName, code, name, paymentAmount, paymentCount, returnAmount, returnCount`
+
+### 연동 키로 호출 시험 → 401
+
+`GET /api/v2/sales/analysis/goods` + `shop-id: 434` + `Authorization: Bearer <연동 키>` →
+`401 {"status":401,"code":"UNAUTHORIZED","message":"유효한 인증 자격 증명이 없습니다."}` (1분 뒤 재시도도 동일).
+
+- 해석: 연동 키는 관리자 화면 API의 Bearer 토큰으로는 안 받음 → **다른 엔드포인트(연동 업체용) 또는 다른 헤더 형식**일 가능성.
+  (사용자가 새로 발급한 키를 정확히 넣었는지도 재확인 필요.)
+- **하지 않기로 한 것**: 사장님 ASP 로그인 비밀번호/세션을 서버에 저장해 관리자 API를 대신 부르는 방식 — 비공식이고, 토큰이 만료되며, 계정 탈취 위험.
+- 지원센터에 물어볼 문구:
+  > 외부 연결 관리에서 발급한 매장 ID(434)와 API 키로 매출을 조회하려 합니다. 어떤 API 주소를 어떤 헤더 형식으로 호출해야 하나요?
+  > `api.bixolon-pos.com/api/v2/sales/analysis/goods`에 `shop-id: 434`, `Authorization: Bearer 키`로 보내면 401이 납니다. 연동 업체로 등록해야 쓸 수 있는 키인가요?
+
+## 4. 앱의 매출 연동 구현 (`src/lib/server/bixolon.ts`, `pos.ts`, `public/schema.sql` 5-2)
+
+- **하루씩** `sales/analysis/goods?startDate=D&endDate=D` 호출 → `pos_sales`에 (날짜, 상품) 한 행.
+  `external_id = goods:YYYY-MM-DD:<goodsId>` (엑셀 가져오기를 만들면 API와 같은 키 형식으로 맞출 것), `sold_at = D 00:00 +09:00`.
+- 같은 날 수량이 늘면 행을 갱신하고, `apply_pos_sales()`가 `qty - applied_qty` **차이만** 재고에서 빼요. 줄면(반품) 다시 더해요. 멱등.
+  PostgreSQL에서 검증: 20 → 17(3개) → 15(5개로 증가) → 16(반품 1).
+- 상품 연결: `goodsCode` = 상품의 `kiosk_code`, 없으면 바코드. 연결 안 된 상품은 매출 화면 ‘앱에 없는 상품’에 나오고 원터치 등록.
+- 첫 가져오기는 **오늘부터**(연동 전 판매로 재고가 빠지지 않게). 이후엔 마지막 성공일 전날부터 오늘까지(최대 31일).
+- 인증 헤더는 `BIXOLON_AUTH_SCHEME`(기본 `Bearer`, `none`이면 키만)로 바꿀 수 있어요. 지원센터 답에 맞춰 `headers()`만 고치면 돼요.
+- 키·ID는 서버 환경변수에만: `BIXOLON_STORE_ID`, `BIXOLON_API_KEY`, (선택) `BIXOLON_BRAND_ID`, `BIXOLON_HQ_ID`, `BIXOLON_AGENCY_ID`, `BIXOLON_API_BASE`.
+- 대안(미구현): 상품별 매출 분석 **하루치 엑셀** 가져오기 — 엑셀 열: 상품 코드, 상품명, 판매가, 원가, 판매 수량, 상품 금액, 옵션 금액, 할인 금액, 매출 금액, 결제 금액, 이익률(매뉴얼 기준). 실제 샘플 파일을 받은 뒤 구현.
+
+## 5. 기타
+
+- 빅솔론 Web Print SDK(브라우저→빅솔론 프린터)는 있지만, 매장 라벨 프린터는 Xprinter라서 해당 없음 → [printing.md](printing.md)
+- 빅솔론 매장관리자-II 앱(안드로이드)도 있음 — API 단서는 아직 없음.
