@@ -11,3 +11,12 @@ export async function compressImage(file: File): Promise<Blob> {
     initialQuality: 0.82,
   });
 }
+
+export function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("사진을 읽지 못했어요."));
+    reader.readAsDataURL(blob);
+  });
+}

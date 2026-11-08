@@ -1,4 +1,4 @@
-import { hasServiceKey, json, requireRole } from "@/lib/server/admin";
+import { hasServiceKey, json, requireMember } from "@/lib/server/admin";
 import { bixolonStatus } from "@/lib/server/bixolon";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +8,7 @@ export async function GET(req: Request) {
   if (!hasServiceKey()) {
     return json({ serviceKey: false, storeId: false, apiKey: false, apiBase: false, adapterReady: false });
   }
-  const caller = await requireRole(req, ["admin", "staff"]);
+  const caller = await requireMember(req);
   if (caller instanceof Response) return caller;
   return json({ serviceKey: true, ...bixolonStatus() });
 }
