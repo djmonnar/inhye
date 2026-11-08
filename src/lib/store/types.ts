@@ -4,6 +4,10 @@ import type {
   Member,
   MemberInput,
   MoveInput,
+  PosSale,
+  PosStatus,
+  PosSyncResult,
+  PosSyncRun,
   PrintJob,
   PrintRequest,
   Product,
@@ -52,6 +56,12 @@ export interface DataStore {
   claimPrintJobs(): Promise<PrintJob[]>;
   finishPrintJobs(ids: string[], ok: boolean, error?: string): Promise<void>;
   deletePrintJob(id: string): Promise<void>;
+
+  /** POS(빅솔론) 매출: sinceISO 이후, 최신순 */
+  listPosSales(sinceISO: string): Promise<PosSale[]>;
+  listPosSyncRuns(limit?: number): Promise<PosSyncRun[]>;
+  posStatus(): Promise<PosStatus>;
+  posSync(days: number): Promise<PosSyncResult>;
 }
 
 export class StoreError extends Error {}

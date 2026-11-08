@@ -312,6 +312,108 @@ end $$;
 grant execute on function public.claim_print_jobs(integer) to authenticated;
 
 -- ---------------------------------------------------------------------
+-- 5-2. POS(빅솔론) 매출 연동
+--   판매 한 줄 = 한 행. 서버(서비스 키)만 쓰고, 직원은 읽기만 해요.
+--   apply_pos_sales()가 상품과 연결하고 재고를 빼요. 여러 번 실행해도 한 번만 빠져요.
+-- ---------------------------------------------------------------------
+create table if not exists public.pos_sales (
+  id uuid primary key default gen_random_uuid(),
+  source text not null default 'bixolon',
+  external_id text not null,
+  sold_at timestamptz not null,
+  product_code text,
+  barcode text,
+  product_name text not null default '',
+  qty integer not null default 1,
+  amount integer not null default 0,
+  payment text,
+  product_id uuid references public.products (id) on delete set null,
+  stock_applied_at timestamptz,
+  raw jsonb,
+  created_at timestamptz not null default now(),
+  unique (source, external_id)
+);
+
+create index if not exists pos_sales_sold_idx on public.pos_sales (sold_at desc);
+create index if not exists pos_sales_pending_idx on public.pos_sales (stock_applied_at) where stock_applied_at is null;
+
+create table if not exists public.pos_sync_runs (
+  id uuid primary key default gen_random_uuid(),
+  source text not null default 'bixolon',
+  started_at timestamptz not null default now(),
+  finished_at timestamptz,
+  ok boolean,
+  range_from timestamptz,
+  range_to timestamptz,
+  fetched integer not null default 0,
+  inserted integer not null default 0,
+  applied integer not null default 0,
+  unmatched integer not null default 0,
+  error text
+);
+
+alter table public.pos_sales enable row level security;
+alter table public.pos_sync_runs enable row level security;
+grant select on public.pos_sales, public.pos_sync_runs to authenticated;
+
+drop policy if exists "pos sales read" on public.pos_sales;
+create policy "pos sales read" on public.pos_sales for select to authenticated using (public.is_member());
+drop policy if exists "pos runs read" on public.pos_sync_runs;
+create policy "pos runs read" on public.pos_sync_runs for select to authenticated using (public.is_member());
+
+create or replace function public.apply_pos_sales() returns json
+language plpgsql security invoker set search_path = public as $$
+declare
+  matched integer;
+  applied integer;
+  unmatched integer;
+begin
+  -- 서버(서비스 키)에서만 실행해요. 앱에서는 /api/pos/sync 를 거쳐요.
+  if current_user not in ('service_role', 'postgres') then
+    raise exception '권한이 없어요';
+  end if;
+
+  -- 빅솔론 상품 코드 → 바코드 순서로 우리 상품과 연결
+  update public.pos_sales s
+     set product_id = p.id
+    from public.products p
+   where s.product_id is null
+     and ((s.product_code is not null and p.kiosk_code = s.product_code)
+       or (s.barcode is not null and p.barcode = s.barcode));
+  get diagnostics matched = row_count;
+
+  -- 아직 안 뺀 판매만 재고에서 빼기 (반품은 음수 수량이라 다시 더해져요)
+  with todo as (
+    select id, product_id, qty, external_id
+      from public.pos_sales
+     where product_id is not null and stock_applied_at is null
+     for update skip locked
+  ), moves as (
+    insert into public.stock_moves (product_id, kind, qty, memo, created_by_name)
+    select product_id, 'sale', -qty, '빅솔론 판매 ' || external_id, '빅솔론' from todo
+    returning product_id, qty
+  ), stock as (
+    update public.products p
+       set stock_qty = p.stock_qty + d.delta
+      from (select product_id, sum(qty) as delta from moves group by product_id) d
+     where p.id = d.product_id
+    returning p.id
+  )
+  update public.pos_sales s
+     set stock_applied_at = now()
+    from todo
+   where s.id = todo.id;
+  get diagnostics applied = row_count;
+
+  select count(*) into unmatched from public.pos_sales where product_id is null;
+  return json_build_object('matched', matched, 'applied', applied, 'unmatched', unmatched);
+end $$;
+
+revoke execute on function public.apply_pos_sales() from public, anon, authenticated;
+grant select, insert, update, delete on public.pos_sales, public.pos_sync_runs to service_role;
+grant execute on function public.apply_pos_sales() to service_role;
+
+-- ---------------------------------------------------------------------
 -- 6. 상품 사진 저장소 (공개 읽기, 직원만 업로드)
 -- ---------------------------------------------------------------------
 insert into storage.buckets (id, name, public)

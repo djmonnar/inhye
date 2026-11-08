@@ -11,14 +11,16 @@ function NewProduct() {
   const { data: products, isLoading } = useProducts();
   const copyId = params.get("copy");
   const barcode = params.get("barcode");
+  const code = params.get("code");
+  const name = params.get("name");
 
   if (copyId && isLoading) return <Loading />;
   const source = copyId ? products?.find((p) => p.id === copyId) : undefined;
   const initial = source
     ? { ...toInput(source), name: `${source.name} (복사)`, barcode: null, kiosk_code: null, stock_qty: 0 }
-    : { barcode: barcode || null };
+    : { barcode: barcode || null, kiosk_code: code || null, name: name ?? "" };
 
-  return <ProductForm key={copyId ?? barcode ?? "new"} initial={initial} />;
+  return <ProductForm key={copyId ?? barcode ?? code ?? "new"} initial={initial} />;
 }
 
 export default function NewProductPage() {

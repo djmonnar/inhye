@@ -1,14 +1,14 @@
 "use client";
 
-import { ChevronRight, FileSpreadsheet, PackagePlus, Plus, Printer, ScanBarcode, TriangleAlert } from "lucide-react";
+import { BarChart3, ChevronRight, FileSpreadsheet, PackagePlus, Plus, Printer, ScanBarcode, TriangleAlert } from "lucide-react";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { useAuth } from "@/components/providers";
 import { Loading, ProductThumb } from "@/components/ui";
 import { SHOP_NAME } from "@/lib/config";
 import { needsKioskSync, num, relTime, stockLevel, won } from "@/lib/format";
-import { useMoves, usePrintJobs, useProducts } from "@/lib/queries";
+import { useMoves, usePosSales, usePrintJobs, useProducts } from "@/lib/queries";
 
 function greeting() {
   const h = new Date().getHours();
@@ -23,6 +23,13 @@ export default function HomePage() {
   const { data: moves = [] } = useMoves(undefined, 300);
   const { data: printJobs = [] } = usePrintJobs("pending");
   const printWaiting = printJobs.reduce((n, j) => n + j.copies, 0);
+  const [todayIso] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString();
+  });
+  const { data: todaySales = [] } = usePosSales(todayIso);
+  const todayAmount = todaySales.reduce((n, s) => n + s.amount, 0);
+  const todayQty = todaySales.reduce((n, s) => n + s.qty, 0);
 
   const stats = useMemo(() => {
     const list = products ?? [];
@@ -100,6 +107,16 @@ export default function HomePage() {
             <p className="text-sm text-ink-soft">
               품절 {stats.out}개 · 품절 임박 {stats.low}개
             </p>
+          </div>
+          <ChevronRight className="text-ink-soft" />
+        </Link>
+      )}
+      {todaySales.length > 0 && (
+        <Link href="/sales" className="card flex items-center gap-3 border-matcha-300 bg-matcha-100 p-4">
+          <BarChart3 className="shrink-0 text-matcha-700" />
+          <div className="flex-1">
+            <p className="font-cute text-lg">오늘 매출 {won(todayAmount)}</p>
+            <p className="text-sm text-ink-soft">키오스크에서 {num(todayQty)}개 팔렸어요 · 재고 자동 반영</p>
           </div>
           <ChevronRight className="text-ink-soft" />
         </Link>

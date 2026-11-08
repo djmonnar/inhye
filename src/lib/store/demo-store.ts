@@ -335,6 +335,22 @@ export function createDemoStore(): DataStore {
       const jobs = await load<PrintJob[]>("printJobs", []);
       await save("printJobs", jobs.filter((j) => j.id !== id));
     },
+
+    async listPosSales() {
+      return [];
+    },
+
+    async listPosSyncRuns() {
+      return [];
+    },
+
+    async posStatus() {
+      return { demo: true, serviceKey: false, storeId: false, apiKey: false, apiBase: false, adapterReady: false };
+    },
+
+    async posSync() {
+      throw new StoreError("체험 모드에서는 빅솔론 매출을 받을 수 없어요. Supabase를 먼저 연결해 주세요.");
+    },
   };
   return store;
 }

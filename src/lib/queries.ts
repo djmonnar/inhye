@@ -29,6 +29,18 @@ export function usePrintJobs(which: "pending" | "recent", pollMs: number | false
   });
 }
 
+export function usePosSales(sinceISO: string) {
+  return useQuery({ queryKey: ["pos", "sales", sinceISO], queryFn: () => store().listPosSales(sinceISO) });
+}
+
+export function usePosRuns() {
+  return useQuery({ queryKey: ["pos", "runs"], queryFn: () => store().listPosSyncRuns(10) });
+}
+
+export function usePosStatus() {
+  return useQuery({ queryKey: ["pos", "status"], queryFn: () => store().posStatus(), retry: false });
+}
+
 export function useProduct(id: string | undefined): { product: Product | undefined; isLoading: boolean } {
   const { data, isLoading } = useProducts();
   return { product: data?.find((p) => p.id === id), isLoading };
@@ -52,7 +64,7 @@ export function useCategories(): string[] {
 export function useRefresh() {
   const qc = useQueryClient();
   return useCallback(
-    (...keys: ("products" | "suppliers" | "moves" | "members" | "print-jobs")[]) =>
+    (...keys: ("products" | "suppliers" | "moves" | "members" | "print-jobs" | "pos")[]) =>
       Promise.all(keys.map((k) => qc.invalidateQueries({ queryKey: [k] }))),
     [qc],
   );

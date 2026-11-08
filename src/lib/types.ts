@@ -122,3 +122,49 @@ export interface PrintRequest {
   copies: number;
   style: PrintStyle;
 }
+
+export interface PosSale {
+  id: string;
+  source: string;
+  external_id: string;
+  sold_at: string;
+  product_code: string | null;
+  barcode: string | null;
+  product_name: string;
+  qty: number;
+  amount: number;
+  payment: string | null;
+  product_id: string | null;
+  stock_applied_at: string | null;
+  created_at: string;
+}
+
+export interface PosSyncRun {
+  id: string;
+  source: string;
+  started_at: string;
+  finished_at: string | null;
+  ok: boolean | null;
+  fetched: number;
+  inserted: number;
+  applied: number;
+  unmatched: number;
+  error: string | null;
+}
+
+export interface PosStatus {
+  demo?: boolean;
+  serviceKey: boolean;
+  storeId: boolean;
+  apiKey: boolean;
+  apiBase: boolean;
+  adapterReady: boolean;
+}
+
+export interface PosSyncResult {
+  fetched: number;
+  inserted: number;
+  matched: number;
+  applied: number;
+  unmatched: number;
+}

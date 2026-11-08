@@ -5,6 +5,10 @@ import type {
   AppUser,
   BulkProductRow,
   Member,
+  PosSale,
+  PosStatus,
+  PosSyncResult,
+  PosSyncRun,
   PrintJob,
   Product,
   ProductInput,
@@ -281,6 +285,35 @@ export function createSupabaseStore(): DataStore {
     async deletePrintJob(id) {
       const { error } = await sb.from("print_jobs").delete().eq("id", id);
       if (error) fail(error);
+    },
+
+    async listPosSales(sinceISO) {
+      const { data, error } = await sb
+        .from("pos_sales")
+        .select("id, source, external_id, sold_at, product_code, barcode, product_name, qty, amount, payment, product_id, stock_applied_at, created_at")
+        .gte("sold_at", sinceISO)
+        .order("sold_at", { ascending: false })
+        .limit(5000);
+      if (error) fail(error);
+      return data as PosSale[];
+    },
+
+    async listPosSyncRuns(limit = 10) {
+      const { data, error } = await sb
+        .from("pos_sync_runs")
+        .select("id, source, started_at, finished_at, ok, fetched, inserted, applied, unmatched, error")
+        .order("started_at", { ascending: false })
+        .limit(limit);
+      if (error) fail(error);
+      return data as PosSyncRun[];
+    },
+
+    async posStatus() {
+      return api<PosStatus>("/api/pos/status", "GET");
+    },
+
+    async posSync(days) {
+      return api<PosSyncResult>("/api/pos/sync", "POST", { days });
     },
   };
 }
