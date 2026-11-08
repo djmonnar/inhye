@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { useAuth, useToast } from "@/components/providers";
 import { EmptyState, Loading, PageHeader, ProductThumb } from "@/components/ui";
 import { IS_DEMO } from "@/lib/config";
-import { num, relTime, won } from "@/lib/format";
+import { num, relTime, shortDate, won } from "@/lib/format";
 import { usePosRuns, usePosSales, usePosStatus, useProducts, useRefresh } from "@/lib/queries";
 import { store } from "@/lib/store";
 
@@ -84,9 +84,9 @@ export default function SalesPage() {
   async function sync() {
     setSyncing(true);
     try {
-      const r = await store().posSync(3);
+      const r = await store().posSync();
       await refresh("pos", "products", "moves");
-      toast(`새 판매 ${r.inserted}건 · 재고 반영 ${r.applied}건`, "wow");
+      toast(`${r.days?.length ?? 1}일치 ${r.fetched}개 상품 · 재고 반영 ${r.applied}건`, "wow");
     } catch (e) {
       toast(e instanceof Error ? e.message : "가져오지 못했어요", "sad");
       await refresh("pos");
@@ -96,7 +96,8 @@ export default function SalesPage() {
   }
 
   const keysReady = Boolean(status?.storeId && status?.apiKey);
-  const ready = Boolean(status?.adapterReady);
+  const connected = runs.some((r) => r.ok);
+  const ready = keysReady && Boolean(status?.serviceKey);
   const lastRun = runs[0];
   const maxTop = Math.max(1, ...stats.top.map((t) => t.qty));
 
@@ -140,24 +141,26 @@ export default function SalesPage() {
               }
             />
             <Step
-              done={ready}
-              title="3. 빅솔론 API 연결"
+              done={connected}
+              title="3. 첫 가져오기로 연결 확인"
               desc={
-                ready
-                  ? "연결됐어요"
-                  : "빅솔론 연동 명세서(API 주소·요청 형식)를 받으면 연결해요. ASP ‘매뉴얼 다운로드’나 지원센터(1877-1125)에서 받을 수 있어요."
+                connected
+                  ? "연결됐어요. 매일 가져오면 팔린 만큼 재고가 빠져요."
+                  : keysReady
+                    ? "‘지금 가져오기’를 눌러 보세요. 처음엔 오늘 판매부터 받아요 (그 전 판매로는 재고가 안 빠져요). 누르기 전에 재고를 맞춰 두면 좋아요."
+                    : "키를 저장하면 눌러서 확인할 수 있어요."
               }
             />
           </ol>
           {user?.role === "admin" && (
             <button type="button" className="btn-primary mt-4 w-full" disabled={!ready || syncing} onClick={sync}>
-              <RefreshCw size={18} className={syncing ? "animate-spin" : ""} /> {syncing ? "가져오는 중..." : "지금 가져오기 (최근 3일)"}
+              <RefreshCw size={18} className={syncing ? "animate-spin" : ""} /> {syncing ? "가져오는 중..." : "지금 가져오기"}
             </button>
           )}
           {lastRun && (
             <p className={`mt-2 text-center text-xs ${lastRun.ok === false ? "text-danger" : "text-ink-soft"}`}>
               마지막 가져오기 {relTime(lastRun.started_at)} ·{" "}
-              {lastRun.ok === false ? lastRun.error : `새 판매 ${lastRun.inserted}건 · 재고 반영 ${lastRun.applied}건`}
+              {lastRun.ok === false ? lastRun.error : `${lastRun.fetched}개 상품 · 재고 반영 ${lastRun.applied}건`}
             </p>
           )}
         </section>
@@ -236,7 +239,7 @@ export default function SalesPage() {
             )}
 
             <section className="card p-4">
-              <p className="mb-2 font-cute text-lg">최근 판매</p>
+              <p className="mb-2 font-cute text-lg">날짜별 판매</p>
               <ul className="divide-y-2 divide-dashed divide-line">
                 {sales.slice(0, 30).map((s) => {
                   const p = s.product_id ? byId.get(s.product_id) : undefined;
@@ -246,7 +249,7 @@ export default function SalesPage() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{p?.name ?? s.product_name}</p>
                         <p className="text-xs text-ink-faint">
-                          {relTime(s.sold_at)}
+                          {s.external_id.startsWith("goods:") ? `${shortDate(s.sold_at)} 하루 ${num(s.qty)}개` : relTime(s.sold_at)}
                           {s.payment ? ` · ${s.payment}` : ""}
                           {s.stock_applied_at ? " · 재고 반영됨" : ""}
                         </p>

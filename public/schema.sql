@@ -313,8 +313,9 @@ grant execute on function public.claim_print_jobs(integer) to authenticated;
 
 -- ---------------------------------------------------------------------
 -- 5-2. POS(빅솔론) 매출 연동
---   판매 한 줄 = 한 행. 서버(서비스 키)만 쓰고, 직원은 읽기만 해요.
---   apply_pos_sales()가 상품과 연결하고 재고를 빼요. 여러 번 실행해도 한 번만 빠져요.
+--   한 행 = (날짜, 상품)별 판매 합계 또는 판매 한 줄. 서버(서비스 키)만 쓰고, 직원은 읽기만 해요.
+--   같은 날 수량이 늘면(3 → 5) 그 행의 qty가 바뀌고, apply_pos_sales()가 차이(2개)만 재고에서 빼요.
+--   applied_qty = 지금까지 재고에 반영한 수량. 여러 번 실행해도 중복으로 빠지지 않아요.
 -- ---------------------------------------------------------------------
 create table if not exists public.pos_sales (
   id uuid primary key default gen_random_uuid(),
@@ -328,14 +329,18 @@ create table if not exists public.pos_sales (
   amount integer not null default 0,
   payment text,
   product_id uuid references public.products (id) on delete set null,
+  applied_qty integer not null default 0,
   stock_applied_at timestamptz,
   raw jsonb,
   created_at timestamptz not null default now(),
   unique (source, external_id)
 );
 
+alter table public.pos_sales add column if not exists applied_qty integer not null default 0;
+
 create index if not exists pos_sales_sold_idx on public.pos_sales (sold_at desc);
-create index if not exists pos_sales_pending_idx on public.pos_sales (stock_applied_at) where stock_applied_at is null;
+drop index if exists public.pos_sales_pending_idx;
+create index if not exists pos_sales_unapplied_idx on public.pos_sales (product_id) where qty <> applied_qty;
 
 create table if not exists public.pos_sync_runs (
   id uuid primary key default gen_random_uuid(),
@@ -382,30 +387,30 @@ begin
        or (s.barcode is not null and p.barcode = s.barcode));
   get diagnostics matched = row_count;
 
-  -- 아직 안 뺀 판매만 재고에서 빼기 (반품은 음수 수량이라 다시 더해져요)
+  -- 아직 반영 안 된 차이만 재고에서 빼기 (수량이 줄면 = 반품, 다시 더해져요)
   with todo as (
-    select id, product_id, qty, external_id
+    select id, product_id, qty - applied_qty as delta, external_id
       from public.pos_sales
-     where product_id is not null and stock_applied_at is null
+     where product_id is not null and qty <> applied_qty
      for update skip locked
   ), moves as (
     insert into public.stock_moves (product_id, kind, qty, memo, created_by_name)
-    select product_id, 'sale', -qty, '빅솔론 판매 ' || external_id, '빅솔론' from todo
+    select product_id, 'sale', -delta, '빅솔론 판매 ' || external_id, '빅솔론' from todo
     returning product_id, qty
   ), stock as (
     update public.products p
-       set stock_qty = p.stock_qty + d.delta
-      from (select product_id, sum(qty) as delta from moves group by product_id) d
+       set stock_qty = p.stock_qty + d.change
+      from (select product_id, sum(qty) as change from moves group by product_id) d
      where p.id = d.product_id
     returning p.id
   )
   update public.pos_sales s
-     set stock_applied_at = now()
+     set applied_qty = s.qty, stock_applied_at = now()
     from todo
    where s.id = todo.id;
   get diagnostics applied = row_count;
 
-  select count(*) into unmatched from public.pos_sales where product_id is null;
+  select count(*) into unmatched from public.pos_sales where product_id is null and qty <> 0;
   return json_build_object('matched', matched, 'applied', applied, 'unmatched', unmatched);
 end $$;
 

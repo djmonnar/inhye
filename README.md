@@ -59,14 +59,21 @@
 
 아이폰은 모든 브라우저가 WebUSB를 막아서 프린터를 직접 꽂을 수는 없어요(3번 방식으로 쓰세요). 이 모델엔 블루투스·와이파이가 없어요.
 
-## 빅솔론 매출 연동 (준비 완료, 명세서 대기)
+## 빅솔론 매출 연동
 
-빅솔론 매장솔루션(ASP)에서 **연동 키(매장 ID + API 키)**를 발급받았어요. 받는 쪽은 다 만들어 뒀어요.
+빅솔론 관리자 화면(www.bixolon-pos.com)이 쓰는 API를 그대로 불러요 (HAR로 확인):
 
-- `pos_sales` 표: 판매 한 줄 = 한 행, `(source, external_id)`로 중복 저장 방지
-- `apply_pos_sales()`: 빅솔론 상품 코드 → 바코드 순으로 우리 상품과 연결하고, 아직 안 뺀 판매만 재고에서 빼요(반품은 다시 더함). 몇 번 실행해도 한 번만 빠져요. 서버(서비스 키)에서만 실행돼요.
-- `/api/pos/sync`(관리자) · `/api/pos/status` · 화면 **더보기 → 매출**
-- 빅솔론 호출부는 `src/lib/server/bixolon.ts`의 `fetchBixolonSales()` 하나 — **API 주소·요청 형식(연동 명세서)**을 받으면 채워요.
+```
+GET https://api.bixolon-pos.com/api/v2/sales/analysis/goods?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+헤더: shop-id(매장 ID), brand-id / hq-id / agency-id(선택), authorization
+응답: 상품별 합계 [{ goodsId, goodsCode, goodsName, salesQty, salesAmount, paymentAmount, ... }]
+```
+
+- 하루씩 받아서 `pos_sales`에 (날짜, 상품)별 한 행으로 저장해요. 같은 날 수량이 늘면 행이 갱신되고,
+  `apply_pos_sales()`가 **차이만** 재고에서 빼요(`applied_qty`). 줄면(반품) 다시 더해요. 중복으로 빠지지 않아요.
+- 처음 가져올 때는 **오늘부터** 받아요 — 연동 전 판매로 재고가 빠지지 않게요. 이후엔 마지막 성공일 전날부터 오늘까지.
+- 상품 연결: 빅솔론 상품 코드(`goodsCode`, 예: S000171) → 우리 상품의 ‘빅솔론 상품 코드’. 빅솔론 상품 목록 엑셀을 가져오면 한 번에 채워져요.
+- 화면: **더보기 → 매출**, `/api/pos/sync`(관리자), `/api/pos/status`
 
 키는 **Vercel 환경변수에만** 넣어요(채팅·코드에 넣지 않기):
 
@@ -74,9 +81,8 @@
 | --- | --- |
 | `BIXOLON_STORE_ID` | 연동 키 발급 화면의 ‘매장 ID’ |
 | `BIXOLON_API_KEY` | 발급된 API 키 (Sensitive로 저장) |
-| `BIXOLON_API_BASE` | 명세서의 API 주소 (받으면) |
-
-매출을 상품과 연결하려면 상품에 **빅솔론 상품 코드**(S000098 같은 값)가 있어야 해요. 빅솔론 상품 목록 엑셀을 ‘엑셀 → 가져오기’로 넣으면 한 번에 채워져요.
+| `BIXOLON_BRAND_ID` / `BIXOLON_HQ_ID` / `BIXOLON_AGENCY_ID` | (선택) 관리자 화면이 함께 보내는 값 |
+| `BIXOLON_AUTH_SCHEME` | (선택) 기본 `Bearer`. 빅솔론이 다른 형식을 쓰면 바꿔요 (`none` = 키만) |
 
 ## 처음 설정하기 (한 번만)
 

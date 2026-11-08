@@ -1,5 +1,5 @@
 import { adminClient } from "./admin";
-import { fetchBixolonSales, PosNotReady, type PosSaleLine } from "./bixolon";
+import { fetchBixolonDay, PosNotReady, type PosSaleLine } from "./bixolon";
 
 export interface PosSyncResult {
   fetched: number;
@@ -7,6 +7,7 @@ export interface PosSyncResult {
   matched: number;
   applied: number;
   unmatched: number;
+  days: string[];
 }
 
 function chunk<T>(arr: T[], size: number): T[][] {
@@ -15,16 +16,35 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
-/** 판매 줄을 저장하고(중복은 무시) 상품 연결 + 재고 차감까지 해요. 실행 기록도 남겨요. */
-export async function ingestPosSales(
-  source: string,
-  lines: PosSaleLine[],
-  range: { from: Date; to: Date },
-): Promise<PosSyncResult> {
+/** 한국 날짜 YYYY-MM-DD */
+export function kstDay(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+}
+
+function daysBetween(from: string, to: string): string[] {
+  const out: string[] = [];
+  const d = new Date(`${from}T00:00:00Z`);
+  const end = new Date(`${to}T00:00:00Z`);
+  while (d <= end && out.length < 31) {
+    out.push(d.toISOString().slice(0, 10));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return out;
+}
+
+/**
+ * 판매 행을 저장(같은 external_id면 수량·금액 갱신)하고 상품 연결 + 재고 차감까지 해요.
+ * 실행 기록도 남겨요.
+ */
+export async function ingestPosSales(source: string, lines: PosSaleLine[], days: string[]): Promise<PosSyncResult> {
   const db = adminClient();
   const { data: run } = await db
     .from("pos_sync_runs")
-    .insert({ source, range_from: range.from.toISOString(), range_to: range.to.toISOString() })
+    .insert({
+      source,
+      range_from: `${days[0]}T00:00:00+09:00`,
+      range_to: `${days[days.length - 1]}T00:00:00+09:00`,
+    })
     .select("id")
     .single();
   try {
@@ -34,7 +54,7 @@ export async function ingestPosSales(
         .from("pos_sales")
         .upsert(
           part.map((l) => ({ ...l, source })),
-          { onConflict: "source,external_id", ignoreDuplicates: true },
+          { onConflict: "source,external_id" },
         )
         .select("id");
       if (error) throw new Error(error.message);
@@ -51,12 +71,9 @@ export async function ingestPosSales(
       unmatched: a.unmatched ?? 0,
     };
     if (run) {
-      await db
-        .from("pos_sync_runs")
-        .update({ ok: true, finished_at: new Date().toISOString(), ...result })
-        .eq("id", run.id);
+      await db.from("pos_sync_runs").update({ ok: true, finished_at: new Date().toISOString(), ...result }).eq("id", run.id);
     }
-    return result;
+    return { ...result, days };
   } catch (e) {
     if (run) {
       await db
@@ -68,11 +85,31 @@ export async function ingestPosSales(
   }
 }
 
-export async function syncBixolon(days: number): Promise<PosSyncResult> {
-  const to = new Date();
-  const from = new Date(to.getTime() - days * 86400000);
-  const lines = await fetchBixolonSales({ from, to });
-  return ingestPosSales("bixolon", lines, { from, to });
+/**
+ * 마지막으로 성공한 날의 전날부터 오늘까지 하루씩 받아와요 (늦게 들어온 판매·반품 반영).
+ * 처음이면 오늘부터 — 연동을 켠 날 이전 판매로 재고가 빠지지 않게요.
+ */
+export async function syncBixolon(): Promise<PosSyncResult> {
+  const db = adminClient();
+  const today = kstDay(new Date());
+  const { data: last } = await db
+    .from("pos_sync_runs")
+    .select("range_to")
+    .eq("source", "bixolon")
+    .eq("ok", true)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  let from = today;
+  if (last?.range_to) {
+    const prev = new Date(last.range_to);
+    prev.setUTCDate(prev.getUTCDate() - 1);
+    from = kstDay(prev) < today ? kstDay(prev) : today;
+  }
+  const days = daysBetween(from, today);
+  const lines: PosSaleLine[] = [];
+  for (const day of days) lines.push(...(await fetchBixolonDay(day)));
+  return ingestPosSales("bixolon", lines, days);
 }
 
 export { PosNotReady };

@@ -241,4 +241,5 @@ export interface PosSyncResult {
   matched: number;
   applied: number;
   unmatched: number;
+  days?: string[];
 }

@@ -72,7 +72,8 @@ export interface DataStore {
   listPosSales(sinceISO: string): Promise<PosSale[]>;
   listPosSyncRuns(limit?: number): Promise<PosSyncRun[]>;
   posStatus(): Promise<PosStatus>;
-  posSync(days: number): Promise<PosSyncResult>;
+  /** 마지막 가져오기 이후 매출을 받아와요 (서버가 기간을 정해요). */
+  posSync(): Promise<PosSyncResult>;
 }
 
 export class StoreError extends Error {}
