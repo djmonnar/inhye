@@ -1,6 +1,6 @@
 import { json, requireMember } from "@/lib/server/admin";
 import { fetchBixolonDay, PosNotReady } from "@/lib/server/bixolon";
-import { kstDay } from "@/lib/server/pos";
+import { kstDay, linkCodesByName } from "@/lib/server/pos";
 import type { PosLive } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -27,13 +27,12 @@ export async function GET(req: Request) {
 
   try {
     const lines = await fetchBixolonDay(day);
-    const live: PosLive = {
-      day,
-      fetchedAt: new Date().toISOString(),
-      items: lines.map((l) => ({ code: l.product_code, name: l.product_name, qty: l.qty, amount: l.amount })),
-    };
+    const items = lines.map((l) => ({ code: l.product_code, name: l.product_name, qty: l.qty, amount: l.amount }));
+    // 앱에 없는 코드 중 이름이 같은 상품이 있으면 코드를 붙여요 (실패해도 판매는 보여줘요)
+    const linked = await linkCodesByName(items).catch(() => 0);
+    const live: PosLive = { day, fetchedAt: new Date().toISOString(), items };
     cache.set(day, live);
-    return json(live);
+    return json({ ...live, linked });
   } catch (e) {
     if (e instanceof PosNotReady) return json({ error: e.message }, 501);
     return json({ error: e instanceof Error ? e.message : "빅솔론에서 받아오지 못했어요." }, 502);

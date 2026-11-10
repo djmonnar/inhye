@@ -247,6 +247,8 @@ export interface PosLive {
   fetchedAt: string;
   items: PosLiveItem[];
   sample?: boolean;
+  /** 이번에 이름이 같아서 빅솔론 코드를 붙인 앱 상품 수 */
+  linked?: number;
 }
 
 export interface PosSyncResult {
@@ -256,4 +258,5 @@ export interface PosSyncResult {
   applied: number;
   unmatched: number;
   days?: string[];
+  linked?: number;
 }

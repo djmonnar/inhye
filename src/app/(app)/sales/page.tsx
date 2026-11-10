@@ -48,6 +48,8 @@ const dayLabel = (day: string) =>
 
 /** 빅솔론 하루치 판매를 바로 받아 보여주기만 해요 (저장·재고 차감 없음 — DB 표가 없어도 돼요). */
 function LiveSales({ products }: { products: Product[] }) {
+  const toast = useToast();
+  const refresh = useRefresh();
   const [today] = useState(kstToday);
   const [day, setDay] = useState(today);
   const [data, setData] = useState<PosLive | null>(null);
@@ -62,14 +64,20 @@ function LiveSales({ products }: { products: Product[] }) {
     setLoading(true);
     setError("");
     try {
-      setData(await store().posLive(d));
+      const live = await store().posLive(d);
+      setData(live);
+      if (live.linked) {
+        // 이름이 같은 앱 상품에 빅솔론 코드를 붙였어요 → 상품 목록을 새로 받아 바로 연결돼 보이게
+        await refresh("products");
+        toast(`이름이 같은 상품 ${live.linked}개에 빅솔론 코드를 붙였어요`, "wow");
+      }
     } catch (e) {
       setData(null);
       setError(e instanceof Error ? e.message : "빅솔론에서 받아오지 못했어요.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refresh, toast]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 날짜를 바꾸면 그날 판매를 받아와요
@@ -240,7 +248,10 @@ export default function SalesPage() {
       // 처음 가져올 때만 시작 날짜를 보내요 (그다음부터는 서버가 알아서 이어 받아요)
       const r = await store().posSync(connected ? undefined : fromDay);
       await refresh("pos", "products", "moves");
-      toast(`${r.days?.length ?? 1}일치 ${r.fetched}개 상품 · 재고 반영 ${r.applied}건`, "wow");
+      toast(
+        `${r.days?.length ?? 1}일치 ${r.fetched}개 상품 · 재고 반영 ${r.applied}건${r.linked ? ` · 이름으로 코드 연결 ${r.linked}개` : ""}`,
+        "wow",
+      );
     } catch (e) {
       toast(e instanceof Error ? e.message : "가져오지 못했어요", "sad");
       await refresh("pos");

@@ -8,6 +8,7 @@ export interface PosSyncResult {
   applied: number;
   unmatched: number;
   days: string[];
+  linked?: number;
 }
 
 /** DB 오류를 사장님이 할 일이 보이는 문장으로 바꿔요. */
@@ -116,7 +117,7 @@ export async function syncBixolon(from?: string): Promise<PosSyncResult> {
       throw new PosBadRequest("시작 날짜는 오늘부터 30일 전까지 고를 수 있어요.");
     }
     const days = daysBetween(from, today);
-    return ingestPosSales("bixolon", await fetchDays(days), days);
+    return ingestWithLinks(await fetchDays(days), days);
   }
   const { data: last } = await db
     .from("pos_sync_runs")
@@ -133,7 +134,13 @@ export async function syncBixolon(from?: string): Promise<PosSyncResult> {
     start = kstDay(prev) < today ? kstDay(prev) : today;
   }
   const days = daysBetween(start, today);
-  return ingestPosSales("bixolon", await fetchDays(days), days);
+  return ingestWithLinks(await fetchDays(days), days);
+}
+
+/** 이름으로 코드를 먼저 이어 붙이고 저장해요 (붙이기가 실패해도 저장은 해요). */
+async function ingestWithLinks(lines: PosSaleLine[], days: string[]): Promise<PosSyncResult> {
+  const linked = await linkCodesByName(lines.map((l) => ({ code: l.product_code, name: l.product_name }))).catch(() => 0);
+  return { ...(await ingestPosSales("bixolon", lines, days)), linked };
 }
 
 /** 하루씩 차례로 받아요. 빅솔론 방화벽(WAF)에 걸리지 않게 사이에 조금 쉬어요. */
@@ -147,5 +154,59 @@ async function fetchDays(days: string[]): Promise<PosSaleLine[]> {
 }
 
 export class PosBadRequest extends Error {}
+
+const normName = (s: string) => s.normalize("NFC").replace(/\s+/g, " ").trim().toLowerCase();
+
+/**
+ * 빅솔론 상품 코드가 앱에 없을 때, 이름이 똑같은 앱 상품(코드 없음)이 딱 하나면 그 상품에 코드를 붙여요.
+ * - 같은 이름의 앱 상품이 여러 개거나, 빅솔론에 같은 이름이 여러 코드로 있으면 헷갈리니 건너뛰어요.
+ * - 코드는 빅솔론에서 온 거라 ‘빅솔론 반영 필요’ 표시는 붙기 전 상태 그대로 둬요.
+ * 붙인 개수를 돌려줘요.
+ */
+export async function linkCodesByName(items: { code: string | null; name: string }[]): Promise<number> {
+  const byName = new Map<string, Set<string>>();
+  for (const it of items) {
+    if (!it.code || !it.name.trim()) continue;
+    const key = normName(it.name);
+    byName.set(key, (byName.get(key) ?? new Set()).add(it.code));
+  }
+  if (!byName.size) return 0;
+  const db = adminClient();
+  const codes = [...new Set([...byName.values()].flatMap((s) => [...s]))];
+  const { data: taken, error: e1 } = await db.from("products").select("kiosk_code").in("kiosk_code", codes);
+  if (e1) throw dbError(e1);
+  const takenCodes = new Set((taken ?? []).map((t) => t.kiosk_code as string));
+  const { data: free, error: e2 } = await db
+    .from("products")
+    .select("id, name, kiosk_changed_at, kiosk_synced_at")
+    .is("kiosk_code", null);
+  if (e2) throw dbError(e2);
+  const candidates = new Map<string, { id: string; kiosk_changed_at: string; kiosk_synced_at: string | null }[]>();
+  for (const p of free ?? []) {
+    const key = normName(p.name as string);
+    candidates.set(key, [...(candidates.get(key) ?? []), p as { id: string; kiosk_changed_at: string; kiosk_synced_at: string | null }]);
+  }
+  let linked = 0;
+  for (const [key, codeSet] of byName) {
+    if (codeSet.size !== 1) continue;
+    const code = [...codeSet][0];
+    const match = candidates.get(key);
+    if (takenCodes.has(code) || !match || match.length !== 1) continue;
+    const p = match[0];
+    const wasClean = Boolean(p.kiosk_synced_at && p.kiosk_changed_at <= p.kiosk_synced_at);
+    const { data: upd, error } = await db
+      .from("products")
+      .update({ kiosk_code: code })
+      .eq("id", p.id)
+      .is("kiosk_code", null)
+      .select("kiosk_changed_at")
+      .maybeSingle();
+    if (error || !upd) continue;
+    // 코드 변경으로 붙은 ‘반영 필요’ 표시를 원래대로 (원래 깨끗했던 상품만)
+    if (wasClean) await db.from("products").update({ kiosk_synced_at: upd.kiosk_changed_at }).eq("id", p.id);
+    linked++;
+  }
+  return linked;
+}
 
 export { PosNotReady };
