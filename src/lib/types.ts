@@ -234,6 +234,21 @@ export interface PosStatus {
   adapterReady: boolean;
 }
 
+/** 빅솔론에서 바로 받아 본 하루치 상품별 판매 (저장 안 함) */
+export interface PosLiveItem {
+  code: string | null;
+  name: string;
+  qty: number;
+  amount: number;
+}
+
+export interface PosLive {
+  day: string;
+  fetchedAt: string;
+  items: PosLiveItem[];
+  sample?: boolean;
+}
+
 export interface PosSyncResult {
   fetched: number;
   inserted: number;

@@ -6,6 +6,7 @@ import type {
   Member,
   MemberInput,
   MoveInput,
+  PosLive,
   PosSale,
   PosStatus,
   PosSyncResult,
@@ -74,6 +75,8 @@ export interface DataStore {
   posStatus(): Promise<PosStatus>;
   /** 마지막 가져오기 이후 매출을 받아와요 (서버가 기간을 정해요). */
   posSync(): Promise<PosSyncResult>;
+  /** 빅솔론 하루치 판매를 바로 보기만 해요 (저장·재고 차감 없음). day = 한국 날짜 YYYY-MM-DD */
+  posLive(day: string): Promise<PosLive>;
 }
 
 export class StoreError extends Error {}

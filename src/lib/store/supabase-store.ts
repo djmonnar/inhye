@@ -8,6 +8,7 @@ import type {
   AppUser,
   BulkProductRow,
   Member,
+  PosLive,
   PosSale,
   PosStatus,
   PosSyncResult,
@@ -348,6 +349,10 @@ export function createSupabaseStore(): DataStore {
 
     async posSync() {
       return api<PosSyncResult>("/api/pos/sync", "POST", {});
+    },
+
+    async posLive(day) {
+      return api<PosLive>(`/api/pos/live?day=${encodeURIComponent(day)}`, "GET");
     },
   };
 }

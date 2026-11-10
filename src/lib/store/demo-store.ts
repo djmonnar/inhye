@@ -368,6 +368,19 @@ export function createDemoStore(): DataStore {
     async posSync() {
       throw new StoreError("체험 모드에서는 빅솔론 매출을 받을 수 없어요. Supabase를 먼저 연결해 주세요.");
     },
+
+    async posLive(day) {
+      // 체험 모드: 화면을 미리 볼 수 있게 샘플을 보여줘요 (빅솔론에 접속하지 않아요)
+      const products = (await store.listProducts()).filter((p) => p.is_active).slice(0, 4);
+      const items = products.map((p, i) => ({
+        code: p.kiosk_code,
+        name: p.name,
+        qty: 4 - i,
+        amount: (4 - i) * p.sale_price,
+      }));
+      items.push({ code: "S009999", name: "앱에 없는 샘플 상품", qty: 1, amount: 3000 });
+      return { day, fetchedAt: new Date().toISOString(), items, sample: true };
+    },
   };
   return store;
 }

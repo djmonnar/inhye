@@ -1,14 +1,15 @@
 "use client";
 
-import { Check, CircleHelp, Plus, RefreshCw } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, CircleHelp, Plus, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth, useToast } from "@/components/providers";
 import { EmptyState, Loading, PageHeader, ProductThumb } from "@/components/ui";
 import { IS_DEMO } from "@/lib/config";
 import { num, relTime, shortDate, won } from "@/lib/format";
 import { usePosRuns, usePosSales, usePosStatus, useProducts, useRefresh } from "@/lib/queries";
 import { store } from "@/lib/store";
+import type { PosLive, Product } from "@/lib/types";
 
 const startOfDay = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
@@ -27,6 +28,154 @@ function Step({ done, title, desc }: { done: boolean; title: string; desc: React
         <div className="text-xs text-ink-soft">{desc}</div>
       </div>
     </li>
+  );
+}
+
+/** 한국 날짜 YYYY-MM-DD */
+const kstToday = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+
+function shiftDay(day: string, n: number) {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+const dayLabel = (day: string) =>
+  new Intl.DateTimeFormat("ko-KR", { timeZone: "UTC", month: "long", day: "numeric", weekday: "short" }).format(
+    new Date(`${day}T00:00:00Z`),
+  );
+
+/** 빅솔론 하루치 판매를 바로 받아 보여주기만 해요 (저장·재고 차감 없음 — DB 표가 없어도 돼요). */
+function LiveSales({ products }: { products: Product[] }) {
+  const [today] = useState(kstToday);
+  const [day, setDay] = useState(today);
+  const [data, setData] = useState<PosLive | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const byCode = useMemo(
+    () => new Map(products.filter((p) => p.kiosk_code).map((p) => [p.kiosk_code as string, p])),
+    [products],
+  );
+
+  const load = useCallback(async (d: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      setData(await store().posLive(d));
+    } catch (e) {
+      setData(null);
+      setError(e instanceof Error ? e.message : "빅솔론에서 받아오지 못했어요.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 날짜를 바꾸면 그날 판매를 받아와요
+    void load(day);
+  }, [day, load]);
+
+  const items = useMemo(() => [...(data?.items ?? [])].sort((a, b) => b.qty - a.qty), [data]);
+  const totalQty = items.reduce((n, it) => n + it.qty, 0);
+  const totalAmount = items.reduce((n, it) => n + it.amount, 0);
+
+  return (
+    <section className="card p-4">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <p className="font-cute text-lg">빅솔론 판매 바로 보기</p>
+        <button type="button" className="btn-ghost btn-sm" onClick={() => void load(day)} disabled={loading}>
+          <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> 새로고침
+        </button>
+      </div>
+      <p className="mb-3 text-xs text-ink-soft">
+        빅솔론에서 바로 받아 보여주기만 해요 (저장·재고 차감은 안 해요). 판매 후 최대 10분 뒤에 잡혀요.
+      </p>
+      {data?.sample && <p className="mb-2 rounded-xl bg-butter-100 px-3 py-1.5 text-xs">체험 모드 샘플이에요</p>}
+
+      <div className="mb-3 flex items-center justify-between rounded-2xl bg-cream px-1 py-1">
+        <button type="button" className="btn-ghost btn-sm" aria-label="전날" onClick={() => setDay(shiftDay(day, -1))} disabled={loading}>
+          <ChevronLeft size={18} />
+        </button>
+        <span className="font-cute">
+          {dayLabel(day)}
+          {day === today ? " · 오늘" : ""}
+        </span>
+        <button
+          type="button"
+          className="btn-ghost btn-sm"
+          aria-label="다음 날"
+          onClick={() => setDay(shiftDay(day, 1))}
+          disabled={loading || day >= today}
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
+
+      {error ? (
+        <p className="rounded-2xl bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
+          {error}
+        </p>
+      ) : !data ? (
+        <p className="py-4 text-center text-sm text-ink-soft">불러오는 중...</p>
+      ) : items.length === 0 ? (
+        <p className="py-4 text-center text-sm text-ink-soft">이날은 아직 판매가 없어요</p>
+      ) : (
+        <>
+          <div className="mb-2 grid grid-cols-2 gap-2">
+            <div className="rounded-2xl bg-berry-50 p-3">
+              <p className="text-xs text-ink-soft">판매 수량</p>
+              <p className="font-cute text-xl tabular-nums">{num(totalQty)}개</p>
+            </div>
+            <div className="rounded-2xl bg-berry-50 p-3">
+              <p className="text-xs text-ink-soft">결제 금액</p>
+              <p className="font-cute text-xl tabular-nums">{won(totalAmount)}</p>
+            </div>
+          </div>
+          <ul className="divide-y-2 divide-dashed divide-line">
+            {items.map((it) => {
+              const p = it.code ? byCode.get(it.code) : undefined;
+              return (
+                <li key={`${it.code}-${it.name}`} className="flex items-center gap-3 py-2">
+                  {p ? (
+                    <ProductThumb product={p} className="h-10 w-10" frame="rounded-xl border-2" />
+                  ) : (
+                    <span className="h-10 w-10 shrink-0 rounded-xl border-2 border-dashed border-line" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    {p ? (
+                      <Link href={`/products/${p.id}`} className="block truncate text-sm font-medium">
+                        {p.name}
+                      </Link>
+                    ) : (
+                      <p className="truncate text-sm font-medium text-ink-soft">{it.name}</p>
+                    )}
+                    <p className="truncate text-xs text-ink-faint">
+                      {it.code && <span className="font-mono">{it.code} · </span>}
+                      {p ? `앱 재고 ${num(p.stock_qty)}` : "앱에 없는 상품"}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="font-cute tabular-nums">{num(it.qty)}개</p>
+                    <p className="text-xs tabular-nums text-ink-soft">{won(it.amount)}</p>
+                  </div>
+                  {!p && (
+                    <Link
+                      href={`/products/new?${new URLSearchParams({ ...(it.code ? { code: it.code } : {}), name: it.name }).toString()}`}
+                      className="btn-soft btn-sm shrink-0"
+                      aria-label={`${it.name} 등록`}
+                    >
+                      <Plus size={14} />
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-2 text-center text-[11px] text-ink-faint">{relTime(data.fetchedAt)} 받아왔어요</p>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -164,6 +313,8 @@ export default function SalesPage() {
             </p>
           )}
         </section>
+
+        {(IS_DEMO || status?.apiKey) && <LiveSales products={products} />}
 
         {isLoading ? (
           <Loading />
