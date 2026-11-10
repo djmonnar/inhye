@@ -19,3 +19,4 @@
 - **2026-11-09** — 빅솔론 일반 지원센터는 연결되지만 개발 담당은 전화를 안 받음 → **이메일 문의**로 진행. 공개 개발자 메일은 없어서 지원센터 전달 요청 / 홈페이지 상담 양식 / 매장관리자-II 앱 개발자 연락처를 후보로 정리(`bixolon.md`).
 - **2026-11-10** — 빅솔론 개발 담당 메일 답변 + **‘외부 매출 API 연동 안내’ PDF** 받음. 관리자 화면용 `/api/v2/...`는 쓰면 안 되고 문서의 **외부 API만** 사용. 인증은 `Authorization: {매장키}`(Bearer 없이, 다른 헤더 불필요). 합계는 최대 10분 지연, 건별은 즉시. 키 유효기간·비용 없음, 과도한 호출은 WAF 차단, 엑셀 메일 발송은 불가. → 어댑터를 `/api/external/v2/sales/analysis/goods`로 바꾸고 `BIXOLON_STORE_ID` 등 설정 제거, 필요한 건 `BIXOLON_API_KEY` 하나.
 - **2026-11-10** — 정정: Supabase 환경변수는 10-28에 Vercel Supabase 연동이 이미 넣어 둠(`SUPABASE_SECRET_KEY`, `SUPABASE_PUBLISHABLE_KEY` 등 접두어 없는 이름) → 앱이 자동 인식해 **Supabase 모드로 동작 중**. ‘미입력/체험 모드’ 기록은 틀렸음(MCP로 환경변수 목록을 못 봐서 생긴 착오). `BIXOLON_API_KEY` 저장 완료.
+- **2026-11-10** — 첫 ‘지금 가져오기’: 빅솔론 호출은 통과(오류가 그다음 단계에서 남), `pos_sales` 표가 없어서 저장 실패(PGRST205) → 최신 `schema.sql`을 아직 안 돌린 상태. 서버 오류를 한국어 안내로 바꾸고, `schema.sql` 끝에 `notify pgrst, 'reload schema'` 추가.

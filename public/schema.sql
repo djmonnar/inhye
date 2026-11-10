@@ -435,6 +435,9 @@ drop policy if exists "product images delete" on storage.objects;
 create policy "product images delete" on storage.objects for delete to authenticated
   using (bucket_id = 'product-images' and public.is_member());
 
+-- 새로 만든 표·함수를 API가 바로 알아보게 해요 (schema cache 새로고침)
+notify pgrst, 'reload schema';
+
 -- ---------------------------------------------------------------------
 -- (선택) 특정 아이디를 관리자로 지정하려면 아래 줄의 주석을 풀고 아이디를 바꿔 실행하세요.
 -- update public.profiles set role = 'admin' where username = '관리자아이디';

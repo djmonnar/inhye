@@ -10,6 +10,14 @@ export interface PosSyncResult {
   days: string[];
 }
 
+/** DB 오류를 사장님이 할 일이 보이는 문장으로 바꿔요. */
+function dbError(error: { message: string; code?: string }): Error {
+  if (error.code === "PGRST205" || error.code === "PGRST202" || error.code === "42P01" || error.code === "42883") {
+    return new Error("Supabase에 매출 표가 아직 없어요. 설정 화면(/setup)에서 SQL을 복사해 Supabase SQL 편집기에서 다시 실행해 주세요.");
+  }
+  return new Error(error.message);
+}
+
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
@@ -57,11 +65,11 @@ export async function ingestPosSales(source: string, lines: PosSaleLine[], days:
           { onConflict: "source,external_id" },
         )
         .select("id");
-      if (error) throw new Error(error.message);
+      if (error) throw dbError(error);
       inserted += data?.length ?? 0;
     }
     const { data: applied, error } = await db.rpc("apply_pos_sales");
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error);
     const a = (applied ?? {}) as { matched?: number; applied?: number; unmatched?: number };
     const result = {
       fetched: lines.length,
