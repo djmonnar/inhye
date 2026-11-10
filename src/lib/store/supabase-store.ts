@@ -9,6 +9,7 @@ import type {
   BulkProductRow,
   Member,
   PosLive,
+  PosReceiptsDay,
   PosSale,
   PosStatus,
   PosSyncResult,
@@ -353,6 +354,10 @@ export function createSupabaseStore(): DataStore {
 
     async posLive(day) {
       return api<PosLive>(`/api/pos/live?day=${encodeURIComponent(day)}`, "GET");
+    },
+
+    async posReceipts(day) {
+      return api<PosReceiptsDay>(`/api/pos/receipts?day=${encodeURIComponent(day)}`, "GET");
     },
   };
 }

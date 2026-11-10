@@ -86,6 +86,14 @@
 | `GET /api/external/v2/sales` | **매출 상세(건별)**. 영업일 기준, 기간 최대 31일. 항목: `id`, `billNo`(영수증 번호), `deviceName`, `deviceType`, `status`(`PAID`/`VOID`/`RETURNED`), `salesAmount`, `paymentAmount`, `discountAmount`, `orderedAt`, `paidAt`, `cancelledAt`, `returnedAt`, `salesGoods`(상품명·판매수량·금액·옵션금액 등 배열), `salesPayments`(결제수단·결제금액·승인번호 등 배열). `salesGoods`의 정확한 필드 이름은 문서에 없어서 실제 응답으로 확인 필요. |
 | `GET /api/external/v2/sales/analysis/goods` | **상품별 매출 분석(합계)**. 선택 파라미터 `categoryId`(정수), `goodsName`(부분 일치). 응답 필드: `shopName, categoryId, categoryName, goodsId, goodsCode, goodsName, sellingPrice, unitCost, salesQty, salesAmount, paymentAmount, goodsAmount, optionAmount, discountAmount` (관리자 화면 API와 같은 모양). |
 
+### 영수증별(건별) 매출 사용 (2026-11-10)
+
+- `GET /api/pos/receipts?day=` → `fetchBixolonReceipts()`가 `/api/external/v2/sales`를 하루 단위로 불러 `normalizeReceipt()`로 정리.
+- 문서에 `salesGoods`·`salesPayments` 안쪽 칸 이름이 없어서 후보 이름을 차례로 찾아요(상품: `goodsCode/goodsName/salesQty/...`, 결제: `paymentType/paymentMethod/...`, 금액: `paymentAmount/amount/...`). 결제 종류 코드(CARD, KAKAO_PAY 등)는 한국어로 바꿔요.
+- 시간대 표시 없는 시각(`2026-11-10 14:02:33`)은 한국 시각으로 봐요.
+- 카드 번호·승인 번호 등은 화면에 필요 없어서 넘기지 않아요.
+- **실제 칸 이름 확인 필요**: 영수증 화면 맨 아래 ‘빅솔론 칸 이름 보기(개발용, 관리자)’에 응답의 칸 이름(값 없이)이 나와요. 후보와 다르면 `normalizeReceipt()`의 후보 목록에 추가.
+
 ## 4. 앱의 매출 연동 구현 (`src/lib/server/bixolon.ts`, `pos.ts`, `public/schema.sql` 5-2)
 
 - **하루씩** `sales/analysis/goods?startDate=D&endDate=D` 호출 → `pos_sales`에 (날짜, 상품) 한 행.

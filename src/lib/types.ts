@@ -251,6 +251,47 @@ export interface PosLive {
   linked?: number;
 }
 
+/** 빅솔론 영수증(건별 매출) — 보기 전용으로 정리한 모양 */
+export interface PosReceiptGoods {
+  code: string | null;
+  name: string;
+  qty: number;
+  amount: number;
+}
+
+export interface PosReceiptPayment {
+  /** 카드, 현금, 간편결제 등 (빅솔론 값을 한국어로) */
+  method: string;
+  amount: number;
+}
+
+export interface PosReceipt {
+  id: string;
+  billNo: string | null;
+  device: string | null;
+  /** PAID 결제 · VOID 취소 · RETURNED 반품 (그 밖의 값은 그대로) */
+  status: string;
+  salesAmount: number;
+  paymentAmount: number;
+  discountAmount: number;
+  /** 결제(없으면 주문) 시각 ISO */
+  at: string | null;
+  cancelledAt: string | null;
+  returnedAt: string | null;
+  goods: PosReceiptGoods[];
+  payments: PosReceiptPayment[];
+}
+
+export interface PosReceiptsDay {
+  day: string;
+  fetchedAt: string;
+  receipts: PosReceipt[];
+  /** 빅솔론 응답의 칸 이름들(값 없이) — 칸 이름이 문서와 다를 때 맞추는 용도 */
+  fieldKeys?: { receipt: string[]; goods: string[]; payments: string[] };
+  sample?: boolean;
+  linked?: number;
+}
+
 export interface PosSyncResult {
   fetched: number;
   inserted: number;

@@ -1,11 +1,13 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, CircleHelp, Plus, RefreshCw } from "lucide-react";
+import { Check, ChevronRight, CircleHelp, Plus, ReceiptText, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DayNav } from "@/components/DayNav";
 import { useAuth, useToast } from "@/components/providers";
 import { EmptyState, Loading, PageHeader, ProductThumb } from "@/components/ui";
 import { IS_DEMO } from "@/lib/config";
+import { kstToday, shiftDay } from "@/lib/day";
 import { num, relTime, shortDate, won } from "@/lib/format";
 import { usePosRuns, usePosSales, usePosStatus, useProducts, useRefresh } from "@/lib/queries";
 import { store } from "@/lib/store";
@@ -30,21 +32,6 @@ function Step({ done, title, desc }: { done: boolean; title: string; desc: React
     </li>
   );
 }
-
-/** 한국 날짜 YYYY-MM-DD */
-const kstToday = () =>
-  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-
-function shiftDay(day: string, n: number) {
-  const d = new Date(`${day}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-
-const dayLabel = (day: string) =>
-  new Intl.DateTimeFormat("ko-KR", { timeZone: "UTC", month: "long", day: "numeric", weekday: "short" }).format(
-    new Date(`${day}T00:00:00Z`),
-  );
 
 /** 빅솔론 하루치 판매를 바로 받아 보여주기만 해요 (저장·재고 차감 없음 — DB 표가 없어도 돼요). */
 function LiveSales({ products }: { products: Product[] }) {
@@ -101,23 +88,8 @@ function LiveSales({ products }: { products: Product[] }) {
       </p>
       {data?.sample && <p className="mb-2 rounded-xl bg-butter-100 px-3 py-1.5 text-xs">체험 모드 샘플이에요</p>}
 
-      <div className="mb-3 flex items-center justify-between rounded-2xl bg-cream px-1 py-1">
-        <button type="button" className="btn-ghost btn-sm" aria-label="전날" onClick={() => setDay(shiftDay(day, -1))} disabled={loading}>
-          <ChevronLeft size={18} />
-        </button>
-        <span className="font-cute">
-          {dayLabel(day)}
-          {day === today ? " · 오늘" : ""}
-        </span>
-        <button
-          type="button"
-          className="btn-ghost btn-sm"
-          aria-label="다음 날"
-          onClick={() => setDay(shiftDay(day, 1))}
-          disabled={loading || day >= today}
-        >
-          <ChevronRight size={18} />
-        </button>
+      <div className="mb-3">
+        <DayNav day={day} today={today} onChange={setDay} disabled={loading} />
       </div>
 
       {error ? (
@@ -183,6 +155,9 @@ function LiveSales({ products }: { products: Product[] }) {
           <p className="mt-2 text-center text-[11px] text-ink-faint">{relTime(data.fetchedAt)} 받아왔어요</p>
         </>
       )}
+      <Link href={`/sales/receipts?day=${day}`} className="btn-soft btn-sm mt-3 w-full">
+        <ReceiptText size={16} /> 영수증별로 보기 (시간대 · 결제수단 · 취소) <ChevronRight size={16} />
+      </Link>
     </section>
   );
 }

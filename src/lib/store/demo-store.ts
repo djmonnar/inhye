@@ -381,6 +381,34 @@ export function createDemoStore(): DataStore {
       items.push({ code: "S009999", name: "앱에 없는 샘플 상품", qty: 1, amount: 3000 });
       return { day, fetchedAt: new Date().toISOString(), items, sample: true };
     },
+
+    async posReceipts(day) {
+      // 체험 모드: 화면을 미리 볼 수 있게 샘플 영수증을 만들어요 (빅솔론에 접속하지 않아요)
+      const products = (await store.listProducts()).filter((p) => p.is_active).slice(0, 5);
+      const methods = ["카드", "카드", "카카오페이", "현금"];
+      const hours = [10, 11, 13, 13, 14, 15, 15, 16, 18, 19, 20];
+      const receipts = hours.map((h, i) => {
+        const p = products[i % Math.max(products.length, 1)];
+        const qty = (i % 3) + 1;
+        const amount = qty * (p?.sale_price || 3000);
+        const status = i === 4 ? "VOID" : i === 8 ? "RETURNED" : "PAID";
+        return {
+          id: `demo-${i}`,
+          billNo: String(1000 + i),
+          device: i % 2 ? "키오스크 2" : "키오스크 1",
+          status,
+          salesAmount: amount,
+          paymentAmount: amount,
+          discountAmount: 0,
+          at: new Date(`${day}T${String(h).padStart(2, "0")}:${String((i * 7) % 60).padStart(2, "0")}:00+09:00`).toISOString(),
+          cancelledAt: null,
+          returnedAt: null,
+          goods: [{ code: p?.kiosk_code ?? null, name: p?.name ?? "샘플 상품", qty, amount }],
+          payments: [{ method: methods[i % methods.length], amount }],
+        };
+      });
+      return { day, fetchedAt: new Date().toISOString(), receipts, sample: true };
+    },
   };
   return store;
 }

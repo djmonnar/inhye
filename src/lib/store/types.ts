@@ -7,6 +7,7 @@ import type {
   MemberInput,
   MoveInput,
   PosLive,
+  PosReceiptsDay,
   PosSale,
   PosStatus,
   PosSyncResult,
@@ -77,6 +78,8 @@ export interface DataStore {
   posSync(from?: string): Promise<PosSyncResult>;
   /** 빅솔론 하루치 판매를 바로 보기만 해요 (저장·재고 차감 없음). day = 한국 날짜 YYYY-MM-DD */
   posLive(day: string): Promise<PosLive>;
+  /** 빅솔론 하루치 영수증(건별)을 바로 보기만 해요. */
+  posReceipts(day: string): Promise<PosReceiptsDay>;
 }
 
 export class StoreError extends Error {}
