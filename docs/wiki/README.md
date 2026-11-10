@@ -12,9 +12,9 @@
 | [setup-deploy.md](setup-deploy.md) | Supabase · Vercel 설정, 환경변수, 계정/권한, 현재 설정 상태 |
 | [decisions.md](decisions.md) | 날짜순 결정·발견 기록 |
 
-## 한눈에 보는 현재 상태 (2026-11-08)
+## 한눈에 보는 현재 상태 (2026-11-10)
 
 - 앱: **https://inhye.vercel.app** (Vercel 프로젝트 `inhye`, 브랜치 `ccr-3f5271b3-xj7bqa`에 푸시하면 자동 배포)
 - 데이터: Supabase **연결 전** → 지금은 체험 모드(기기마다 따로 저장)
-- 빅솔론 상품 등록: 엑셀로 연동 ✅ / 빅솔론 매출 자동 수집: 코드 준비 완료, **연동 키 인증 방식 확인 필요** 🟡
+- 빅솔론 상품 등록: 엑셀로 연동 ✅ / 빅솔론 매출 자동 수집: 빅솔론 공식 **외부 매출 API**로 연결 ✅ (Vercel에 `BIXOLON_API_KEY`만 넣으면 돼요)
 - 라벨 인쇄: Xprinter(USB) — PC 드라이버, 안드로이드 USB 직접, 폰→노트북 인쇄 스테이션 ✅

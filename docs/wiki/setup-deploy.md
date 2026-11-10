@@ -1,6 +1,6 @@
 # 설정 · 배포
 
-## 현재 상태 (2026-11-08)
+## 현재 상태 (2026-11-10)
 
 | 항목 | 상태 |
 | --- | --- |
@@ -8,7 +8,7 @@
 | Vercel | 프로젝트 `inhye` (팀 djmonnar4-3362's projects), https://inhye.vercel.app, 푸시하면 자동 배포 |
 | Vercel 보호 | Standard Protection 켜져 있음 — 직원 폰에서 Vercel 로그인이 뜨면 Settings → Deployment Protection에서 끄기 |
 | Supabase | 프로젝트는 만들었지만 **Vercel 환경변수 미입력** → 사이트는 체험 모드 |
-| 빅솔론 키 | Vercel에 아직 없음 (`BIXOLON_STORE_ID`, `BIXOLON_API_KEY`) |
+| 빅솔론 키 | Vercel에 아직 없음 (`BIXOLON_API_KEY` 하나만 필요) |
 
 ## 환경변수 (Vercel → Settings → Environment Variables, 전 환경 체크 후 Redeploy)
 
@@ -19,10 +19,8 @@
 | `SUPABASE_SERVICE_ROLE_KEY` (또는 `SUPABASE_SECRET_KEY`) | **비밀** | 서버 전용. 관리자/직원 계정, 매출 저장 |
 | `OPENAI_API_KEY` | **비밀** | AI 기능 |
 | `OPENAI_MODEL` | | (선택) 모델 바꾸기 |
-| `BIXOLON_STORE_ID` | | 빅솔론 매장 ID (434) |
-| `BIXOLON_API_KEY` | **비밀** | 빅솔론 연동 키 |
-| `BIXOLON_BRAND_ID` / `BIXOLON_HQ_ID` / `BIXOLON_AGENCY_ID` | | (선택) 124 / 111 / 67 |
-| `BIXOLON_AUTH_SCHEME`, `BIXOLON_API_BASE` | | (선택) 인증 형식(기본 Bearer), API 주소 |
+| `BIXOLON_API_KEY` | **비밀** | 빅솔론 매장키 (ASP 외부 연결 관리 → 연동 키 발급) |
+| `BIXOLON_API_BASE` | | (선택) API 주소, 기본 `https://api.bixolon-pos.com` |
 | `NEXT_PUBLIC_SHOP_NAME` | 공개 | (선택) 가게 이름, 기본 포포하우스 |
 | `NEXT_PUBLIC_LOGIN_EMAIL_DOMAIN` | 공개 | (선택) 아이디 로그인용 내부 도메인, 기본 `inhye.local` |
 
@@ -43,6 +41,6 @@
 
 ## 에이전트(클라우드 세션) 참고
 
-- 이 저장소를 다루는 클라우드 환경 네트워크 허용 목록에 `asp-manual.notion.site`가 추가돼 있고, `api.bixolon-pos.com`용 키(시험용)가 환경 비밀로 저장돼 있어요. 앱과는 무관, 필요 없으면 환경 설정에서 지우기.
+- 이 저장소를 다루는 클라우드 환경 네트워크 허용 목록에 `asp-manual.notion.site`가 추가돼 있고, `api.bixolon-pos.com`용 키(시험용)가 환경 비밀로 저장돼 있어요(Bearer 형식으로 저장돼 공식 API에선 401 — 쓰려면 환경 설정에서 접두어 없이 다시 저장). 앱과는 무관, 필요 없으면 환경 설정에서 지우기.
 - Vercel 도구로는 배포 조회·재배포는 되지만 환경변수 목록/추가, 프로젝트 생성 권한은 없어요 → 사용자가 대시보드에서.
 - 검증 방법: `typecheck`·`lint`·`build`, Playwright(휴대폰 화면, 가짜 카메라/가짜 WebUSB), 로컬 PostgreSQL 16에 Supabase 흉내(auth/storage 스키마, anon·authenticated·service_role 역할)를 만들고 `schema.sql` 2회 실행 + RLS/함수 시험.

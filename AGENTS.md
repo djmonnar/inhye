@@ -54,7 +54,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 - Tailwind v4 주의: 기본 요소 스타일은 `@layer base` 안에(밖에 두면 유틸리티를 이겨버려요). `@apply`로 쓸 클래스는 `@utility`로.
 - TypeScript 6은 `@types/*`를 자동 포함하지 않아요 → 필요한 파일에 `/// <reference types="..."/>`.
 
-## 5. 배포 · 환경 (2026-11-08 기준)
+## 5. 배포 · 환경 (2026-11-10 기준)
 
 - GitHub `djmonnar/inhye`, 브랜치 **`ccr-3f5271b3-xj7bqa`** (유일한 브랜치 = 기본/프로덕션). 푸시하면 Vercel이 자동 배포.
 - Vercel 프로젝트 `inhye` → **https://inhye.vercel.app**
@@ -66,16 +66,16 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 | 대상 | 상태 | 자세히 |
 | --- | --- | --- |
 | 빅솔론 대량작업 엑셀 (상품 등록) | ✅ 양식 그대로 내보내기/가져오기 | [bixolon.md](docs/wiki/bixolon.md) |
-| 빅솔론 매출 API | 🟡 코드 완성, **연동 키 인증 방식 확인 필요**(Bearer로 401) | [bixolon.md](docs/wiki/bixolon.md) |
+| 빅솔론 매출 API | ✅ 공식 외부 매출 API(`/api/external/v2/...`, `Authorization: {매장키}`) — 키만 Vercel에 넣으면 동작 | [bixolon.md](docs/wiki/bixolon.md) |
 | 히엘페이 (결제) | ❌ 공개 API 없음, 승인내역엔 상품 정보 없음 | [hielpay.md](docs/wiki/hielpay.md) |
 | Xprinter 라벨 | ✅ PC 드라이버 인쇄 · 안드로이드 USB 직접(TSPL) · 노트북 인쇄 스테이션 | [printing.md](docs/wiki/printing.md) |
 | OpenAI | ✅ 사진→상품정보, 링크→상품정보, 홍보글, 가게 리포트 (`OPENAI_API_KEY`) | [features.md](docs/wiki/features.md) |
 
 ## 7. 다음에 할 일 (열린 문제)
 
-1. 사용자: Supabase 값 3개 + `BIXOLON_STORE_ID`/`BIXOLON_API_KEY`를 Vercel에 저장 → Redeploy → `/setup`에서 SQL 실행·관리자 생성.
-2. 빅솔론 지원센터(1877-1125)에 연동 키 사용법(엔드포인트·헤더 형식) 문의 → `src/lib/server/bixolon.ts`의 `headers()`만 맞추면 끝.
-3. 그동안 대안: ‘상품별 매출 분석’ **하루치 엑셀 가져오기** (샘플 파일 받으면 구현, external_id를 API와 같은 `goods:날짜:상품코드` 형식으로 맞춰 중복 차감 방지).
+1. 사용자: Supabase 값 3개 + `BIXOLON_API_KEY`(매장키)를 Vercel에 저장 → Redeploy → `/setup`에서 SQL 실행·관리자 생성 → `/sales`에서 ‘지금 가져오기’로 첫 연결 확인.
+2. 빅솔론 API는 **문서로 받은 외부 API만** 써요(관리자 화면용 `/api/v2/...`는 쓰지 않기). 과도한 호출은 WAF 차단 → 자동 가져오기를 만들면 10분 이상 간격으로.
+3. (선택) 건별 매출 `GET /api/external/v2/sales`로 영수증 단위·즉시 반영·취소/반품 상태 받기 — 실제 응답의 `salesGoods` 필드 이름을 확인한 뒤에.
 4. `src/lib/report.ts`는 아직 판매를 출고 기록으로 계산해요 → `pos_sales`가 들어오면 그걸 쓰도록.
 
 결정·발견 기록은 [`docs/wiki/decisions.md`](docs/wiki/decisions.md)에 날짜순으로 있어요.

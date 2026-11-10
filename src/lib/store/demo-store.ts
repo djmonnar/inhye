@@ -362,7 +362,7 @@ export function createDemoStore(): DataStore {
     },
 
     async posStatus() {
-      return { demo: true, serviceKey: false, storeId: false, apiKey: false, apiBase: false, adapterReady: false };
+      return { demo: true, serviceKey: false, apiKey: false, apiBase: false, adapterReady: false };
     },
 
     async posSync() {

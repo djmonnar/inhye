@@ -61,13 +61,15 @@
 
 ## 빅솔론 매출 연동
 
-빅솔론 관리자 화면(www.bixolon-pos.com)이 쓰는 API를 그대로 불러요 (HAR로 확인):
+빅솔론이 문서로 준 **외부 매출 API**를 불러요 (‘외부 매출 API 연동 안내’, 2026-11-10):
 
 ```
-GET https://api.bixolon-pos.com/api/v2/sales/analysis/goods?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
-헤더: shop-id(매장 ID), brand-id / hq-id / agency-id(선택), authorization
-응답: 상품별 합계 [{ goodsId, goodsCode, goodsName, salesQty, salesAmount, paymentAmount, ... }]
+GET https://api.bixolon-pos.com/api/external/v2/sales/analysis/goods?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+헤더: Authorization: {매장키}   (Bearer 없이 키 그대로, 다른 헤더 필요 없음)
+응답: 상품별 합계 [{ goodsId, goodsCode, goodsName, salesQty, salesAmount, paymentAmount, ... }], 없으면 []
 ```
+
+- 합계는 판매 후 **최대 10분** 뒤에 잡혀요. 너무 자주 부르면 빅솔론 방화벽(WAF)에 막힐 수 있어요.
 
 - 하루씩 받아서 `pos_sales`에 (날짜, 상품)별 한 행으로 저장해요. 같은 날 수량이 늘면 행이 갱신되고,
   `apply_pos_sales()`가 **차이만** 재고에서 빼요(`applied_qty`). 줄면(반품) 다시 더해요. 중복으로 빠지지 않아요.
@@ -79,10 +81,8 @@ GET https://api.bixolon-pos.com/api/v2/sales/analysis/goods?startDate=YYYY-MM-DD
 
 | 환경변수 | 값 |
 | --- | --- |
-| `BIXOLON_STORE_ID` | 연동 키 발급 화면의 ‘매장 ID’ |
-| `BIXOLON_API_KEY` | 발급된 API 키 (Sensitive로 저장) |
-| `BIXOLON_BRAND_ID` / `BIXOLON_HQ_ID` / `BIXOLON_AGENCY_ID` | (선택) 관리자 화면이 함께 보내는 값 |
-| `BIXOLON_AUTH_SCHEME` | (선택) 기본 `Bearer`. 빅솔론이 다른 형식을 쓰면 바꿔요 (`none` = 키만) |
+| `BIXOLON_API_KEY` | ASP ‘외부 연결 관리 → 연동 키 발급’에서 받은 매장키 (Sensitive로 저장). 매장은 키로 구분돼서 매장 ID는 따로 필요 없어요 |
+| `BIXOLON_API_BASE` | (선택) 기본 `https://api.bixolon-pos.com` |
 
 ## 처음 설정하기 (한 번만)
 

@@ -229,7 +229,6 @@ export interface PosSyncRun {
 export interface PosStatus {
   demo?: boolean;
   serviceKey: boolean;
-  storeId: boolean;
   apiKey: boolean;
   apiBase: boolean;
   adapterReady: boolean;

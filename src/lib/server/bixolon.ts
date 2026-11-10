@@ -1,17 +1,16 @@
 /**
- * 빅솔론 매장솔루션(ASP) 매출 연동.
+ * 빅솔론 매장솔루션 외부 매출 API (빅솔론 ‘외부 매출 API 연동 안내’ 2026-11-10 기준).
  *
- * 빅솔론 관리자 화면(www.bixolon-pos.com)이 쓰는 API를 그대로 불러요:
- *   GET https://api.bixolon-pos.com/api/v2/sales/analysis/goods?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
- *   헤더: shop-id(매장 ID), brand-id·hq-id·agency-id(있으면), authorization
- *   응답: 상품별 합계 [{ goodsId, goodsCode, goodsName, salesQty, salesAmount, paymentAmount, ... }]
+ *   GET https://api.bixolon-pos.com/api/external/v2/sales/analysis/goods?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+ *   헤더: Authorization: {매장키}   ← 키를 그대로 (Bearer 같은 말 없이). 매장은 키로 구분해서 다른 헤더는 필요 없어요.
+ *   응답: 상품별 합계 [{ goodsId, goodsCode, goodsName, salesQty, salesAmount, paymentAmount, ... }], 없으면 []
+ *
+ * - 합계 조회는 판매 후 최대 10분 뒤에 반영돼요 (건별 조회 /api/external/v2/sales 는 바로).
+ * - 너무 자주 부르면 방화벽(WAF)에 막힐 수 있어요 → 하루 단위로, 필요할 때만 불러요.
  *
  * 키는 Vercel 환경변수에만 둬요 (브라우저로 절대 안 나가요):
- *   BIXOLON_STORE_ID     매장 ID (연동 키 발급 화면의 ‘매장 ID’)
- *   BIXOLON_API_KEY      발급된 API 키
- *   BIXOLON_BRAND_ID / BIXOLON_HQ_ID / BIXOLON_AGENCY_ID   (선택) 관리자 화면이 같이 보내는 값
- *   BIXOLON_AUTH_SCHEME  (선택) authorization 앞에 붙일 말. 기본 "Bearer", 없이 보내려면 "none"
- *   BIXOLON_API_BASE     (선택) 기본 https://api.bixolon-pos.com
+ *   BIXOLON_API_KEY   ASP ‘외부 연결 관리 → 연동 키 발급’에서 받은 매장키
+ *   BIXOLON_API_BASE  (선택) 기본 https://api.bixolon-pos.com
  */
 
 export interface PosSaleLine {
@@ -33,10 +32,9 @@ export class PosNotReady extends Error {}
 const env = (name: string) => (process.env[name] ?? "").trim();
 
 export function bixolonStatus() {
-  const storeId = Boolean(env("BIXOLON_STORE_ID"));
   const apiKey = Boolean(env("BIXOLON_API_KEY"));
   const apiBase = Boolean(env("BIXOLON_API_BASE"));
-  return { storeId, apiKey, apiBase, adapterReady: storeId && apiKey };
+  return { apiKey, apiBase, adapterReady: apiKey };
 }
 
 interface GoodsRow {
@@ -48,37 +46,22 @@ interface GoodsRow {
   paymentAmount?: number;
 }
 
-function headers(): Record<string, string> {
-  const scheme = env("BIXOLON_AUTH_SCHEME") || "Bearer";
-  const key = env("BIXOLON_API_KEY");
-  const h: Record<string, string> = {
-    accept: "application/json",
-    "shop-id": env("BIXOLON_STORE_ID"),
-    authorization: scheme.toLowerCase() === "none" ? key : `${scheme} ${key}`,
-  };
-  for (const [name, v] of [
-    ["brand-id", "BIXOLON_BRAND_ID"],
-    ["hq-id", "BIXOLON_HQ_ID"],
-    ["agency-id", "BIXOLON_AGENCY_ID"],
-  ] as const) {
-    if (env(v)) h[name] = env(v);
-  }
-  return h;
-}
-
 /** 하루치 상품별 판매 합계 (day = 한국 날짜 YYYY-MM-DD). */
 export async function fetchBixolonDay(day: string): Promise<PosSaleLine[]> {
-  const s = bixolonStatus();
-  if (!s.storeId || !s.apiKey) {
-    throw new PosNotReady("Vercel 환경변수에 BIXOLON_STORE_ID와 BIXOLON_API_KEY를 먼저 넣어 주세요.");
+  const key = env("BIXOLON_API_KEY");
+  if (!key) {
+    throw new PosNotReady("Vercel 환경변수에 BIXOLON_API_KEY(빅솔론 매장키)를 먼저 넣어 주세요.");
   }
   const base = (env("BIXOLON_API_BASE") || "https://api.bixolon-pos.com").replace(/\/$/, "");
-  const url = `${base}/api/v2/sales/analysis/goods?startDate=${day}&endDate=${day}`;
-  const res = await fetch(url, { headers: headers(), cache: "no-store" });
-  if (res.status === 401 || res.status === 403) {
+  const url = `${base}/api/external/v2/sales/analysis/goods?startDate=${day}&endDate=${day}`;
+  const res = await fetch(url, { headers: { accept: "application/json", authorization: key }, cache: "no-store" });
+  if (res.status === 401) {
     throw new Error(
-      `빅솔론이 연동 키를 받아주지 않았어요 (HTTP ${res.status}). 키를 새로 발급했다면 Vercel의 BIXOLON_API_KEY도 바꿔 주세요.`,
+      "빅솔론이 매장키를 받아주지 않았어요 (HTTP 401). 키를 새로 발급했다면 Vercel의 BIXOLON_API_KEY도 바꾸고 Redeploy 해 주세요.",
     );
+  }
+  if (res.status === 403 || res.status === 429) {
+    throw new Error(`빅솔론이 잠시 요청을 막았어요 (HTTP ${res.status}). 너무 자주 눌렀다면 몇 분 뒤에 다시 해 주세요.`);
   }
   if (!res.ok) throw new Error(`빅솔론 응답 오류 (HTTP ${res.status})`);
   const data = (await res.json().catch(() => null)) as GoodsRow[] | { data?: GoodsRow[] } | null;

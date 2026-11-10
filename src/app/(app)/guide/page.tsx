@@ -9,10 +9,8 @@ import { SHOP_NAME } from "@/lib/config";
 const BIXOLON_ASK = `안녕하세요, 빅솔론 키오스크를 사용 중인 소품샵(${SHOP_NAME})입니다.
 상품 관리를 별도 프로그램으로 하고 있어서 몇 가지 여쭤봅니다.
 
-1. 판매 내역을 상품별(상품코드/바코드, 수량, 금액, 일시)로 엑셀 다운로드할 수 있나요?
-2. 등록된 상품 목록을 상품 코드 포함해서 엑셀로 내려받을 수 있나요?
-3. 상품·판매 데이터를 API나 웹훅으로 받을 수 있나요?
-4. 대량작업 양식의 ‘상품단가’ 칸은 원가인가요, 판매 단가인가요?
+1. 등록된 상품 목록을 상품 코드 포함해서 엑셀로 내려받을 수 있나요?
+2. 대량작업 양식의 ‘상품단가’ 칸은 원가인가요, 판매 단가인가요?
 
 감사합니다.`;
 
@@ -29,9 +27,9 @@ const STATUS = [
   { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "빅솔론 상품 목록 엑셀 → 앱으로 가져오기 (상품 코드 맞추기)" },
   { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "바코드 라벨 · 가격표 → Xprinter로 인쇄 (PC 인쇄 창 · 안드로이드 USB 직접)" },
   { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "폰(아이폰 포함)에서 보내면 노트북 인쇄 스테이션이 자동 인쇄" },
-  { tone: "bg-butter-100 text-butter-700", mark: "파일만 주시면", text: "빅솔론 판매내역 엑셀 → 재고 자동 차감 + 매출 통계" },
+  { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "빅솔론 매출 API(매장키) → 팔린 만큼 재고 자동 차감 + 매출 통계" },
   { tone: "bg-butter-100 text-butter-700", mark: "파일만 주시면", text: "히엘페이 정산 엑셀 → 일/월 카드 매출 · 수수료" },
-  { tone: "bg-berry-100 text-berry-700", mark: "업체 협조 필요", text: "엑셀 없이 실시간 자동 연동 (빅솔론·히엘페이 모두 공개 API 없음)" },
+  { tone: "bg-berry-100 text-berry-700", mark: "업체 협조 필요", text: "히엘페이 결제 내역 자동 연동 (공개 API 없음)" },
 ];
 
 export default function GuidePage() {
@@ -64,9 +62,8 @@ export default function GuidePage() {
         <section className="card space-y-3 p-4">
           <p className="font-cute text-xl">🖥️ 빅솔론 (키오스크 · 상품 관리)</p>
           <div className="rounded-2xl bg-soda-100 p-3 text-sm">
-            <b>조사 결과:</b> 빅솔론은 키오스크(K1 등)와 프린터를 만드는 회사예요. 상품·매출 데이터를 주고받는 공개 API나
-            개발자 문서는 찾지 못했어요 (공개된 개발 도구는 프린터 인쇄용 Web Print SDK뿐이에요). 그래서{" "}
-            <b>대량작업 엑셀이 공식 연결 통로</b>예요.
+            <b>연결 방법:</b> 매출은 빅솔론이 알려준 <b>외부 매출 API</b>(매장키)로 자동으로 받아요. 받은 API는 매출 조회뿐이라{" "}
+            <b>상품 등록은 대량작업 엑셀</b>로 해요.
           </div>
           <p className="font-cute">상품 올리는 순서</p>
           <ol className="list-decimal space-y-1 pl-5 text-sm text-ink-soft">
@@ -86,8 +83,11 @@ export default function GuidePage() {
             채워져요.
           </div>
           <div className="rounded-2xl bg-butter-100 p-3 text-sm">
-            <b>판매 → 재고 자동 차감</b> · 빅솔론에서 <b>상품별 판매내역 엑셀</b>을 받을 수 있으면, 그 파일 하나만 보내주세요.
-            올리기만 하면 팔린 만큼 재고가 빠지고 많이 팔린 상품·일별 매출이 보이게 붙여 드릴게요.
+            <b>판매 → 재고 자동 차감</b> · 빅솔론 매장키를 서버(Vercel)에 넣으면{" "}
+            <Link href="/sales" className="font-semibold text-berry-600 underline">
+              매출 화면
+            </Link>
+            에서 팔린 상품을 받아와 그만큼 재고를 빼요. 판매 후 최대 10분 뒤에 잡혀요.
           </div>
           <div className="rounded-2xl border-2 border-dashed border-line bg-cream p-3 text-xs whitespace-pre-wrap text-ink-soft">
             {BIXOLON_ASK}

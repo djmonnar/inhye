@@ -10,7 +10,8 @@
   - 지원센터(1877-1125)에 개발 담당 메일 주소를 묻거나 문의 전달을 요청하기
   - 빅솔론 홈페이지 제품 상담 양식: https://kr.bixolon.com/contact.php (본사 대표 031-218-5500)
   - 구글플레이 ‘빅솔론 매장관리자-II’ 앱 페이지의 개발자 연락처 이메일 (같은 ASP 서버를 쓰는 앱 — 매장솔루션 전용 창구인지는 미확인)
-- 포포하우스 매장 식별값 (비밀 아님): `shop-id` **434**, `brand-id` 124, `hq-id` 111, `agency-id` 67
+  - → 2026-11-10 메일로 개발 담당 답변과 API 문서를 받았어요 (아래 3-1).
+- 포포하우스 매장 식별값 (비밀 아님): `shop-id` **434**, `brand-id` 124, `hq-id` 111, `agency-id` 67 — 관리자 화면용 값이고, 외부 API는 매장키만 있으면 돼요.
 
 ## 1. 상품 대량작업 엑셀 (✅ 연동 중)
 
@@ -41,7 +42,7 @@
 - **연동 키 발급**: “새로운 연동 키가 생성되었습니다” 창에 **매장 ID(434)** 와 **생성된 API 키**가 나옴(창을 닫으면 다시 못 봄).
   - 이 키는 채팅에 일부 노출된 적이 있어 **재발급 권장**. 값은 Vercel `BIXOLON_API_KEY`에만 저장.
 
-## 3. 매출 API 조사 (HAR, 2026-11-08)
+## 3. 매출 API 조사 (HAR, 2026-11-08) — 관리자 화면용, 연동에는 쓰지 않기
 
 사용자가 관리자 화면에서 HAR을 떠서 줬어요(쿠키·인증 값은 브라우저가 지운 상태).
 
@@ -59,17 +60,31 @@
 - `sales/summary/payment` 응답: `shopId, shopName, paymentType, paymentAmount, paymentCount, returnAmount, returnCount`
 - `sales/summary/payment/card` 응답: `shopName, code, name, paymentAmount, paymentCount, returnAmount, returnCount`
 
-### 연동 키로 호출 시험 → 401
+### 연동 키로 관리자 API 호출 → 401 (2026-11-08)
 
-`GET /api/v2/sales/analysis/goods` + `shop-id: 434` + `Authorization: Bearer <연동 키>` →
-`401 {"status":401,"code":"UNAUTHORIZED","message":"유효한 인증 자격 증명이 없습니다."}` (1분 뒤 재시도도 동일).
+`GET /api/v2/sales/analysis/goods` + `shop-id: 434` + `Authorization: Bearer <연동 키>` → `401 UNAUTHORIZED`.
+→ 관리자 화면용 API는 연동 키로 쓸 수 없는 게 맞았어요(아래 공식 답변).
 
-- 해석: 연동 키는 관리자 화면 API의 Bearer 토큰으로는 안 받음 → **다른 엔드포인트(연동 업체용) 또는 다른 헤더 형식**일 가능성.
-  (사용자가 새로 발급한 키를 정확히 넣었는지도 재확인 필요.)
-- **하지 않기로 한 것**: 사장님 ASP 로그인 비밀번호/세션을 서버에 저장해 관리자 API를 대신 부르는 방식 — 비공식이고, 토큰이 만료되며, 계정 탈취 위험.
-- 지원센터에 물어볼 문구:
-  > 외부 연결 관리에서 발급한 매장 ID(434)와 API 키로 매출을 조회하려 합니다. 어떤 API 주소를 어떤 헤더 형식으로 호출해야 하나요?
-  > `api.bixolon-pos.com/api/v2/sales/analysis/goods`에 `shop-id: 434`, `Authorization: Bearer 키`로 보내면 401이 납니다. 연동 업체로 등록해야 쓸 수 있는 키인가요?
+## 3-1. ✅ 공식 외부 매출 API (2026-11-10, 빅솔론 개발 담당 메일 답변)
+
+빅솔론 개발 담당이 메일로 답하면서 **‘외부 매출 API 연동 안내’ PDF**(2쪽)를 보내 줬어요.
+
+**답변 요약**
+- 관리자 화면(ASP)이 쓰는 API(`/api/v2/...`)는 쓰면 안 되고, **문서로 준 API만** 쓸 수 있어요.
+- 상품별 판매 수량을 상품 코드와 함께 받을 수 있고, 영수증별(건별) 조회도 돼요.
+- 건별 조회는 **즉시**, 합계 조회는 **최대 10분 뒤**부터 반영돼요.
+- 키 유효기간·비용은 없어요. 다만 **너무 자주 부르면 WAF(방화벽)에 막힐 수 있어요.**
+- 매출 엑셀을 메일로 보내주는 기능은 없어요.
+
+**공통**
+- 기본 주소 `https://api.bixolon-pos.com`
+- 인증: `Authorization: {매장키}` — 키를 **그대로**(Bearer 없이). 매장은 키로 구분해서 `shop-id` 같은 헤더는 필요 없어요.
+- 필수 파라미터 `startDate`, `endDate` (YYYY-MM-DD, 시작일 ≤ 종료일). 응답은 HTTP 200 + JSON 배열, 없으면 `[]`.
+
+| API | 내용 |
+| --- | --- |
+| `GET /api/external/v2/sales` | **매출 상세(건별)**. 영업일 기준, 기간 최대 31일. 항목: `id`, `billNo`(영수증 번호), `deviceName`, `deviceType`, `status`(`PAID`/`VOID`/`RETURNED`), `salesAmount`, `paymentAmount`, `discountAmount`, `orderedAt`, `paidAt`, `cancelledAt`, `returnedAt`, `salesGoods`(상품명·판매수량·금액·옵션금액 등 배열), `salesPayments`(결제수단·결제금액·승인번호 등 배열). `salesGoods`의 정확한 필드 이름은 문서에 없어서 실제 응답으로 확인 필요. |
+| `GET /api/external/v2/sales/analysis/goods` | **상품별 매출 분석(합계)**. 선택 파라미터 `categoryId`(정수), `goodsName`(부분 일치). 응답 필드: `shopName, categoryId, categoryName, goodsId, goodsCode, goodsName, sellingPrice, unitCost, salesQty, salesAmount, paymentAmount, goodsAmount, optionAmount, discountAmount` (관리자 화면 API와 같은 모양). |
 
 ## 4. 앱의 매출 연동 구현 (`src/lib/server/bixolon.ts`, `pos.ts`, `public/schema.sql` 5-2)
 
@@ -79,9 +94,10 @@
   PostgreSQL에서 검증: 20 → 17(3개) → 15(5개로 증가) → 16(반품 1).
 - 상품 연결: `goodsCode` = 상품의 `kiosk_code`, 없으면 바코드. 연결 안 된 상품은 매출 화면 ‘앱에 없는 상품’에 나오고 원터치 등록.
 - 첫 가져오기는 **오늘부터**(연동 전 판매로 재고가 빠지지 않게). 이후엔 마지막 성공일 전날부터 오늘까지(최대 31일).
-- 인증 헤더는 `BIXOLON_AUTH_SCHEME`(기본 `Bearer`, `none`이면 키만)로 바꿀 수 있어요. 지원센터 답에 맞춰 `headers()`만 고치면 돼요.
-- 키·ID는 서버 환경변수에만: `BIXOLON_STORE_ID`, `BIXOLON_API_KEY`, (선택) `BIXOLON_BRAND_ID`, `BIXOLON_HQ_ID`, `BIXOLON_AGENCY_ID`, `BIXOLON_API_BASE`.
-- 대안(미구현): 상품별 매출 분석 **하루치 엑셀** 가져오기 — 엑셀 열: 상품 코드, 상품명, 판매가, 원가, 판매 수량, 상품 금액, 옵션 금액, 할인 금액, 매출 금액, 결제 금액, 이익률(매뉴얼 기준). 실제 샘플 파일을 받은 뒤 구현.
+- 호출: `GET /api/external/v2/sales/analysis/goods`, 헤더 `Authorization: {매장키}`만. 401이면 키 확인, 403/429면 WAF로 보고 잠시 뒤 다시.
+- 키는 서버 환경변수에만: `BIXOLON_API_KEY`, (선택) `BIXOLON_API_BASE`. 매장 ID·brand/hq/agency 값은 이제 필요 없어요.
+- 자동 가져오기(크론)를 만든다면 **10분 이상 간격**으로 (합계는 10분 지연 + WAF).
+- ~~대안: 하루치 엑셀 가져오기~~ → 공식 API가 생겨서 필요 없어짐. 참고용 — 엑셀 열: 상품 코드, 상품명, 판매가, 원가, 판매 수량, 상품 금액, 옵션 금액, 할인 금액, 매출 금액, 결제 금액, 이익률(매뉴얼 기준). 실제 샘플 파일을 받은 뒤 구현.
 
 ## 5. 기타
 

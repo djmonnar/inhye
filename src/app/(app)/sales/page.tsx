@@ -95,7 +95,7 @@ export default function SalesPage() {
     }
   }
 
-  const keysReady = Boolean(status?.storeId && status?.apiKey);
+  const keysReady = Boolean(status?.apiKey);
   const connected = runs.some((r) => r.ok);
   const ready = keysReady && Boolean(status?.serviceKey);
   const lastRun = runs[0];
@@ -128,14 +128,14 @@ export default function SalesPage() {
             />
             <Step
               done={keysReady}
-              title="2. 빅솔론 연동 키 저장"
+              title="2. 빅솔론 매장키 저장"
               desc={
                 keysReady ? (
-                  "매장 ID와 API 키가 서버에 저장돼 있어요 (값은 화면에 안 보여요)"
+                  "매장키가 서버에 저장돼 있어요 (값은 화면에 안 보여요)"
                 ) : (
                   <>
-                    Vercel → Settings → Environment Variables에 <code className="rounded bg-cream px-1">BIXOLON_STORE_ID</code>(매장 ID)와{" "}
-                    <code className="rounded bg-cream px-1">BIXOLON_API_KEY</code>(발급된 API 키)를 넣고 Redeploy. 키는 채팅에 보내지 마세요.
+                    빅솔론 ASP ‘외부 연결 관리 → 연동 키 발급’에서 받은 키를 Vercel → Settings → Environment Variables에{" "}
+                    <code className="rounded bg-cream px-1">BIXOLON_API_KEY</code>로 넣고 Redeploy. 키는 채팅에 보내지 마세요.
                   </>
                 )
               }
@@ -147,7 +147,7 @@ export default function SalesPage() {
                 connected
                   ? "연결됐어요. 매일 가져오면 팔린 만큼 재고가 빠져요."
                   : keysReady
-                    ? "‘지금 가져오기’를 눌러 보세요. 처음엔 오늘 판매부터 받아요 (그 전 판매로는 재고가 안 빠져요). 누르기 전에 재고를 맞춰 두면 좋아요."
+                    ? "‘지금 가져오기’를 눌러 보세요. 처음엔 오늘 판매부터 받아요 (그 전 판매로는 재고가 안 빠져요). 누르기 전에 재고를 맞춰 두면 좋아요. 판매 후 최대 10분 뒤에 잡혀요."
                     : "키를 저장하면 눌러서 확인할 수 있어요."
               }
             />
