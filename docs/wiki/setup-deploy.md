@@ -7,8 +7,8 @@
 | GitHub | `djmonnar/inhye`, 브랜치 `ccr-3f5271b3-xj7bqa` (유일·기본 브랜치) |
 | Vercel | 프로젝트 `inhye` (팀 djmonnar4-3362's projects), https://inhye.vercel.app, 푸시하면 자동 배포 |
 | Vercel 보호 | Standard Protection 켜져 있음 — 직원 폰에서 Vercel 로그인이 뜨면 Settings → Deployment Protection에서 끄기 |
-| Supabase | 프로젝트는 만들었지만 **Vercel 환경변수 미입력** → 사이트는 체험 모드 |
-| 빅솔론 키 | Vercel에 아직 없음 (`BIXOLON_API_KEY` 하나만 필요) |
+| Supabase | **연결됨** — Vercel의 Supabase 연동이 10-28에 환경변수를 넣어 둠(`SUPABASE_*`, `POSTGRES_*`). 앱이 이름을 자동 인식 |
+| 빅솔론 키 | `BIXOLON_API_KEY` 저장됨 (2026-11-10, Secret · Production) |
 
 ## 환경변수 (Vercel → Settings → Environment Variables, 전 환경 체크 후 Redeploy)
 

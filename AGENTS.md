@@ -58,7 +58,8 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 
 - GitHub `djmonnar/inhye`, 브랜치 **`ccr-3f5271b3-xj7bqa`** (유일한 브랜치 = 기본/프로덕션). 푸시하면 Vercel이 자동 배포.
 - Vercel 프로젝트 `inhye` → **https://inhye.vercel.app**
-- **Supabase는 아직 Vercel에 연결 안 됨** → 사이트는 체험 모드. 값 3개를 Vercel 환경변수에 넣고 Redeploy 해야 해요.
+- **Supabase 연결됨**: Vercel의 Supabase 연동이 10-28에 환경변수를 넣어 둠(`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `POSTGRES_*` 등). `next.config.ts`·`admin.ts`가 이 이름을 자동 인식 → 사이트는 Supabase 모드(2026-11-10 로그인 화면으로 확인).
+- `BIXOLON_API_KEY`(Secret, Production) 2026-11-10 저장.
 - 환경변수 전체 목록·설명: [`docs/wiki/setup-deploy.md`](docs/wiki/setup-deploy.md), `.env.example`
 
 ## 6. 연동 현황 요약
@@ -73,7 +74,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 
 ## 7. 다음에 할 일 (열린 문제)
 
-1. 사용자: Supabase 값 3개 + `BIXOLON_API_KEY`(매장키)를 Vercel에 저장 → Redeploy → `/setup`에서 SQL 실행·관리자 생성 → `/sales`에서 ‘지금 가져오기’로 첫 연결 확인.
+1. 사용자: 키 저장 후 배포 → `/setup`에서 **최신 SQL 실행**(POS 표 포함, 예전에 돌렸어도 다시)·관리자 생성(처음이면) → `/sales`에서 ‘지금 가져오기’로 첫 연결 확인.
 2. 빅솔론 API는 **문서로 받은 외부 API만** 써요(관리자 화면용 `/api/v2/...`는 쓰지 않기). 과도한 호출은 WAF 차단 → 자동 가져오기를 만들면 10분 이상 간격으로.
 3. (선택) 건별 매출 `GET /api/external/v2/sales`로 영수증 단위·즉시 반영·취소/반품 상태 받기 — 실제 응답의 `salesGoods` 필드 이름을 확인한 뒤에.
 4. `src/lib/report.ts`는 아직 판매를 출고 기록으로 계산해요 → `pos_sales`가 들어오면 그걸 쓰도록.

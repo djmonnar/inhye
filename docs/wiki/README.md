@@ -15,6 +15,6 @@
 ## 한눈에 보는 현재 상태 (2026-11-10)
 
 - 앱: **https://inhye.vercel.app** (Vercel 프로젝트 `inhye`, 브랜치 `ccr-3f5271b3-xj7bqa`에 푸시하면 자동 배포)
-- 데이터: Supabase **연결 전** → 지금은 체험 모드(기기마다 따로 저장)
+- 데이터: Supabase **연결됨** (Vercel Supabase 연동이 넣은 환경변수를 앱이 자동 인식)
 - 빅솔론 상품 등록: 엑셀로 연동 ✅ / 빅솔론 매출 자동 수집: 빅솔론 공식 **외부 매출 API**로 연결 ✅ (Vercel에 `BIXOLON_API_KEY`만 넣으면 돼요)
 - 라벨 인쇄: Xprinter(USB) — PC 드라이버, 안드로이드 USB 직접, 폰→노트북 인쇄 스테이션 ✅
