@@ -64,8 +64,16 @@ export function useCategories(): string[] {
 export function useRefresh() {
   const qc = useQueryClient();
   return useCallback(
-    (...keys: ("products" | "suppliers" | "moves" | "members" | "print-jobs" | "pos")[]) =>
+    (...keys: ("products" | "suppliers" | "moves" | "members" | "print-jobs" | "pos" | "orders" | "kakao")[]) =>
       Promise.all(keys.map((k) => qc.invalidateQueries({ queryKey: [k] }))),
     [qc],
   );
+}
+
+export function useOrders() {
+  return useQuery({ queryKey: ["orders"], queryFn: () => store().listOrders() });
+}
+
+export function useKakaoStatus(enabled = true) {
+  return useQuery({ queryKey: ["kakao"], queryFn: () => store().kakaoStatus(), enabled, retry: false });
 }

@@ -2,6 +2,7 @@ import { createStore, get, set } from "idb-keyval";
 import { setRemember, getRemember } from "../supabase";
 import type {
   AppUser,
+  Order,
   PrintJob,
   Product,
   ProductInput,
@@ -408,6 +409,58 @@ export function createDemoStore(): DataStore {
         };
       });
       return { day, fetchedAt: new Date().toISOString(), receipts, sample: true };
+    },
+
+    async listOrders() {
+      const list = await load<Order[]>("orders", []);
+      return [...list].sort((a, b) => a.due_date.localeCompare(b.due_date));
+    },
+
+    async saveOrder(input, id) {
+      const list = await load<Order[]>("orders", []);
+      const now = new Date().toISOString();
+      const doneAt = input.status ? (input.status === "done" ? now : null) : undefined;
+      let result: Order;
+      if (id) {
+        const cur = list.find((o) => o.id === id);
+        if (!cur) throw new StoreError("주문을 찾지 못했어요.");
+        result = { ...cur, ...input, ...(doneAt !== undefined ? { done_at: doneAt } : {}), updated_at: now };
+        await save("orders", list.map((o) => (o.id === id ? result : o)));
+      } else {
+        result = {
+          id: crypto.randomUUID(),
+          status: "open",
+          source_text: null,
+          done_at: null,
+          created_at: now,
+          updated_at: now,
+          ...input,
+          ...(doneAt !== undefined ? { done_at: doneAt } : {}),
+        };
+        await save("orders", [...list, result]);
+      }
+      return result;
+    },
+
+    async deleteOrder(id) {
+      const list = await load<Order[]>("orders", []);
+      await save("orders", list.filter((o) => o.id !== id));
+    },
+
+    async orderChat() {
+      throw new StoreError("체험 모드에서는 주문 비서(AI)를 쓸 수 없어요. ‘직접 추가’로 넣어 보세요.");
+    },
+
+    async kakaoStatus() {
+      return { configured: false, connected: false, cronReady: false, lastBriefOn: null };
+    },
+
+    async kakaoConnectUrl() {
+      throw new StoreError("체험 모드에서는 카카오톡 알림을 연결할 수 없어요. Supabase를 먼저 연결해 주세요.");
+    },
+
+    async kakaoTest() {
+      throw new StoreError("체험 모드에서는 카카오톡 알림을 보낼 수 없어요.");
     },
   };
   return store;

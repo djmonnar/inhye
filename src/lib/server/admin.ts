@@ -14,6 +14,9 @@ const SERVICE_KEY = (() => {
 
 export const hasServiceKey = () => Boolean(SUPABASE_URL && SERVICE_KEY);
 
+/** 서버만 아는 값 — 서명(카카오 연결 state 등)에 써요. 밖으로 내보내지 않아요. */
+export const serverSecret = () => SERVICE_KEY;
+
 export function adminClient(): SupabaseClient {
   return createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },

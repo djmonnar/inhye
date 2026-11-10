@@ -5,6 +5,7 @@ import {
   BookOpen,
   ChevronRight,
   FileSpreadsheet,
+  Flower2,
   History,
   LogOut,
   Printer,
@@ -35,6 +36,7 @@ export default function MorePage() {
   const [reset, setReset] = useState<null | "sample" | "empty">(null);
 
   const items = [
+    { href: "/orders", icon: Flower2, label: "주문 · 주문 비서", desc: "꽃다발 예약 주문을 채팅으로 등록, 카톡 알림" },
     { href: "/sales", icon: BarChart3, label: "매출 · 빅솔론 연동", desc: "키오스크 판매를 받아 재고 자동 차감" },
     { href: "/report", icon: Sparkles, label: "AI 가게 리포트", desc: "기간 정리, 발주 추천, 이번 주 할 일, 신상 소개 글" },
     { href: "/excel", icon: FileSpreadsheet, label: "엑셀 · 빅솔론 대량등록", desc: "빅솔론 대량작업 엑셀 내보내기/가져오기, 백업" },

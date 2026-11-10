@@ -8,6 +8,10 @@ import type {
   AppUser,
   BulkProductRow,
   Member,
+  KakaoStatus,
+  Order,
+  OrderChatResult,
+  OrderInput,
   PosLive,
   PosReceiptsDay,
   PosSale,
@@ -358,6 +362,52 @@ export function createSupabaseStore(): DataStore {
 
     async posReceipts(day) {
       return api<PosReceiptsDay>(`/api/pos/receipts?day=${encodeURIComponent(day)}`, "GET");
+    },
+
+    async listOrders() {
+      // 날짜만 (YYYY-MM-DD) — 필터 값에 특수문자가 없게
+      const since = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
+      const { data, error } = await sb
+        .from("orders")
+        .select("*")
+        .or(`status.eq.open,updated_at.gte.${since}`)
+        .order("due_date")
+        .limit(500);
+      if (error) fail(error);
+      return data as Order[];
+    },
+
+    async saveOrder(input: OrderInput, id?: string) {
+      const row = {
+        ...input,
+        ...(input.status ? { done_at: input.status === "done" ? new Date().toISOString() : null } : {}),
+      };
+      const q = id ? sb.from("orders").update(row).eq("id", id) : sb.from("orders").insert(row);
+      const { data, error } = await q.select("*").single();
+      if (error) fail(error);
+      return data as Order;
+    },
+
+    async deleteOrder(id) {
+      const { error } = await sb.from("orders").delete().eq("id", id);
+      if (error) fail(error);
+    },
+
+    async orderChat(message, history) {
+      return api<OrderChatResult>("/api/orders/chat", "POST", { message, history });
+    },
+
+    async kakaoStatus() {
+      return api<KakaoStatus>("/api/kakao/status", "GET");
+    },
+
+    async kakaoConnectUrl() {
+      const r = await api<{ url: string }>("/api/kakao/connect", "POST", {});
+      return r.url;
+    },
+
+    async kakaoTest() {
+      return api<{ sent: boolean; text: string }>("/api/kakao/test", "POST", {});
     },
   };
 }

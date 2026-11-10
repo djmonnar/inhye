@@ -301,3 +301,52 @@ export interface PosSyncResult {
   days?: string[];
   linked?: number;
 }
+
+/** 예약 주문 (꽃다발 등) */
+export type OrderMethod = "pickup" | "delivery";
+export type OrderStatus = "open" | "done" | "canceled";
+
+export interface Order {
+  id: string;
+  customer: string;
+  item: string;
+  price: number;
+  /** YYYY-MM-DD (픽업일 / 택배 도착 희망일) */
+  due_date: string;
+  method: OrderMethod;
+  status: OrderStatus;
+  memo: string | null;
+  contact: string | null;
+  address: string | null;
+  source_text: string | null;
+  done_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type OrderInput = Pick<Order, "customer" | "item" | "price" | "due_date" | "method" | "memo" | "contact" | "address"> & {
+  status?: OrderStatus;
+};
+
+export type OrderChangeOp = "create" | "update" | "complete" | "reopen" | "cancel";
+
+export interface OrderChatTurn {
+  role: "user" | "assistant";
+  text: string;
+}
+
+export interface OrderChatResult {
+  reply: string;
+  changes: { op: OrderChangeOp; order: Order }[];
+  skipped: string[];
+}
+
+export interface KakaoStatus {
+  /** Vercel에 KAKAO_REST_API_KEY 가 있는지 */
+  configured: boolean;
+  /** 카카오 계정이 연결돼 토큰이 저장됐는지 */
+  connected: boolean;
+  /** 매일 알림(CRON_SECRET)이 켜질 준비가 됐는지 */
+  cronReady: boolean;
+  lastBriefOn: string | null;
+}

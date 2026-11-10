@@ -4,6 +4,7 @@ import {
   BarChart3,
   ChevronRight,
   FileSpreadsheet,
+  Flower2,
   PackagePlus,
   Plus,
   Printer,
@@ -18,7 +19,8 @@ import { useAuth } from "@/components/providers";
 import { Loading, ProductThumb } from "@/components/ui";
 import { SHOP_NAME } from "@/lib/config";
 import { needsKioskSync, num, relTime, stockLevel, won } from "@/lib/format";
-import { useMoves, usePosSales, usePrintJobs, useProducts } from "@/lib/queries";
+import { kstToday } from "@/lib/day";
+import { useMoves, useOrders, usePosSales, usePrintJobs, useProducts } from "@/lib/queries";
 
 function greeting() {
   const h = new Date().getHours();
@@ -38,6 +40,16 @@ export default function HomePage() {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString();
   });
   const { data: todaySales = [] } = usePosSales(todayIso);
+  const { data: orders = [] } = useOrders();
+  const [kstDay] = useState(kstToday);
+  const orderAlert = useMemo(() => {
+    const until = (day: string) => Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${kstDay}T00:00:00Z`)) / 86400000);
+    const open = orders.filter((o) => o.status === "open");
+    return {
+      ship: open.filter((o) => o.method === "delivery" && until(o.due_date) <= 7).length,
+      pick: open.filter((o) => o.method === "pickup" && until(o.due_date) <= 1).length,
+    };
+  }, [orders, kstDay]);
   const todayAmount = todaySales.reduce((n, s) => n + s.amount, 0);
   const todayQty = todaySales.reduce((n, s) => n + s.qty, 0);
 
@@ -127,6 +139,20 @@ export default function HomePage() {
           <div className="flex-1">
             <p className="font-cute text-lg">오늘 매출 {won(todayAmount)}</p>
             <p className="text-sm text-ink-soft">키오스크에서 {num(todayQty)}개 팔렸어요 · 재고 자동 반영</p>
+          </div>
+          <ChevronRight className="text-ink-soft" />
+        </Link>
+      )}
+      {(orderAlert.ship > 0 || orderAlert.pick > 0) && (
+        <Link href="/orders" className="card flex items-center gap-3 border-butter-300 bg-butter-100 p-4">
+          <Flower2 className="shrink-0 text-butter-700" />
+          <div className="flex-1">
+            <p className="font-cute text-lg">챙길 주문 {orderAlert.ship + orderAlert.pick}건</p>
+            <p className="text-sm text-ink-soft">
+              {[orderAlert.ship ? `7일 안에 보낼 택배 ${orderAlert.ship}건` : "", orderAlert.pick ? `오늘·내일 픽업 ${orderAlert.pick}건` : ""]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
           </div>
           <ChevronRight className="text-ink-soft" />
         </Link>

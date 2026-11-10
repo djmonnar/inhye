@@ -28,13 +28,13 @@ npm run build
 
 ```
 src/app/(app)/        로그인 후 화면: 홈, products, scan, reorder, suppliers, excel, labels,
-                      print-station, sales, report, members, guide, history, more
+                      print-station, sales(+receipts), orders, report, members, guide, history, more
 src/app/login, setup  로그인(자동 로그인) / 처음 설정(SQL 안내, 관리자 계정)
-src/app/api/          setup/admin, setup/schema(DB에 schema.sql 바로 적용), members, pos/status, pos/sync, pos/live(빅솔론 하루치 바로 보기, 저장 없음), pos/receipts(영수증별, 저장 없음), ai/{product,link,promo,report}
+src/app/api/          setup/admin, setup/schema(DB에 schema.sql 바로 적용), members, pos/status, pos/sync, pos/live(빅솔론 하루치 바로 보기, 저장 없음), pos/receipts(영수증별, 저장 없음), orders/chat(주문 비서), kakao/{status,connect,callback,test}, cron/orders(매일 알림), ai/{product,link,promo,report}
 src/components/       ui.tsx(공용 UI), ProductForm, BarcodeScanner, StockSheet, SupplierSheet,
                       labels.tsx(라벨 공용), SendLabelSheet, AiFillSheet, PromoSheet, Mascot
 src/lib/store/        데이터 계층 인터페이스(types.ts) + supabase-store.ts + demo-store.ts
-src/lib/server/       서버 전용: admin.ts(서비스 키, 권한), schema.ts(pg로 schema.sql 적용), pos.ts, bixolon.ts, openai.ts, ai-*.ts, fetch-page.ts
+src/lib/server/       서버 전용: admin.ts(서비스 키, 권한), schema.ts(pg로 schema.sql 적용), orders.ts(주문 비서·알림 글), kakao.ts(나에게 보내기), pos.ts, bixolon.ts, openai.ts, ai-*.ts, fetch-page.ts
 src/lib/              excel.ts(빅솔론 양식), tspl.ts / labelCanvas.ts / usbPrinter.ts(라벨 직접 인쇄),
                       format.ts, queries.ts, report.ts
 public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해도 안전해야 함)
@@ -72,7 +72,8 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 | 빅솔론 매출 API | ✅ 공식 외부 매출 API(`/api/external/v2/...`, `Authorization: {매장키}`) — 키만 Vercel에 넣으면 동작 | [bixolon.md](docs/wiki/bixolon.md) |
 | 히엘페이 (결제) | ❌ 공개 API 없음, 승인내역엔 상품 정보 없음 | [hielpay.md](docs/wiki/hielpay.md) |
 | Xprinter 라벨 | ✅ PC 드라이버 인쇄 · 안드로이드 USB 직접(TSPL) · 노트북 인쇄 스테이션 | [printing.md](docs/wiki/printing.md) |
-| OpenAI | ✅ 사진→상품정보, 링크→상품정보, 홍보글, 가게 리포트 (`OPENAI_API_KEY`) | [features.md](docs/wiki/features.md) |
+| OpenAI | ✅ 사진→상품정보, 링크→상품정보, 홍보글, 가게 리포트, 주문 비서 (`OPENAI_API_KEY`) | [features.md](docs/wiki/features.md) |
+| 카카오톡 ‘나에게 보내기’ | 🟡 코드 완성 — 카카오 앱 키·`CRON_SECRET` 넣고 연결, 표(v3)는 Supabase 복구 후 | [orders-kakao.md](docs/wiki/orders-kakao.md) |
 
 ## 7. 다음에 할 일 (열린 문제)
 
@@ -80,6 +81,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 2. 빅솔론 API는 **문서로 받은 외부 API만** 써요(관리자 화면용 `/api/v2/...`는 쓰지 않기). 과도한 호출은 WAF 차단 → 자동 가져오기를 만들면 10분 이상 간격으로.
 3. (선택) 건별 매출 `GET /api/external/v2/sales`로 영수증 단위·즉시 반영·취소/반품 상태 받기 — 실제 응답의 `salesGoods` 필드 이름을 확인한 뒤에.
 4. `src/lib/report.ts`는 아직 판매를 출고 기록으로 계산해요 → `pos_sales`가 들어오면 그걸 쓰도록.
+5. 주문·카카오: 사용자가 카카오 디벨로퍼스 앱을 만들고 `KAKAO_REST_API_KEY`·`CRON_SECRET`을 Vercel에 넣기 → Supabase 복구 후 스키마 v3 적용 → 주문 화면에서 카카오톡 연결.
 
 결정·발견 기록은 [`docs/wiki/decisions.md`](docs/wiki/decisions.md)에 날짜순으로 있어요.
 

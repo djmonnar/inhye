@@ -6,6 +6,11 @@ import type {
   Member,
   MemberInput,
   MoveInput,
+  KakaoStatus,
+  Order,
+  OrderChatResult,
+  OrderChatTurn,
+  OrderInput,
   PosLive,
   PosReceiptsDay,
   PosSale,
@@ -80,6 +85,21 @@ export interface DataStore {
   posLive(day: string): Promise<PosLive>;
   /** 빅솔론 하루치 영수증(건별)을 바로 보기만 해요. */
   posReceipts(day: string): Promise<PosReceiptsDay>;
+
+  /** 예약 주문: 진행 중 전부 + 최근 60일 안에 끝난/취소한 것 */
+  listOrders(): Promise<Order[]>;
+  saveOrder(input: OrderInput, id?: string): Promise<Order>;
+  /** 관리자만. 보통은 status 'canceled'로 취소해요(되살릴 수 있게). */
+  deleteOrder(id: string): Promise<void>;
+  /** 주문 비서: 말로 등록·수정·완료·취소. history = 최근 대화 몇 줄 */
+  orderChat(message: string, history: OrderChatTurn[]): Promise<OrderChatResult>;
+
+  /** 카카오톡 ‘나에게 보내기’ 알림 */
+  kakaoStatus(): Promise<KakaoStatus>;
+  /** 카카오 로그인 주소 (관리자) — 이 주소로 이동하면 연결돼요 */
+  kakaoConnectUrl(): Promise<string>;
+  /** 지금 알림을 한 번 보내 봐요 (관리자) */
+  kakaoTest(): Promise<{ sent: boolean; text: string }>;
 }
 
 export class StoreError extends Error {}

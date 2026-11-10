@@ -54,7 +54,7 @@ create trigger on_auth_user_created
 create or replace function public.app_status() returns json
 language sql stable security definer set search_path = public as $$
   select json_build_object(
-    'version', 2,
+    'version', 3,
     'has_admin', exists (select 1 from public.profiles where role = 'admin')
   );
 $$;
@@ -434,6 +434,62 @@ create policy "product images update" on storage.objects for update to authentic
 drop policy if exists "product images delete" on storage.objects;
 create policy "product images delete" on storage.objects for delete to authenticated
   using (bucket_id = 'product-images' and public.is_member());
+
+-- ---------------------------------------------------------------------
+-- 7. 주문 (꽃다발 등 예약 주문) — 주문 비서 채팅 / 주문 화면에서 등록·수정
+--    status: open 진행 중 · done 완료(알림 안 함) · canceled 취소(삭제 대신, 되살릴 수 있어요)
+-- ---------------------------------------------------------------------
+create table if not exists public.orders (
+  id uuid primary key default gen_random_uuid(),
+  customer text not null default '',
+  item text not null default '',
+  price integer not null default 0 check (price >= 0),
+  due_date date not null,
+  method text not null default 'pickup' check (method in ('pickup', 'delivery')),
+  status text not null default 'open' check (status in ('open', 'done', 'canceled')),
+  memo text,
+  contact text,
+  address text,
+  source_text text,
+  done_at timestamptz,
+  created_by uuid default auth.uid() references auth.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists orders_status_due_idx on public.orders (status, due_date);
+
+drop trigger if exists orders_touch on public.orders;
+create trigger orders_touch before update on public.orders
+  for each row execute function public.touch_updated_at();
+
+alter table public.orders enable row level security;
+grant select, insert, update, delete on public.orders to authenticated;
+
+drop policy if exists "orders read" on public.orders;
+create policy "orders read" on public.orders for select to authenticated using (public.is_member());
+drop policy if exists "orders insert" on public.orders;
+create policy "orders insert" on public.orders for insert to authenticated with check (public.is_member());
+drop policy if exists "orders update" on public.orders;
+create policy "orders update" on public.orders for update to authenticated
+  using (public.is_member()) with check (public.is_member());
+drop policy if exists "orders delete" on public.orders;
+create policy "orders delete" on public.orders for delete to authenticated using (public.is_admin());
+
+-- 카카오톡 ‘나에게 보내기’ 토큰 (한 줄). 비밀이라 서버(서비스 키)만 읽고 써요 — 정책 없음.
+create table if not exists public.kakao_tokens (
+  id integer primary key default 1 check (id = 1),
+  access_token text not null,
+  refresh_token text not null,
+  access_expires_at timestamptz not null,
+  refresh_expires_at timestamptz,
+  connected_by uuid references auth.users (id) on delete set null,
+  last_brief_on date,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.kakao_tokens enable row level security;
+revoke all on public.kakao_tokens from anon, authenticated;
 
 -- 새로 만든 표·함수를 API가 바로 알아보게 해요 (schema cache 새로고침)
 notify pgrst, 'reload schema';
