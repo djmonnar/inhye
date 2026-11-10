@@ -73,8 +73,8 @@ export interface DataStore {
   listPosSales(sinceISO: string): Promise<PosSale[]>;
   listPosSyncRuns(limit?: number): Promise<PosSyncRun[]>;
   posStatus(): Promise<PosStatus>;
-  /** 마지막 가져오기 이후 매출을 받아와요 (서버가 기간을 정해요). */
-  posSync(): Promise<PosSyncResult>;
+  /** 마지막 가져오기 이후 매출을 받아와요 (서버가 기간을 정해요). from(YYYY-MM-DD)을 주면 그날부터. */
+  posSync(from?: string): Promise<PosSyncResult>;
   /** 빅솔론 하루치 판매를 바로 보기만 해요 (저장·재고 차감 없음). day = 한국 날짜 YYYY-MM-DD */
   posLive(day: string): Promise<PosLive>;
 }

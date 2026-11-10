@@ -1,5 +1,5 @@
 import { json, requireAdmin } from "@/lib/server/admin";
-import { PosNotReady, syncBixolon } from "@/lib/server/pos";
+import { PosBadRequest, PosNotReady, syncBixolon } from "@/lib/server/pos";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -8,10 +8,13 @@ export const maxDuration = 60;
 export async function POST(req: Request) {
   const caller = await requireAdmin(req);
   if (caller instanceof Response) return caller;
+  const body = (await req.json().catch(() => ({}))) as { from?: unknown };
+  const from = typeof body.from === "string" && body.from ? body.from : undefined;
   try {
-    return json({ ok: true, ...(await syncBixolon()) });
+    return json({ ok: true, ...(await syncBixolon(from)) });
   } catch (e) {
     if (e instanceof PosNotReady) return json({ error: e.message, notReady: true }, 501);
+    if (e instanceof PosBadRequest) return json({ error: e.message }, 400);
     return json({ error: e instanceof Error ? e.message : "가져오지 못했어요." }, 502);
   }
 }

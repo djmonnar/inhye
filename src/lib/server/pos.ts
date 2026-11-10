@@ -93,13 +93,31 @@ export async function ingestPosSales(source: string, lines: PosSaleLine[], days:
   }
 }
 
+/** 시작 날짜로 고를 수 있는 가장 이른 날 (오늘 포함 31일) */
+export function earliestSyncDay(today = kstDay(new Date())): string {
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 30);
+  return d.toISOString().slice(0, 10);
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
  * 마지막으로 성공한 날의 전날부터 오늘까지 하루씩 받아와요 (늦게 들어온 판매·반품 반영).
  * 처음이면 오늘부터 — 연동을 켠 날 이전 판매로 재고가 빠지지 않게요.
+ * `from`(YYYY-MM-DD)을 주면 그날부터 받아요 — 재고를 센 날부터 빠짐없이 빼고 싶을 때.
+ * 이미 반영한 날을 다시 받아도 차이만 반영돼서 안전해요.
  */
-export async function syncBixolon(): Promise<PosSyncResult> {
+export async function syncBixolon(from?: string): Promise<PosSyncResult> {
   const db = adminClient();
   const today = kstDay(new Date());
+  if (from !== undefined) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || from > today || from < earliestSyncDay(today)) {
+      throw new PosBadRequest("시작 날짜는 오늘부터 30일 전까지 고를 수 있어요.");
+    }
+    const days = daysBetween(from, today);
+    return ingestPosSales("bixolon", await fetchDays(days), days);
+  }
   const { data: last } = await db
     .from("pos_sync_runs")
     .select("range_to")
@@ -108,16 +126,26 @@ export async function syncBixolon(): Promise<PosSyncResult> {
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  let from = today;
+  let start = today;
   if (last?.range_to) {
     const prev = new Date(last.range_to);
     prev.setUTCDate(prev.getUTCDate() - 1);
-    from = kstDay(prev) < today ? kstDay(prev) : today;
+    start = kstDay(prev) < today ? kstDay(prev) : today;
   }
-  const days = daysBetween(from, today);
-  const lines: PosSaleLine[] = [];
-  for (const day of days) lines.push(...(await fetchBixolonDay(day)));
-  return ingestPosSales("bixolon", lines, days);
+  const days = daysBetween(start, today);
+  return ingestPosSales("bixolon", await fetchDays(days), days);
 }
+
+/** 하루씩 차례로 받아요. 빅솔론 방화벽(WAF)에 걸리지 않게 사이에 조금 쉬어요. */
+async function fetchDays(days: string[]): Promise<PosSaleLine[]> {
+  const lines: PosSaleLine[] = [];
+  for (const [i, day] of days.entries()) {
+    if (i > 0) await sleep(300);
+    lines.push(...(await fetchBixolonDay(day)));
+  }
+  return lines;
+}
+
+export class PosBadRequest extends Error {}
 
 export { PosNotReady };

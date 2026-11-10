@@ -193,6 +193,8 @@ export default function SalesPage() {
   const { data: status } = usePosStatus();
   const { data: products = [] } = useProducts();
   const [syncing, setSyncing] = useState(false);
+  const [today] = useState(kstToday);
+  const [fromDay, setFromDay] = useState(today);
 
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
 
@@ -230,10 +232,13 @@ export default function SalesPage() {
     };
   }, [sales]);
 
+  const connected = runs.some((r) => r.ok);
+
   async function sync() {
     setSyncing(true);
     try {
-      const r = await store().posSync();
+      // 처음 가져올 때만 시작 날짜를 보내요 (그다음부터는 서버가 알아서 이어 받아요)
+      const r = await store().posSync(connected ? undefined : fromDay);
       await refresh("pos", "products", "moves");
       toast(`${r.days?.length ?? 1}일치 ${r.fetched}개 상품 · 재고 반영 ${r.applied}건`, "wow");
     } catch (e) {
@@ -245,7 +250,6 @@ export default function SalesPage() {
   }
 
   const keysReady = Boolean(status?.apiKey);
-  const connected = runs.some((r) => r.ok);
   const ready = keysReady && Boolean(status?.serviceKey);
   const lastRun = runs[0];
   const maxTop = Math.max(1, ...stats.top.map((t) => t.qty));
@@ -296,11 +300,27 @@ export default function SalesPage() {
                 connected
                   ? "연결됐어요. 매일 가져오면 팔린 만큼 재고가 빠져요."
                   : keysReady
-                    ? "‘지금 가져오기’를 눌러 보세요. 처음엔 오늘 판매부터 받아요 (그 전 판매로는 재고가 안 빠져요). 누르기 전에 재고를 맞춰 두면 좋아요. 판매 후 최대 10분 뒤에 잡혀요."
+                    ? "처음엔 아래에서 고른 날부터 판매를 받아 재고를 빼요. 앱에 실제 재고를 넣은 날을 골라 주세요 (그 전 판매는 안 빠져요). 판매 후 최대 10분 뒤에 잡혀요."
                     : "키를 저장하면 눌러서 확인할 수 있어요."
               }
             />
           </ol>
+          {user?.role === "admin" && !connected && (
+            <label className="mt-4 block rounded-2xl bg-cream p-3">
+              <span className="block font-cute text-[15px]">어느 날 판매부터 재고를 뺄까요?</span>
+              <span className="mb-2 block text-xs text-ink-soft">
+                재고를 센 날을 골라요. 문 열기 전에 셌다면 그날, 문 닫은 뒤 셌다면 다음 날이에요. 최대 30일 전까지 돼요.
+              </span>
+              <input
+                type="date"
+                className="input"
+                value={fromDay}
+                min={shiftDay(today, -30)}
+                max={today}
+                onChange={(e) => setFromDay(e.target.value || today)}
+              />
+            </label>
+          )}
           {user?.role === "admin" && (
             <button type="button" className="btn-primary mt-4 w-full" disabled={!ready || syncing} onClick={sync}>
               <RefreshCw size={18} className={syncing ? "animate-spin" : ""} /> {syncing ? "가져오는 중..." : "지금 가져오기"}

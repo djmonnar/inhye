@@ -347,8 +347,8 @@ export function createSupabaseStore(): DataStore {
       return api<PosStatus>("/api/pos/status", "GET");
     },
 
-    async posSync() {
-      return api<PosSyncResult>("/api/pos/sync", "POST", {});
+    async posSync(from) {
+      return api<PosSyncResult>("/api/pos/sync", "POST", from ? { from } : {});
     },
 
     async posLive(day) {
