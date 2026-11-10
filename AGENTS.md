@@ -59,9 +59,11 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 
 - GitHub `djmonnar/inhye`, 브랜치 **`ccr-3f5271b3-xj7bqa`** (유일한 브랜치 = 기본/프로덕션). 푸시하면 Vercel이 자동 배포.
 - Vercel 프로젝트 `inhye` → **https://inhye.vercel.app**
-- **Supabase 연결됨**: Vercel의 Supabase 연동이 10-28에 환경변수를 넣어 둠(`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `POSTGRES_*` 등). `next.config.ts`·`admin.ts`가 이 이름을 자동 인식 → 사이트는 Supabase 모드(2026-11-10 로그인 화면으로 확인).
+- **Supabase (2026-11-10 새 프로젝트로 옮김)**: supabase.com에서 직접 만든 프로젝트 `popohouse`(ref `ifuuiubraqbxwliyzowq`, 서울, 사용자 개인 조직 Free). Vercel 환경변수는 **직접 입력**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`(Secret), `POSTGRES_URL_NON_POOLING`(Session pooler, `[YOUR-PASSWORD]` 그대로), `SUPABASE_DB_PASSWORD`(Secret, 새 DB 비밀번호).
+  - 예전 Vercel 연동 프로젝트 `supabase-erin-mountain`(ref `umbhdjklakksjthzyiqz`, Vercel Marketplace 조직)은 `postgres` 로그인이 PAM 28000으로 막혀 **일시정지**·연결 해제. 지우지 말 것(90일 보관). 상품은 엑셀 전체 백업으로 옮김, 사진은 없었음.
+  - 같은 개인 조직의 `djmonnar's Project`는 **다른 앱(센터노트) 전용** — 포포하우스 표를 넣지 않기(로그인·`on_auth_user_created`·`is_admin` 이름이 겹쳐요).
 - `BIXOLON_API_KEY`(Secret, Production) 2026-11-10 저장.
-- Supabase 대시보드 SQL 편집기는 `PAM authentication failed`로 막혀 있음(Supabase 쪽) → 스키마는 `/setup` ‘앱에서 바로 실행’으로 적용. DB 비밀번호를 재설정해서 `SUPABASE_DB_PASSWORD`(새 비밀번호)를 Vercel에 넣어야 해요.
+- 스키마는 `/setup` ‘앱에서 바로 실행’ 또는 새 프로젝트 SQL 편집기로 적용(둘 다 동작해야 함).
 - 환경변수 전체 목록·설명: [`docs/wiki/setup-deploy.md`](docs/wiki/setup-deploy.md), `.env.example`
 
 ## 6. 연동 현황 요약
