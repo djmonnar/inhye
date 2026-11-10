@@ -79,8 +79,11 @@ export function schemaErrorMessage(e: unknown): string {
   if (msg === "NO_DB_URL") {
     return "Vercel에 DB 접속 주소(POSTGRES_URL)가 없어요. Supabase SQL 편집기로 실행해 주세요.";
   }
-  if (err?.code === "28P01" || err?.code === "28000") {
-    return `DB가 접속을 거절했어요 (${err.code}). Supabase에서 DB 비밀번호를 바꿨다면 Vercel의 POSTGRES_ 값도 새 비밀번호로 바꿔야 해요.`;
+  if (err?.code === "28P01") {
+    return `DB 비밀번호가 맞지 않아요 (28P01: ${msg}). Supabase에서 DB 비밀번호를 바꿨다면 Vercel의 POSTGRES_ 값도 새 비밀번호로 바꿔 주세요.`;
+  }
+  if (err?.code === "28000") {
+    return `DB가 로그인 자체를 막고 있어요 (28000: ${msg}). Supabase 쪽 문제일 가능성이 커요 — 프로젝트 재시작·DB 비밀번호 재설정 후 다시 눌러 보고, 그래도 같으면 Supabase에 문의해 주세요.`;
   }
   if (/timeout|ENOTFOUND|ECONNREFUSED|ETIMEDOUT/i.test(msg)) {
     return "DB에 연결하지 못했어요. Supabase 프로젝트가 켜져 있는지(일시 정지 아님) 확인하고 다시 눌러 주세요.";
