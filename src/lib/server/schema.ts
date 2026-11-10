@@ -24,15 +24,25 @@ function findDbUrl(): string | undefined {
 
 export const hasDbUrl = () => Boolean(findDbUrl());
 
+/**
+ * Supabase에서 DB 비밀번호를 새로 바꾸면 연동이 넣어 둔 POSTGRES_URL 안의 비밀번호는 옛것이 돼요.
+ * 그때는 Vercel에 SUPABASE_DB_PASSWORD(새 비밀번호)만 넣으면 그걸 써요 — 주소를 손으로 고칠 필요 없어요.
+ */
 function connect(): pg.Client {
   const raw = findDbUrl();
   if (!raw) throw new Error("NO_DB_URL");
   const url = new URL(raw);
-  const local = ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+  const host = url.hostname.replace(/^\[|\]$/g, "");
+  const local = ["localhost", "127.0.0.1", "::1"].includes(host);
+  const override = (process.env.SUPABASE_DB_PASSWORD ?? "").trim();
+  // 주소를 통째로 넘기면 주소 속 비밀번호가 우선이라, 칸별로 나눠서 넘겨요.
   // sslmode 등은 아래 ssl 설정으로 대신해요 (Supabase 인증서는 Node 기본 인증서 목록에 없어요).
-  url.search = "";
   return new pg.Client({
-    connectionString: url.toString(),
+    host,
+    port: Number(url.port || 5432),
+    user: decodeURIComponent(url.username),
+    password: override || decodeURIComponent(url.password),
+    database: decodeURIComponent(url.pathname.replace(/^\//, "")) || "postgres",
     ssl: local ? false : { rejectUnauthorized: false },
     connectionTimeoutMillis: 10_000,
     statement_timeout: 50_000,
@@ -80,7 +90,7 @@ export function schemaErrorMessage(e: unknown): string {
     return "Vercel에 DB 접속 주소(POSTGRES_URL)가 없어요. Supabase SQL 편집기로 실행해 주세요.";
   }
   if (err?.code === "28P01") {
-    return `DB 비밀번호가 맞지 않아요 (28P01: ${msg}). Supabase에서 DB 비밀번호를 바꿨다면 Vercel의 POSTGRES_ 값도 새 비밀번호로 바꿔 주세요.`;
+    return `DB 비밀번호가 맞지 않아요 (28P01: ${msg}). Vercel 환경변수에 SUPABASE_DB_PASSWORD(Supabase에서 새로 정한 DB 비밀번호)를 Secret으로 넣고 Redeploy 한 뒤 다시 눌러 주세요.`;
   }
   if (err?.code === "28000") {
     return `DB가 로그인 자체를 막고 있어요 (28000: ${msg}). Supabase 쪽 문제일 가능성이 커요 — 프로젝트 재시작·DB 비밀번호 재설정 후 다시 눌러 보고, 그래도 같으면 Supabase에 문의해 주세요.`;

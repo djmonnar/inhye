@@ -17,6 +17,7 @@
 | `NEXT_PUBLIC_SUPABASE_URL` | 공개 | Supabase 프로젝트 URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` (또는 `_PUBLISHABLE_KEY`) | 공개 | anon/publishable 키 |
 | `SUPABASE_SERVICE_ROLE_KEY` (또는 `SUPABASE_SECRET_KEY`) | **비밀** | 서버 전용. 관리자/직원 계정, 매출 저장 |
+| `SUPABASE_DB_PASSWORD` | **비밀** | (선택) Supabase DB 비밀번호를 재설정했을 때 새 비밀번호. 연동이 넣은 `POSTGRES_URL` 속 옛 비밀번호 대신 써요(‘앱에서 바로 실행’ 전용) |
 | `OPENAI_API_KEY` | **비밀** | AI 기능 |
 | `OPENAI_MODEL` | | (선택) 모델 바꾸기 |
 | `BIXOLON_API_KEY` | **비밀** | 빅솔론 매장키 (ASP 외부 연결 관리 → 연동 키 발급) |

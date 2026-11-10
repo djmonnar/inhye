@@ -61,6 +61,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 - Vercel 프로젝트 `inhye` → **https://inhye.vercel.app**
 - **Supabase 연결됨**: Vercel의 Supabase 연동이 10-28에 환경변수를 넣어 둠(`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `POSTGRES_*` 등). `next.config.ts`·`admin.ts`가 이 이름을 자동 인식 → 사이트는 Supabase 모드(2026-11-10 로그인 화면으로 확인).
 - `BIXOLON_API_KEY`(Secret, Production) 2026-11-10 저장.
+- Supabase 대시보드 SQL 편집기는 `PAM authentication failed`로 막혀 있음(Supabase 쪽) → 스키마는 `/setup` ‘앱에서 바로 실행’으로 적용. DB 비밀번호를 재설정해서 `SUPABASE_DB_PASSWORD`(새 비밀번호)를 Vercel에 넣어야 해요.
 - 환경변수 전체 목록·설명: [`docs/wiki/setup-deploy.md`](docs/wiki/setup-deploy.md), `.env.example`
 
 ## 6. 연동 현황 요약
