@@ -30,7 +30,7 @@
 ## Supabase 처음 설정
 
 1. Vercel에 값 넣고 Redeploy
-2. `https://inhye.vercel.app/setup` → **SQL 복사** → Supabase SQL 편집기에 붙여넣고 Run (`public/schema.sql`, 다시 실행해도 안전)
+2. `https://inhye.vercel.app/setup` → **앱에서 바로 실행** (서버가 Vercel의 `POSTGRES_URL_NON_POOLING`/`POSTGRES_URL`로 `public/schema.sql`을 한 트랜잭션으로 실행. 관리자가 있으면 관리자만). 안 되면 **SQL 복사** → Supabase SQL 편집기 → Run. 다시 실행해도 안전
 3. 같은 화면에서 관리자 아이디·비밀번호 만들기 (서비스 키 필요. 없으면 Supabase Authentication에서 `아이디@inhye.local`로 직접 만들고 Auto Confirm — 첫 계정이 관리자)
 4. 스키마가 바뀐 업데이트 후에는 2번 SQL을 다시 실행
 

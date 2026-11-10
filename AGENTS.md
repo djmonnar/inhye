@@ -30,11 +30,11 @@ npm run build
 src/app/(app)/        로그인 후 화면: 홈, products, scan, reorder, suppliers, excel, labels,
                       print-station, sales, report, members, guide, history, more
 src/app/login, setup  로그인(자동 로그인) / 처음 설정(SQL 안내, 관리자 계정)
-src/app/api/          setup/admin, members, pos/status, pos/sync, ai/{product,link,promo,report}
+src/app/api/          setup/admin, setup/schema(DB에 schema.sql 바로 적용), members, pos/status, pos/sync, ai/{product,link,promo,report}
 src/components/       ui.tsx(공용 UI), ProductForm, BarcodeScanner, StockSheet, SupplierSheet,
                       labels.tsx(라벨 공용), SendLabelSheet, AiFillSheet, PromoSheet, Mascot
 src/lib/store/        데이터 계층 인터페이스(types.ts) + supabase-store.ts + demo-store.ts
-src/lib/server/       서버 전용: admin.ts(서비스 키, 권한), pos.ts, bixolon.ts, openai.ts, ai-*.ts, fetch-page.ts
+src/lib/server/       서버 전용: admin.ts(서비스 키, 권한), schema.ts(pg로 schema.sql 적용), pos.ts, bixolon.ts, openai.ts, ai-*.ts, fetch-page.ts
 src/lib/              excel.ts(빅솔론 양식), tspl.ts / labelCanvas.ts / usbPrinter.ts(라벨 직접 인쇄),
                       format.ts, queries.ts, report.ts
 public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해도 안전해야 함)
@@ -46,7 +46,8 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
   `NEXT_PUBLIC_`이 붙은 값은 브라우저에 공개돼요 — 비밀은 절대 붙이지 마세요.
 - **데이터 계층은 두 구현을 같이**: `DataStore`(src/lib/store/types.ts)에 메서드를 추가하면 `supabase-store.ts`와 `demo-store.ts` 둘 다 구현해요.
 - **스키마 변경은 `public/schema.sql`에서 멱등하게** (`create ... if not exists`, `drop policy if exists` 후 `create policy`, `add column if not exists`).
-  사용자는 Supabase SQL 편집기에 이 파일 전체를 다시 붙여넣어 적용해요. 마이그레이션 폴더는 없어요.
+  사용자는 `/setup`의 **‘앱에서 바로 실행’**(서버가 `POSTGRES_URL`로 이 파일만 실행) 또는 Supabase SQL 편집기로 적용해요. 마이그레이션 폴더는 없어요.
+  스키마를 바꾸면 `app_status()`의 `'version'`과 `src/app/setup/page.tsx`의 `SCHEMA_VERSION`을 **같이 올려요** → 설정 화면이 ‘DB 업데이트 필요’를 알려줘요.
 - **권한(RLS)**: 역할은 `admin` / `staff` / `pending`. 첫 계정 = 관리자, 이후 직접 가입은 `pending`(아무것도 못 봄).
   삭제는 관리자만. `pos_sales`는 서버(서비스 키)만 쓰고, `apply_pos_sales()`는 `service_role`만 실행.
 - **재고는 이동 기록으로만 바꿔요**: `adjust_stock()` RPC(앱) / `apply_pos_sales()`(빅솔론 매출). `stock_qty`를 직접 덮어쓰지 않기.
@@ -80,3 +81,13 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 4. `src/lib/report.ts`는 아직 판매를 출고 기록으로 계산해요 → `pos_sales`가 들어오면 그걸 쓰도록.
 
 결정·발견 기록은 [`docs/wiki/decisions.md`](docs/wiki/decisions.md)에 날짜순으로 있어요.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

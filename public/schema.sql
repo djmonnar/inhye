@@ -54,7 +54,7 @@ create trigger on_auth_user_created
 create or replace function public.app_status() returns json
 language sql stable security definer set search_path = public as $$
   select json_build_object(
-    'version', 1,
+    'version', 2,
     'has_admin', exists (select 1 from public.profiles where role = 'admin')
   );
 $$;

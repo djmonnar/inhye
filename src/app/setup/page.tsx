@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, ExternalLink, RefreshCw } from "lucide-react";
+import { Check, Copy, Database, ExternalLink, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -11,7 +11,10 @@ import { APP_NAME, IS_DEMO, LOGIN_DOMAIN, SUPABASE_REF } from "@/lib/config";
 import { store } from "@/lib/store";
 import { supabase, USERNAME_RE } from "@/lib/supabase";
 
-type Status = { schema: boolean; hasAdmin: boolean } | null;
+type Status = { schema: boolean; current: boolean; hasAdmin: boolean } | null;
+
+/** public/schema.sql 의 app_status() 'version'과 같아야 해요. SQL을 바꾸면 둘 다 올려요. */
+const SCHEMA_VERSION = 2;
 
 function Step({ n, title, done, children }: { n: number; title: string; done?: boolean; children: ReactNode }) {
   return (
@@ -41,12 +44,19 @@ export default function SetupPage() {
   const [f, setF] = useState({ username: "", password: "", display_name: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [applying, setApplying] = useState(false);
+  const [applyMsg, setApplyMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const check = useCallback(async () => {
     if (IS_DEMO) return;
     setChecking(true);
     const { data, error } = await supabase().rpc("app_status");
-    setStatus(error ? { schema: false, hasAdmin: false } : { schema: true, hasAdmin: Boolean((data as { has_admin?: boolean })?.has_admin) });
+    const d = (data ?? {}) as { has_admin?: boolean; version?: number };
+    setStatus(
+      error
+        ? { schema: false, current: false, hasAdmin: false }
+        : { schema: true, current: (d.version ?? 0) >= SCHEMA_VERSION, hasAdmin: Boolean(d.has_admin) },
+    );
     setChecking(false);
   }, []);
 
@@ -63,6 +73,28 @@ export default function SetupPage() {
     await navigator.clipboard.writeText(sql);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  /** 서버가 저장소의 schema.sql 을 DB에 바로 적용 (Supabase SQL 편집기가 안 될 때도). */
+  async function applyNow() {
+    setApplying(true);
+    setApplyMsg(null);
+    try {
+      const { data } = await supabase().auth.getSession();
+      const token = data.session?.access_token;
+      const res = await fetch("/api/setup/schema", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(json.error || "실행하지 못했어요.");
+      setApplyMsg({ ok: true, text: "DB 준비 끝! 표가 만들어졌어요." });
+      await check();
+    } catch (err) {
+      setApplyMsg({ ok: false, text: err instanceof Error ? err.message : "실행하지 못했어요." });
+    } finally {
+      setApplying(false);
+    }
   }
 
   async function createAdmin(e: React.FormEvent) {
@@ -150,18 +182,25 @@ SUPABASE_SERVICE_ROLE_KEY=(service_role 또는 secret 키)`}
 
         {!IS_DEMO && (
           <>
-            <Step n={2} title="DB 만들기 (SQL 한 번 실행)" done={status?.schema}>
-              {status?.schema ? (
+            <Step n={2} title="DB 만들기 (SQL 한 번 실행)" done={status?.schema && status.current}>
+              {status?.schema && status.current ? (
                 <p className="text-ink-soft">테이블이 준비됐어요. 앱을 업데이트할 때 SQL이 바뀌면 다시 실행해도 안전해요.</p>
+              ) : status?.schema ? (
+                <p className="rounded-2xl bg-butter-100 p-3">
+                  앱이 업데이트돼서 <b>DB도 업데이트가 필요해요</b> (매출 표 등). 아래 ‘앱에서 바로 실행’을 눌러 주세요. 기존 데이터는 그대로예요.
+                </p>
               ) : (
-                <>
-                  <ol className="list-decimal space-y-0.5 pl-5 text-ink-soft">
-                    <li>아래 ‘SQL 복사’를 눌러요</li>
-                    <li>‘SQL 편집기 열기’ → 빈 칸에 붙여넣기 → 오른쪽 아래 <b>Run</b></li>
-                    <li>‘Success’가 뜨면 ‘다시 확인’을 눌러요</li>
-                  </ol>
-                </>
+                <p className="text-ink-soft">‘앱에서 바로 실행’을 누르면 필요한 표가 만들어져요. 여러 번 눌러도 안전해요.</p>
               )}
+              <button type="button" className="btn-primary w-full" onClick={applyNow} disabled={applying}>
+                <Database size={18} className={applying ? "animate-pulse" : ""} /> {applying ? "실행하는 중..." : "앱에서 바로 실행"}
+              </button>
+              {applyMsg && (
+                <p className={`text-center text-sm ${applyMsg.ok ? "text-matcha-700" : "text-danger"}`}>{applyMsg.text}</p>
+              )}
+              <p className="pt-1 text-xs text-ink-soft">
+                또는 직접: ‘SQL 복사’ → ‘SQL 편집기 열기’ → 붙여넣기 → <b>Run</b> → ‘다시 확인’
+              </p>
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" className="btn-primary btn-sm" onClick={copySql} disabled={!sql}>
                   {copied ? <Check size={16} /> : <Copy size={16} />} {copied ? "복사됨" : "SQL 복사"}
