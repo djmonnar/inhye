@@ -3,6 +3,7 @@
 import { MessageCircle, Send, ShoppingBag, Truck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/providers";
+import { timeLabel } from "@/lib/day";
 import { won } from "@/lib/format";
 import { useRefresh } from "@/lib/queries";
 import { store } from "@/lib/store";
@@ -116,7 +117,7 @@ export function OrderChat({ bare = false }: { bare?: boolean }) {
       </div>
       {msgs.length === 0 && (
         <p className="mb-3 whitespace-pre-line rounded-2xl bg-cream p-3 text-xs leading-relaxed text-ink-soft">
-          {"주문을 그대로 붙여 넣으면 정리해서 등록해요. 수정·삭제·완료도 말로 해요.\n\n예) 11/11 수 픽업 김포포 하치와레 꽃다발 2.5만원\n예) 이토끼 주문 3만5천원으로 바꿔줘\n예) 박고양 택배 보냈어 → 완료\n예) 이번 주 주문 정리해줘"}
+          {"주문을 그대로 붙여 넣으면 정리해서 등록해요. 수정·삭제·완료도 말로 해요.\n\n예) 11/11 수 오후 3시 픽업 김포포 하치와레 꽃다발 2.5만원\n예) 이토끼 픽업 4시 반으로 바꿔줘\n예) 박고양 택배 보냈어 → 완료\n예) 이번 주 주문 정리해줘"}
         </p>
       )}
       {msgs.length > 0 && (
@@ -134,7 +135,10 @@ export function OrderChat({ bare = false }: { bare?: boolean }) {
                     {m.result.changes.map((c, j) => (
                       <li key={j} className="flex flex-wrap items-center gap-1 rounded-xl bg-white px-2 py-1 text-xs">
                         <span className="font-semibold text-matcha-700">✓ {OP_LABEL[c.op]}</span>
-                        <span>{md(c.order.due_date)}</span>
+                        <span>
+                          {md(c.order.due_date)}
+                          {c.order.due_time ? ` ${timeLabel(c.order.due_time)}` : ""}
+                        </span>
                         <MethodChip method={c.order.method} />
                         <span className="min-w-0 truncate">
                           {c.order.customer} · {c.order.item} · {won(c.order.price)}

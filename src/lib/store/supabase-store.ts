@@ -1,5 +1,6 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { IMAGE_BUCKET, SUPABASE_URL } from "../config";
+import { normTime } from "../day";
 import { blobToDataUrl } from "../image";
 import { loginEmail, setRemember, supabase } from "../supabase";
 import type {
@@ -374,7 +375,7 @@ export function createSupabaseStore(): DataStore {
         .order("due_date")
         .limit(500);
       if (error) fail(error);
-      return data as Order[];
+      return (data as Order[]).map((o) => ({ ...o, due_time: normTime(o.due_time) }));
     },
 
     async saveOrder(input: OrderInput, id?: string) {
@@ -385,7 +386,8 @@ export function createSupabaseStore(): DataStore {
       const q = id ? sb.from("orders").update(row).eq("id", id) : sb.from("orders").insert(row);
       const { data, error } = await q.select("*").single();
       if (error) fail(error);
-      return data as Order;
+      const o = data as Order;
+      return { ...o, due_time: normTime(o.due_time) };
     },
 
     async deleteOrder(id) {

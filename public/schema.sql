@@ -54,7 +54,7 @@ create trigger on_auth_user_created
 create or replace function public.app_status() returns json
 language sql stable security definer set search_path = public as $$
   select json_build_object(
-    'version', 4,
+    'version', 5,
     'has_admin', exists (select 1 from public.profiles where role = 'admin')
   );
 $$;
@@ -458,6 +458,8 @@ create table if not exists public.orders (
 );
 
 create index if not exists orders_status_due_idx on public.orders (status, due_date);
+-- 픽업 시간 (선택, 한국 시각 HH:MM)
+alter table public.orders add column if not exists due_time time;
 
 drop trigger if exists orders_touch on public.orders;
 create trigger orders_touch before update on public.orders

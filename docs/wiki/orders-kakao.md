@@ -14,9 +14,9 @@
   눌러서 직접 고치기·완료·주문 취소(관리자는 취소된 주문 완전히 지우기).
 - **홈 카드**: ‘챙길 주문 N건’ (7일 안 택배, 오늘·내일 픽업).
 
-## 데이터 (`public/schema.sql` 7번, 스키마 버전 4)
+## 데이터 (`public/schema.sql` 7번, 스키마 버전 5)
 
-- `orders`: customer, item, price, due_date, method(`pickup`/`delivery`), status(`open`/`done`/`canceled`), memo, contact, address, source_text(원문), done_at.
+- `orders`: customer, item, price, due_date, **due_time**(픽업 시간 `time`, 선택 — 앱에선 "HH:MM"으로 다뤄요), method(`pickup`/`delivery`), status(`open`/`done`/`canceled`), memo, contact, address, source_text(원문), done_at.
   RLS: 읽기·추가·수정 = 직원 이상, 지우기 = 관리자. 채팅의 ‘삭제’는 `canceled`(되살릴 수 있어요).
 - `kakao_tokens`(한 줄): 카카오 access/refresh 토큰, `last_brief_on`. **서비스 키만**(anon/authenticated 권한 없음, 정책 없음).
 - `app_settings`(한 줄): `brief_hour`(0~23, 기본 9). 읽기 = 직원 이상, 바꾸기 = 관리자.
@@ -27,13 +27,15 @@
   **엄격한 JSON**으로 `{reply, actions[]}`를 받아요. action = create / update / complete / reopen / cancel.
 - 서버가 검사해서 반영: 날짜 형식 확인, 번호 → 진짜 id, 가격 0 이상, 글자 길이 제한. 실패한 건 `skipped`로 이유를 보여줘요.
 - 연도 없는 날짜는 오늘 이후 가장 가까운 날(2달 넘게 지난 날짜면 내년).
+- 시간: "오후 3시"→15:00, "3시 반"→15:30, 오전/오후 없는 1~8시는 오후로. 형식이 이상하면 시간만 비우고 주문은 저장. 수정 때 `due_time: ""` = 시간 지우기. AI 답에 빠진 칸은 안 바꿔요.
+- 입력 창(직접 추가/고치기): 날짜는 오늘·내일·모레·다음 주 버튼 + 달력, 시간은 오전 10시~오후 9시 버튼 + 정각/15/30/45분 버튼 + 직접 입력·지우기 (`src/components/WhenPicker.tsx`).
 
 ## 카카오톡 알림 (`src/lib/server/kakao.ts`, `/api/kakao/*`, `/api/cron/orders`)
 
 - **나에게 보내기** API(`POST https://kapi.kakao.com/v2/api/talk/memo/default/send`, 텍스트 템플릿 200자).
   나와의 채팅방은 **보내기 전용**이라 거기서 주문을 받을 수는 없어요(받으려면 카카오톡 채널 + 챗봇이 필요).
 - **보내는 시간은 주문 화면 카카오톡 카드에서 골라요**(한국 0~23시, 기본 9시, `app_settings.brief_hour`, 관리자만). `vercel.json`에 `/api/cron/orders`를 **매시 정각 24개**(각각 하루 한 번 — 무료 플랜 규칙) 등록해 두고, 고른 시각이 되면 그날 한 번만 보내요(`last_brief_on`). 그 시간에 실패하면 다음 시간에 다시 시도. Vercel 무료 예약은 정각~59분 사이에 돌아요. `Authorization: Bearer $CRON_SECRET`이 맞아야만 동작.
-- 알림 내용: **택배는 날짜 7일 전부터 완료할 때까지 매일**(지난 것도), **픽업은 전날·당일**. 완료·취소는 빠져요. 보낼 게 없으면 안 보내요. 200자 넘으면 ‘외 N건’.
+- 알림 내용: **택배는 날짜 7일 전부터 완료할 때까지 매일**(지난 것도), **픽업은 전날·당일**(픽업 시간이 있으면 ‘오늘 오후 3시 픽업’처럼, 시간순). 완료·취소는 빠져요. 보낼 게 없으면 안 보내요. 200자 넘으면 ‘외 N건’.
 - 토큰: access는 끝나기 5분 전 자동 갱신, refresh는 카카오가 새로 줄 때 저장(매일 돌면 계속 유지).
 - 연결: 관리자 → 주문 화면 ‘카카오톡 연결’ → 카카오 동의 → `/api/kakao/callback`이 토큰 저장(state는 서버 키로 서명, 10분 유효).
 

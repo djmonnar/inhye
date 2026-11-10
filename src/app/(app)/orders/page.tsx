@@ -4,10 +4,11 @@ import { Bell, Check, Plus, RotateCcw, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { md, MethodChip, OrderChat } from "@/components/OrderChat";
+import { DayChips, TimeChips } from "@/components/WhenPicker";
 import { useAuth, useToast } from "@/components/providers";
 import { EmptyState, Field, Loading, MoneyInput, PageHeader, Segmented, Sheet } from "@/components/ui";
 import { IS_DEMO } from "@/lib/config";
-import { kstToday } from "@/lib/day";
+import { kstToday, timeLabel } from "@/lib/day";
 import { num, won } from "@/lib/format";
 import { useKakaoStatus, useOrders, useRefresh } from "@/lib/queries";
 import { store } from "@/lib/store";
@@ -22,6 +23,7 @@ const blank = (today: string): OrderInput => ({
   item: "",
   price: 0,
   due_date: today,
+  due_time: null,
   method: "pickup",
   memo: null,
   contact: null,
@@ -48,6 +50,7 @@ function OrderSheet({ order, onClose, today }: { order: Order | "new" | null; on
             item: order.item,
             price: order.price,
             due_date: order.due_date,
+            due_time: order.due_time,
             method: order.method,
             memo: order.memo,
             contact: order.contact,
@@ -76,22 +79,21 @@ function OrderSheet({ order, onClose, today }: { order: Order | "new" | null; on
   return (
     <Sheet open={order !== null} onClose={onClose} title={existing ? "주문 고치기" : "주문 직접 추가"}>
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="날짜">
-            {(id) => <input id={id} type="date" className="input" value={f.due_date} onChange={(e) => set("due_date", e.target.value)} />}
-          </Field>
-          <Field label="받는 방법">
-            {() => (
-              <Segmented<OrderMethod>
-                options={[
-                  { value: "pickup", label: "픽업" },
-                  { value: "delivery", label: "택배" },
-                ]}
-                value={f.method}
-                onChange={(v) => set("method", v)}
-              />
-            )}
-          </Field>
+        <Segmented<OrderMethod>
+          options={[
+            { value: "pickup", label: "🛍 픽업" },
+            { value: "delivery", label: "📦 택배" },
+          ]}
+          value={f.method}
+          onChange={(v) => set("method", v)}
+        />
+        <div>
+          <p className="label">{f.method === "delivery" ? "도착 희망 날짜" : "픽업 날짜"}</p>
+          <DayChips value={f.due_date} today={today} onChange={(d) => set("due_date", d)} />
+        </div>
+        <div>
+          <p className="label">{f.method === "delivery" ? "시간 (선택)" : "픽업 시간"}</p>
+          <TimeChips value={f.due_time} onChange={(t) => set("due_time", t)} />
         </div>
         <Field label="주문한 분">
           {(id) => <input id={id} className="input" value={f.customer} onChange={(e) => set("customer", e.target.value)} placeholder="예: 김포포" />}
@@ -275,7 +277,8 @@ function Orders() {
 
   const list = useMemo(() => {
     const filtered = orders.filter((o) => (tab === "all" ? true : tab === "open" ? o.status === "open" : o.status === "done"));
-    return filtered.sort((a, b) => (tab === "open" ? a.due_date.localeCompare(b.due_date) : b.due_date.localeCompare(a.due_date)));
+    const when = (o: Order) => `${o.due_date} ${o.due_time ?? "99:99"}`;
+    return filtered.sort((a, b) => (tab === "open" ? when(a).localeCompare(when(b)) : when(b).localeCompare(when(a))));
   }, [orders, tab]);
 
   const openOrders = orders.filter((o) => o.status === "open");
@@ -288,6 +291,7 @@ function Orders() {
         item: o.item,
         price: o.price,
         due_date: o.due_date,
+        due_time: o.due_time,
         method: o.method,
         memo: o.memo,
         contact: o.contact,
@@ -352,7 +356,10 @@ function Orders() {
                   <li key={o.id} className={`flex items-center gap-2 py-2.5 ${o.status !== "open" ? "opacity-60" : ""}`}>
                     <button type="button" className="min-w-0 flex-1 text-left" onClick={() => setEditing(o)}>
                       <span className="flex flex-wrap items-center gap-1.5 text-xs">
-                        <span className="font-cute text-sm text-ink">{md(o.due_date)}</span>
+                        <span className="font-cute text-sm text-ink">
+                          {md(o.due_date)}
+                          {o.due_time ? ` ${timeLabel(o.due_time)}` : ""}
+                        </span>
                         <MethodChip method={o.method} />
                         {o.status === "open" ? (
                           <span className={`rounded-full px-2 py-0.5 text-[11px] ${urgent ? (d < 0 ? "bg-danger/10 text-danger" : "bg-butter-100 text-butter-700") : "bg-cream-deep text-ink-soft"}`}>

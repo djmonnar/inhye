@@ -313,6 +313,8 @@ export interface Order {
   price: number;
   /** YYYY-MM-DD (픽업일 / 택배 도착 희망일) */
   due_date: string;
+  /** 픽업 시간 "HH:MM" (한국 시각, 없으면 null) */
+  due_time: string | null;
   method: OrderMethod;
   status: OrderStatus;
   memo: string | null;
@@ -324,7 +326,10 @@ export interface Order {
   updated_at: string;
 }
 
-export type OrderInput = Pick<Order, "customer" | "item" | "price" | "due_date" | "method" | "memo" | "contact" | "address"> & {
+export type OrderInput = Pick<
+  Order,
+  "customer" | "item" | "price" | "due_date" | "due_time" | "method" | "memo" | "contact" | "address"
+> & {
   status?: OrderStatus;
 };
 

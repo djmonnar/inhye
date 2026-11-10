@@ -14,7 +14,7 @@ import { supabase, USERNAME_RE } from "@/lib/supabase";
 type Status = { schema: boolean; current: boolean; hasAdmin: boolean } | null;
 
 /** public/schema.sql 의 app_status() 'version'과 같아야 해요. SQL을 바꾸면 둘 다 올려요. */
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 function Step({ n, title, done, children }: { n: number; title: string; done?: boolean; children: ReactNode }) {
   return (

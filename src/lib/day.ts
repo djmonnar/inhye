@@ -28,3 +28,24 @@ export const kstTime = (iso: string) =>
   new Intl.DateTimeFormat("ko-KR", { timeZone: KST, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(
     new Date(iso),
   );
+
+/** DB의 "15:30:00" → "15:30", 이상하면 null */
+export function normTime(t: string | null | undefined): string | null {
+  if (!t) return null;
+  const m = /^(\d{1,2}):(\d{2})/.exec(t);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return `${String(h).padStart(2, "0")}:${m[2]}`;
+}
+
+/** "15:30" → "오후 3:30", "15:00" → "오후 3시", "12:00" → "낮 12시" */
+export function timeLabel(t: string | null | undefined): string {
+  const n = normTime(t);
+  if (!n) return "";
+  const h = Number(n.slice(0, 2));
+  const min = n.slice(3, 5);
+  const ap = h === 0 ? "밤 12" : h < 12 ? `오전 ${h}` : h === 12 ? "낮 12" : `오후 ${h - 12}`;
+  return min === "00" ? `${ap}시` : `${ap}:${min}`;
+}
