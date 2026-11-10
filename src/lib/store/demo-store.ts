@@ -452,7 +452,7 @@ export function createDemoStore(): DataStore {
     },
 
     async kakaoStatus() {
-      return { configured: false, connected: false, cronReady: false, lastBriefOn: null };
+      return { configured: false, connected: false, cronReady: false, lastBriefOn: null, briefHour: 9 };
     },
 
     async kakaoConnectUrl() {
@@ -461,6 +461,10 @@ export function createDemoStore(): DataStore {
 
     async kakaoTest() {
       throw new StoreError("체험 모드에서는 카카오톡 알림을 보낼 수 없어요.");
+    },
+
+    async kakaoSetHour() {
+      throw new StoreError("체험 모드에서는 카카오톡 알림을 설정할 수 없어요.");
     },
   };
   return store;

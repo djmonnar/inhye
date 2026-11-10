@@ -54,7 +54,7 @@ create trigger on_auth_user_created
 create or replace function public.app_status() returns json
 language sql stable security definer set search_path = public as $$
   select json_build_object(
-    'version', 3,
+    'version', 4,
     'has_admin', exists (select 1 from public.profiles where role = 'admin')
   );
 $$;
@@ -490,6 +490,26 @@ create table if not exists public.kakao_tokens (
 
 alter table public.kakao_tokens enable row level security;
 revoke all on public.kakao_tokens from anon, authenticated;
+
+-- 앱 설정 (한 줄). brief_hour = 카카오톡 알림을 보낼 한국 시각(0~23시)
+create table if not exists public.app_settings (
+  id integer primary key default 1 check (id = 1),
+  brief_hour smallint not null default 9 check (brief_hour between 0 and 23),
+  updated_at timestamptz not null default now()
+);
+insert into public.app_settings (id) values (1) on conflict (id) do nothing;
+
+drop trigger if exists app_settings_touch on public.app_settings;
+create trigger app_settings_touch before update on public.app_settings
+  for each row execute function public.touch_updated_at();
+
+alter table public.app_settings enable row level security;
+grant select, update on public.app_settings to authenticated;
+drop policy if exists "settings read" on public.app_settings;
+create policy "settings read" on public.app_settings for select to authenticated using (public.is_member());
+drop policy if exists "settings admin update" on public.app_settings;
+create policy "settings admin update" on public.app_settings for update to authenticated
+  using (public.is_admin()) with check (public.is_admin());
 
 -- 새로 만든 표·함수를 API가 바로 알아보게 해요 (schema cache 새로고침)
 notify pgrst, 'reload schema';

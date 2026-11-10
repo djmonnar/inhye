@@ -171,3 +171,25 @@ export async function sendMemo(text: string, link: string) {
 export async function markBriefSent(day: string) {
   await adminClient().from("kakao_tokens").update({ last_brief_on: day }).eq("id", 1);
 }
+
+/** 알림 보낼 한국 시각 (설정 표가 아직 없으면 9시) */
+export async function loadBriefHour(): Promise<number> {
+  const { data, error } = await adminClient().from("app_settings").select("brief_hour").eq("id", 1).maybeSingle();
+  if (error || !data) return 9;
+  const h = Number((data as { brief_hour: number }).brief_hour);
+  return Number.isInteger(h) && h >= 0 && h <= 23 ? h : 9;
+}
+
+export async function saveBriefHour(hour: number) {
+  const { error } = await adminClient().from("app_settings").upsert({ id: 1, brief_hour: hour });
+  if (error) {
+    if (error.code === "PGRST205" || error.code === "42P01") {
+      throw new KakaoError("설정 표가 아직 없어요. 설정 화면(/setup)에서 ‘앱에서 바로 실행’으로 DB를 업데이트해 주세요.");
+    }
+    throw new KakaoError(`시간을 저장하지 못했어요: ${error.message}`);
+  }
+}
+
+/** 지금 한국 시각의 ‘시’(0~23) */
+export const kstHourNow = (d = new Date()) =>
+  Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", hour: "2-digit", hourCycle: "h23" }).format(d));

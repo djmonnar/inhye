@@ -100,6 +100,8 @@ export interface DataStore {
   kakaoConnectUrl(): Promise<string>;
   /** 지금 알림을 한 번 보내 봐요 (관리자) */
   kakaoTest(): Promise<{ sent: boolean; text: string }>;
+  /** 매일 알림 보낼 시각(한국 0~23시) 바꾸기 (관리자) */
+  kakaoSetHour(hour: number): Promise<void>;
 }
 
 export class StoreError extends Error {}

@@ -1,5 +1,5 @@
 import { json, requireMember } from "@/lib/server/admin";
-import { cronReady, kakaoConfigured, loadTokens } from "@/lib/server/kakao";
+import { cronReady, kakaoConfigured, loadBriefHour, loadTokens } from "@/lib/server/kakao";
 
 export const dynamic = "force-dynamic";
 
@@ -13,5 +13,6 @@ export async function GET(req: Request) {
     connected: Boolean(row),
     cronReady: cronReady(),
     lastBriefOn: row?.last_brief_on ?? null,
+    briefHour: await loadBriefHour(),
   });
 }

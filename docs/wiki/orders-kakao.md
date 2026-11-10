@@ -14,12 +14,12 @@
   눌러서 직접 고치기·완료·주문 취소(관리자는 취소된 주문 완전히 지우기).
 - **홈 카드**: ‘챙길 주문 N건’ (7일 안 택배, 오늘·내일 픽업).
 
-## 데이터 (`public/schema.sql` 7번, 스키마 버전 3)
+## 데이터 (`public/schema.sql` 7번, 스키마 버전 4)
 
 - `orders`: customer, item, price, due_date, method(`pickup`/`delivery`), status(`open`/`done`/`canceled`), memo, contact, address, source_text(원문), done_at.
   RLS: 읽기·추가·수정 = 직원 이상, 지우기 = 관리자. 채팅의 ‘삭제’는 `canceled`(되살릴 수 있어요).
 - `kakao_tokens`(한 줄): 카카오 access/refresh 토큰, `last_brief_on`. **서비스 키만**(anon/authenticated 권한 없음, 정책 없음).
-- ⚠️ 2026-11-10 현재 Supabase `postgres` 로그인 문제(PAM 28000)로 새 표를 못 만들어서, 고쳐지면 `/setup` ‘앱에서 바로 실행’ 후 쓸 수 있어요.
+- `app_settings`(한 줄): `brief_hour`(0~23, 기본 9). 읽기 = 직원 이상, 바꾸기 = 관리자.
 
 ## 주문 비서 동작 (`src/lib/server/orders.ts`, `POST /api/orders/chat`)
 
@@ -32,7 +32,7 @@
 
 - **나에게 보내기** API(`POST https://kapi.kakao.com/v2/api/talk/memo/default/send`, 텍스트 템플릿 200자).
   나와의 채팅방은 **보내기 전용**이라 거기서 주문을 받을 수는 없어요(받으려면 카카오톡 채널 + 챗봇이 필요).
-- 매일 **UTC 0시 = 한국 9시쯤**(Vercel Cron, `vercel.json`) `/api/cron/orders`가 돌아요. `Authorization: Bearer $CRON_SECRET`이 맞아야만 동작, 하루 한 번(`last_brief_on`).
+- **보내는 시간은 주문 화면 카카오톡 카드에서 골라요**(한국 0~23시, 기본 9시, `app_settings.brief_hour`, 관리자만). `vercel.json`에 `/api/cron/orders`를 **매시 정각 24개**(각각 하루 한 번 — 무료 플랜 규칙) 등록해 두고, 고른 시각이 되면 그날 한 번만 보내요(`last_brief_on`). 그 시간에 실패하면 다음 시간에 다시 시도. Vercel 무료 예약은 정각~59분 사이에 돌아요. `Authorization: Bearer $CRON_SECRET`이 맞아야만 동작.
 - 알림 내용: **택배는 날짜 7일 전부터 완료할 때까지 매일**(지난 것도), **픽업은 전날·당일**. 완료·취소는 빠져요. 보낼 게 없으면 안 보내요. 200자 넘으면 ‘외 N건’.
 - 토큰: access는 끝나기 5분 전 자동 갱신, refresh는 카카오가 새로 줄 때 저장(매일 돌면 계속 유지).
 - 연결: 관리자 → 주문 화면 ‘카카오톡 연결’ → 카카오 동의 → `/api/kakao/callback`이 토큰 저장(state는 서버 키로 서명, 10분 유효).

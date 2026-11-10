@@ -409,5 +409,9 @@ export function createSupabaseStore(): DataStore {
     async kakaoTest() {
       return api<{ sent: boolean; text: string }>("/api/kakao/test", "POST", {});
     },
+
+    async kakaoSetHour(hour) {
+      await api<{ ok: boolean }>("/api/kakao/hour", "POST", { hour });
+    },
   };
 }

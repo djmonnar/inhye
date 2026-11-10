@@ -75,7 +75,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 | 히엘페이 (결제) | ❌ 공개 API 없음, 승인내역엔 상품 정보 없음 | [hielpay.md](docs/wiki/hielpay.md) |
 | Xprinter 라벨 | ✅ PC 드라이버 인쇄 · 안드로이드 USB 직접(TSPL) · 노트북 인쇄 스테이션 | [printing.md](docs/wiki/printing.md) |
 | OpenAI | ✅ 사진→상품정보, 링크→상품정보, 홍보글, 가게 리포트, 주문 비서 (`OPENAI_API_KEY`) | [features.md](docs/wiki/features.md) |
-| 카카오톡 ‘나에게 보내기’ | 🟡 키·`CRON_SECRET` 저장, 표(v3) 생성 완료 — 주문 화면에서 ‘카카오톡 연결’만 하면 동작 | [orders-kakao.md](docs/wiki/orders-kakao.md) |
+| 카카오톡 ‘나에게 보내기’ | ✅ 연결·테스트 발송 확인(2026-11-10). 보내는 시간은 주문 화면에서 선택(스키마 v4 `app_settings`) | [orders-kakao.md](docs/wiki/orders-kakao.md) |
 
 ## 7. 다음에 할 일 (열린 문제)
 
@@ -83,7 +83,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 2. 빅솔론 API는 **문서로 받은 외부 API만** 써요(관리자 화면용 `/api/v2/...`는 쓰지 않기). 과도한 호출은 WAF 차단 → 자동 가져오기를 만들면 10분 이상 간격으로.
 3. (선택) 건별 매출 `GET /api/external/v2/sales`로 영수증 단위·즉시 반영·취소/반품 상태 받기 — 실제 응답의 `salesGoods` 필드 이름을 확인한 뒤에.
 4. `src/lib/report.ts`는 아직 판매를 출고 기록으로 계산해요 → `pos_sales`가 들어오면 그걸 쓰도록.
-5. 주문·카카오: 카카오 앱·`KAKAO_REST_API_KEY`·`KAKAO_CLIENT_SECRET`·`CRON_SECRET` 저장 완료 → 주문 화면에서 카카오톡 연결·‘지금 보내 보기’로 확인.
+5. ✅ 카카오톡 연결·테스트 발송 확인. 스키마 v4(알림 시간 설정) 적용은 `/setup` ‘앱에서 바로 실행’으로.
 
 결정·발견 기록은 [`docs/wiki/decisions.md`](docs/wiki/decisions.md)에 날짜순으로 있어요.
 

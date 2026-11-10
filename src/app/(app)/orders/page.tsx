@@ -310,11 +310,27 @@ function OrderSheet({ order, onClose, today }: { order: Order | "new" | null; on
   );
 }
 
+const hourLabel = (h: number) => (h === 0 ? "밤 12시" : h < 12 ? `오전 ${h}시` : h === 12 ? "낮 12시" : `오후 ${h - 12}시`);
+
 /** 관리자: 카카오톡 ‘나에게 보내기’ 알림 연결 */
 function KakaoCard() {
   const toast = useToast();
+  const refresh = useRefresh();
   const { data: status, isLoading, error } = useKakaoStatus(!IS_DEMO);
   const [busy, setBusy] = useState(false);
+
+  async function setHour(hour: number) {
+    setBusy(true);
+    try {
+      await store().kakaoSetHour(hour);
+      await refresh("kakao");
+      toast(`이제 매일 ${hourLabel(hour)}쯤 보내요`, "wow");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "저장하지 못했어요", "sad");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function connect() {
     setBusy(true);
@@ -344,7 +360,8 @@ function KakaoCard() {
         <Bell size={18} className="text-butter-700" /> 카카오톡 알림
       </p>
       <p className="mb-3 text-xs text-ink-soft">
-        매일 아침 9시쯤 ‘나와의 채팅’으로 보내요. 택배는 날짜 7일 전부터, 픽업은 전날·당일에 알려요. 완료한 주문은 빠져요.
+        매일 {hourLabel(status?.briefHour ?? 9)}쯤 ‘나와의 채팅’으로 보내요 (정각~59분 사이). 택배는 날짜 7일 전부터, 픽업은 전날·당일에
+        알려요. 완료한 주문은 빠져요. 보낼 주문이 없으면 안 보내요.
       </p>
       {IS_DEMO ? (
         <p className="text-sm text-ink-soft">체험 모드에서는 연결할 수 없어요.</p>
@@ -364,6 +381,22 @@ function KakaoCard() {
             {status.connected && !status.cronReady && <span className="block text-xs text-danger">매일 알림을 켜려면 Vercel에 CRON_SECRET을 넣어 주세요.</span>}
             {status.lastBriefOn && <span className="block text-xs text-ink-faint">마지막 알림 {status.lastBriefOn}</span>}
           </p>
+          <label className="flex items-center justify-between gap-3 rounded-2xl bg-cream px-3 py-2 text-sm">
+            <span>보내는 시간</span>
+            <select
+              className="rounded-xl border-2 border-line bg-white px-2 py-1 font-semibold"
+              value={status.briefHour}
+              onChange={(e) => void setHour(Number(e.target.value))}
+              disabled={busy}
+              aria-label="카카오톡 알림 보내는 시간"
+            >
+              {Array.from({ length: 24 }, (_, h) => (
+                <option key={h} value={h}>
+                  {hourLabel(h)}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="grid grid-cols-2 gap-2">
             <button type="button" className={status.connected ? "btn-soft btn-sm" : "btn-primary btn-sm"} onClick={connect} disabled={busy}>
               {status.connected ? "다시 연결" : "카카오톡 연결"}

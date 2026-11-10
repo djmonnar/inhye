@@ -349,4 +349,6 @@ export interface KakaoStatus {
   /** 매일 알림(CRON_SECRET)이 켜질 준비가 됐는지 */
   cronReady: boolean;
   lastBriefOn: string | null;
+  /** 알림 보낼 한국 시각 (0~23시) */
+  briefHour: number;
 }
