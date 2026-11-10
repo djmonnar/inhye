@@ -31,7 +31,7 @@ src/app/(app)/        로그인 후 화면: 홈, products, scan, reorder, suppli
                       print-station, sales(+receipts), orders, report, members, guide, history, more
 src/app/login, setup  로그인(자동 로그인) / 처음 설정(SQL 안내, 관리자 계정)
 src/app/api/          setup/admin, setup/schema(DB에 schema.sql 바로 적용), members, pos/status, pos/sync, pos/live(빅솔론 하루치 바로 보기, 저장 없음), pos/receipts(영수증별, 저장 없음), orders/chat(주문 비서), kakao/{status,connect,callback,test}, cron/orders(매일 알림), ai/{product,link,promo,report}
-src/components/       ui.tsx(공용 UI), ProductForm, BarcodeScanner, StockSheet, SupplierSheet,
+src/components/       ui.tsx(공용 UI), OrderChat(주문 비서 — 주문 화면·홈 떠 있는 버튼 공용), DayNav, ProductForm, BarcodeScanner, StockSheet, SupplierSheet,
                       labels.tsx(라벨 공용), SendLabelSheet, AiFillSheet, PromoSheet, Mascot
 src/lib/store/        데이터 계층 인터페이스(types.ts) + supabase-store.ts + demo-store.ts
 src/lib/server/       서버 전용: admin.ts(서비스 키, 권한), schema.ts(pg로 schema.sql 적용), orders.ts(주문 비서·알림 글), kakao.ts(나에게 보내기), pos.ts, bixolon.ts, openai.ts, ai-*.ts, fetch-page.ts

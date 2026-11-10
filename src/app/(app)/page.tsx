@@ -5,6 +5,7 @@ import {
   ChevronRight,
   FileSpreadsheet,
   Flower2,
+  MessageCircle,
   PackagePlus,
   Plus,
   Printer,
@@ -16,7 +17,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Mascot } from "@/components/Mascot";
 import { useAuth } from "@/components/providers";
-import { Loading, ProductThumb } from "@/components/ui";
+import { OrderChat } from "@/components/OrderChat";
+import { Loading, ProductThumb, Sheet } from "@/components/ui";
 import { SHOP_NAME } from "@/lib/config";
 import { needsKioskSync, num, relTime, stockLevel, won } from "@/lib/format";
 import { kstToday } from "@/lib/day";
@@ -41,6 +43,7 @@ export default function HomePage() {
   });
   const { data: todaySales = [] } = usePosSales(todayIso);
   const { data: orders = [] } = useOrders();
+  const [chatOpen, setChatOpen] = useState(false);
   const [kstDay] = useState(kstToday);
   const orderAlert = useMemo(() => {
     const until = (day: string) => Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${kstDay}T00:00:00Z`)) / 86400000);
@@ -286,6 +289,27 @@ export default function HomePage() {
           </div>
         </Link>
       )}
+
+      {/* 주문 비서: 떠 있는 버튼 → 시트에서 바로 등록·수정 (하단 메뉴 위, 오른쪽) */}
+      <div
+        className="pointer-events-none fixed inset-x-0 z-30 mx-auto flex max-w-3xl justify-end px-4"
+        style={{ bottom: "calc(env(safe-area-inset-bottom) + 6.75rem)" }}
+      >
+        <button
+          type="button"
+          onClick={() => setChatOpen(true)}
+          className="pointer-events-auto flex h-12 items-center gap-1.5 rounded-full border-2 border-berry-600 bg-berry-500 px-4 font-cute text-white shadow-pop active:translate-y-0.5"
+          aria-label="주문 비서 열기"
+        >
+          <MessageCircle size={20} /> 주문 비서
+        </button>
+      </div>
+      <Sheet open={chatOpen} onClose={() => setChatOpen(false)} title="주문 비서">
+        <OrderChat bare />
+        <Link href="/orders" className="btn-ghost btn-sm mt-3 w-full" onClick={() => setChatOpen(false)}>
+          주문 목록 보기 <ChevronRight size={16} />
+        </Link>
+      </Sheet>
     </div>
   );
 }
