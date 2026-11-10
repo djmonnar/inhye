@@ -21,3 +21,4 @@
 - **2026-11-10** — 정정: Supabase 환경변수는 10-28에 Vercel Supabase 연동이 이미 넣어 둠(`SUPABASE_SECRET_KEY`, `SUPABASE_PUBLISHABLE_KEY` 등 접두어 없는 이름) → 앱이 자동 인식해 **Supabase 모드로 동작 중**. ‘미입력/체험 모드’ 기록은 틀렸음(MCP로 환경변수 목록을 못 봐서 생긴 착오). `BIXOLON_API_KEY` 저장 완료.
 - **2026-11-10** — 첫 ‘지금 가져오기’: 빅솔론 호출은 통과(오류가 그다음 단계에서 남), `pos_sales` 표가 없어서 저장 실패(PGRST205) → 최신 `schema.sql`을 아직 안 돌린 상태. 서버 오류를 한국어 안내로 바꾸고, `schema.sql` 끝에 `notify pgrst, 'reload schema'` 추가.
 - **2026-11-10** — Supabase SQL 편집기가 `FATAL: 28000: PAM authentication failed for user "postgres"`로 계속 실패(대시보드 쪽 문제, 우리 SQL과 무관) → `/setup`에 **‘앱에서 바로 실행’** 추가: 서버가 `pg`로 Vercel 연동의 `POSTGRES_URL`에 접속해 저장소의 `schema.sql`만 한 트랜잭션으로 실행. 관리자가 있으면 관리자만 허용. 스키마 버전 2로 올리고 설정 화면이 ‘DB 업데이트 필요’를 표시.
+- **2026-11-10** — ‘앱에서 바로 실행’도 `28000`(로그인 거절)로 실패 → 대시보드뿐 아니라 `postgres` 역할 로그인 자체가 막힌 상태(Supabase 쪽). 앱 데이터 읽기/쓰기(PostgREST)는 정상. 다음: 프로젝트 재시작 → DB 비밀번호 재설정 + Vercel `POSTGRES_*` 갱신 → 안 되면 Supabase 지원 문의.
