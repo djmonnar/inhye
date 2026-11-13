@@ -1,5 +1,6 @@
 import type { PostgrestError } from "@supabase/supabase-js";
-import type { Product, ProductSource, Role, Supplier } from "../../types";
+import { normTime } from "../../day";
+import type { Order, Product, ProductSource, Role, Supplier } from "../../types";
 import { adminClient } from "../admin";
 import { fetchBixolonDay, PosNotReady } from "../bixolon";
 import type { BotDb, BotSession, BotUser, TodaySales } from "./types";
@@ -166,6 +167,12 @@ export function supabaseBotDb(): BotDb {
         items,
         note: "빅솔론에서 바로 못 받아서, 앱에 마지막으로 가져온 매출 기준이에요.",
       };
+    },
+
+    async listOrders() {
+      const { data, error } = await sb.from("orders").select("*").eq("status", "open").order("due_date").limit(200);
+      if (error) dbFail(error, "주문 불러오기");
+      return (data as Order[]).map((o) => ({ ...o, due_time: normTime(o.due_time) }));
     },
   };
 }

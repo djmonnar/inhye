@@ -1,19 +1,52 @@
 import { timingSafeEqual } from "node:crypto";
+import { after } from "next/server";
 import { hasServiceKey } from "@/lib/server/admin";
 import { appUrl } from "@/lib/server/kakao";
-import { handleSkill } from "@/lib/server/kakao-bot/bot";
-import { reply, text, type SkillRequest } from "@/lib/server/kakao-bot/kakao";
+import { makeBotAi } from "@/lib/server/kakao-bot/ai";
+import { handleSkill, type BotContext } from "@/lib/server/kakao-bot/bot";
+import { reply, text, type SkillRequest, type SkillResponse } from "@/lib/server/kakao-bot/kakao";
 import { supabaseBotDb } from "@/lib/server/kakao-bot/supabase-db";
 
 export const dynamic = "force-dynamic";
+// 답을 보낸 뒤에도 주문 정리(AI)를 끝까지 마무리하고, 콜백이면 카카오에 보내요
+export const maxDuration = 60;
 
 /**
  * 카카오 i 오픈빌더 스킬 서버. 오픈빌더 → 스킬 → URL에 https://<사이트>/api/kakao/skill,
  * 헤더값에 X-Popo-Key = (Vercel 환경변수 KAKAO_SKILL_SECRET 과 같은 값)을 넣어요.
  * 카카오는 5초 안에 답을 못 받으면 오류를 보여주니, 4.3초가 넘으면 ‘다시 보내 달라’고 먼저 답해요.
+ * 주문 비서(AI)는 3.8초 안에 못 끝나면 ‘결과 보기’로 받아 가게 하고(bot.ts), 블록에서 콜백을 켜면
+ * ‘정리 중’이라고 먼저 답한 뒤 다 되면 userRequest.callbackUrl로 보내요(5분 안에 한 번).
  */
 const HEADER = "x-popo-key";
 const LIMIT_MS = 4300;
+
+/** 카카오가 준 콜백 주소만 써요 (https, 카카오 도메인) */
+function kakaoCallbackUrl(raw: unknown): string | null {
+  if (typeof raw !== "string" || !raw) return null;
+  try {
+    const u = new URL(raw);
+    if (u.protocol === "https:" && /(^|\.)kakao(enterprise)?\.com$/.test(u.hostname)) return u.toString();
+    console.warn("[kakao skill] callbackUrl host not trusted:", u.hostname);
+  } catch {
+    /* 이상한 주소는 무시 */
+  }
+  return null;
+}
+
+async function sendCallback(url: string, res: SkillResponse) {
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(res),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!r.ok) console.error("[kakao skill] callback failed", r.status);
+  } catch (e) {
+    console.error("[kakao skill] callback error", e);
+  }
+}
 
 function sameSecret(a: string, b: string) {
   const x = Buffer.from(a);
@@ -43,13 +76,32 @@ export async function POST(req: Request) {
   }
 
   const origin = new URL(req.url).origin;
-  const work = handleSkill(body, { db: supabaseBotDb(), appUrl: appUrl(origin) });
+  const callbackUrl = kakaoCallbackUrl(body.userRequest?.callbackUrl);
+  const ctx: BotContext = {
+    db: supabaseBotDb(),
+    appUrl: appUrl(origin),
+    ai: makeBotAi(),
+    deadline: Date.now() + 3800,
+    defer: (job) =>
+      after(async () => {
+        await job.catch((e) => console.error("[kakao skill] deferred", e));
+      }),
+    callback: callbackUrl
+      ? (job) =>
+          after(async () => {
+            await sendCallback(callbackUrl, await job);
+          })
+      : undefined,
+  };
+  const work = handleSkill(body, ctx);
   const slow = new Promise<"slow">((resolve) => setTimeout(() => resolve("slow"), LIMIT_MS));
   try {
     const res = await Promise.race([work, slow]);
     if (res === "slow") {
-      // 늦게 끝나도 저장은 마무리돼요. 화면에는 다시 보내 달라고만 해요.
-      work.catch(() => undefined);
+      // 늦게 끝나도 저장은 마무리돼요(after가 함수를 끝까지 살려 둬요). 화면에는 다시 보내 달라고만 해요.
+      after(async () => {
+        await work.catch(() => undefined);
+      });
       return Response.json(reply([text("조금 오래 걸리고 있어요 ⏳ 잠시 뒤에 같은 말을 한 번 더 보내 주세요.")]));
     }
     return Response.json(res);

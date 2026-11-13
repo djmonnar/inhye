@@ -11,6 +11,8 @@ export interface SkillRequest {
     utterance?: string;
     user?: { id?: string; type?: string; properties?: Record<string, unknown> };
     block?: { id?: string; name?: string };
+    /** 블록에서 콜백을 켜면 와요 — 5분 안에 한 번, 이 주소로 답을 보내요 */
+    callbackUrl?: string;
   };
   action?: { name?: string; params?: Record<string, unknown>; clientExtra?: Record<string, unknown> };
 }
@@ -53,6 +55,16 @@ export interface SkillResponse {
   version: "2.0";
   template: { outputs: Output[]; quickReplies?: QuickReply[] };
 }
+
+/** 콜백 모드의 첫 답: ‘기다려 주세요’ — 진짜 답은 나중에 callbackUrl로 보내요 (template 없이) */
+export interface CallbackAck {
+  version: "2.0";
+  useCallback: true;
+  data: { text: string };
+}
+
+export const callbackAck = (t: string): CallbackAck => ({ version: "2.0", useCallback: true, data: { text: cut(t, 400) } });
+export const isCallbackAck = (r: SkillResponse | CallbackAck): r is CallbackAck => "useCallback" in r;
 
 export const cut = (s: string, n: number) => {
   const chars = [...(s ?? "")];

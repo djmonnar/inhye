@@ -1,4 +1,4 @@
-import type { PriceInput, Product, ProductSource, Role, Supplier, SupplierInput } from "../../types";
+import type { Order, OrderChatResult, OrderChatTurn, PriceInput, Product, ProductSource, Role, Supplier, SupplierInput } from "../../types";
 
 /** 연결된 카카오 사용자 = 앱 계정 (권한도 앱 계정 그대로) */
 export interface BotUser {
@@ -10,7 +10,8 @@ export interface BotUser {
 
 /** 여러 번 주고받는 대화(거래처 등록, 가격 기록 …)의 진행 상태 */
 export interface BotSession {
-  flow: "sup_new" | "sup_edit" | "sup_del" | "price" | "search";
+  /** ai_job: 오래 걸리는 주문 비서 작업 (step: running / done / error) — ‘결과’로 받아 가요 */
+  flow: "sup_new" | "sup_edit" | "sup_del" | "price" | "search" | "ai_job";
   step: string;
   data: Record<string, string | number | boolean | null>;
   /** ISO — 오래된 대화(15분)는 버려요 */
@@ -44,4 +45,36 @@ export interface BotDb {
   listSources(): Promise<ProductSource[]>;
   recordPrice(input: PriceInput, byName: string): Promise<void>;
   todaySales(day: string): Promise<TodaySales>;
+  /** 진행 중인 주문 (날짜·시간순) */
+  listOrders(): Promise<Order[]>;
+}
+
+/** AI가 알아들은 뜻 — 챗봇의 정해진 명령으로 바꿔서 실행해요 */
+export type AiIntent =
+  | "orders"
+  | "order_list"
+  | "supplier"
+  | "supplier_list"
+  | "supplier_products"
+  | "supplier_new"
+  | "supplier_edit"
+  | "product"
+  | "price_record"
+  | "reorder"
+  | "sales"
+  | "help"
+  | "unknown";
+
+export interface AiRoute {
+  intent: AiIntent;
+  /** 거래처 이름·상품 이름 같은 찾을 말 (없으면 null) */
+  query: string | null;
+}
+
+/** 챗봇의 AI (OpenAI, 서버 전용) — 테스트에선 가짜로 바꿔 끼워요 */
+export interface BotAi {
+  /** 정해진 말이 아닐 때 뜻 알아내기. 늦거나 실패하면 null */
+  route(said: string, hints: { suppliers: string[] }): Promise<AiRoute | null>;
+  /** 주문 비서 (앱과 같은 두뇌). userId = 연결된 앱 계정 */
+  orderChat(message: string, history: OrderChatTurn[], userId: string): Promise<OrderChatResult>;
 }

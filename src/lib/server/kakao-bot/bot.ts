@@ -1,9 +1,11 @@
+import { normTime, timeLabel } from "../../day";
 import { margin, num, relTime, won } from "../../format";
 import { j } from "../../josa";
 import { cheaperThanMain, isStale, sortSources, suggestQty } from "../../sources";
-import type { Product, ProductSource, Supplier, SupplierInput, SupplierKind } from "../../types";
+import type { Order, OrderChangeOp, OrderChatResult, OrderChatTurn, Product, ProductSource, Supplier, SupplierInput, SupplierKind } from "../../types";
 import {
   call,
+  callbackAck,
   card,
   carousel,
   link,
@@ -13,11 +15,12 @@ import {
   say,
   text,
   type Button,
+  type CallbackAck,
   type ListItem,
   type SkillRequest,
   type SkillResponse,
 } from "./kakao";
-import type { BotDb, BotSession, BotUser } from "./types";
+import type { BotAi, BotDb, BotSession, BotUser } from "./types";
 
 /**
  * 포포하우스 카카오 챗봇 — 오픈빌더의 폴백·웰컴 블록이 이 스킬을 불러요(말 전체를 여기서 해석).
@@ -28,19 +31,44 @@ export interface BotContext {
   /** 버튼이 열 앱 주소 (예: https://inhye.vercel.app) */
   appUrl: string;
   now?: Date;
+  /** AI (서버에 OpenAI 키가 있을 때만) — 정해진 말이 아닐 때 뜻 알아내기 + 주문 비서 */
+  ai?: BotAi;
+  /** 이 시각(ms)까지 답해야 해요 (카카오 5초 규칙). 늦어지는 주문 정리는 ‘결과 보기’로 받아 가요 */
+  deadline?: number;
+  /** 답을 보낸 뒤에도 끝까지 마무리할 일 (Next.js after) */
+  defer?: (work: Promise<unknown>) => void;
+  /** 블록에서 콜백을 켰을 때만: 늦은 답을 카카오에 나중에 보내요 */
+  callback?: (work: Promise<SkillResponse>) => void;
 }
+
+export type BotReply = SkillResponse | CallbackAck;
 
 const KIND_LABEL: Record<SupplierKind, string> = { online: "온라인", wholesale: "도매", offline: "오프라인", etc: "기타" };
 const ROLE_LABEL = { admin: "관리자", staff: "직원", pending: "승인 대기" } as const;
 const SESSION_MS = 15 * 60 * 1000;
 const PAGE = 5;
 
-const MENU = quick("거래처 목록", "발주 목록", "상품 찾기", "가격 기록", "오늘 매출", "거래처 등록", "도움말");
+const MENU = quick("주문 목록", "거래처 목록", "발주 목록", "상품 찾기", "가격 기록", "오늘 매출", "거래처 등록", "도움말");
 const CANCEL = quick("취소");
 
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 const norm = (s: string) => s.toLowerCase().replace(/[\s·.,()\-_/]+/g, "");
 const kstDay = (d: Date) => new Date(d.getTime() + 9 * 3600_000).toISOString().slice(0, 10);
+
+const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
+const md = (day: string) => `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))}(${WEEK[new Date(`${day}T00:00:00Z`).getUTCDay()]})`;
+const daysUntil = (day: string, today: string) =>
+  Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
+const dLabel = (n: number) => (n === 0 ? "오늘" : n > 0 ? `D-${n}` : `${-n}일 지남`);
+const OP_LABEL: Record<OrderChangeOp, string> = { create: "등록", update: "수정", complete: "완료", reopen: "다시 진행", cancel: "취소" };
+const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 200);
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, Math.max(0, ms)));
+const SLOW: unique symbol = Symbol("slow");
+/** 오래 걸리는 주문 정리가 이보다 오래 ‘정리 중’이면 멈춘 걸로 봐요 */
+const JOB_STALE_MS = 90_000;
+
+/** 주문(예약) 이야기 같으면 바로 주문 비서로 — 날짜, 픽업·택배, 꽃다발, 보냈어·완료 … */
+const ORDER_RE = /(\d{1,2}\s*[\/.월]\s*\d{1,2}|픽업|택배|꽃다발|예약|주문\s*(?:등록|추가|넣|받|들어)|보냈|찾아\s*갔|가져\s*갔|완료)/;
 
 /** "1,800" "1800원" "2만" "1만5천" "1.5천" → 숫자 (모르면 null) */
 export function parsePrice(s: string): number | null {
@@ -70,7 +98,7 @@ const isClear = (s: string) => /^(지우기|비우기|삭제)$/.test(s);
 
 // ---------------------------------------------------------------------------
 
-export async function handleSkill(body: SkillRequest, ctx: BotContext): Promise<SkillResponse> {
+export async function handleSkill(body: SkillRequest, ctx: BotContext): Promise<BotReply> {
   const key = body.userRequest?.user?.id?.trim();
   // 웰컴 블록(대화방에 처음 들어올 때)은 어떤 말이 오든 인사·연결 안내로 답해요
   const welcome = /웰컴|welcome/i.test(`${body.userRequest?.block?.name ?? ""} ${body.intent?.name ?? ""}`);
@@ -157,7 +185,7 @@ class Bot {
 
   // --- 말 해석 ---------------------------------------------------------------
 
-  async command(said: string): Promise<SkillResponse> {
+  async command(said: string, viaAi = false): Promise<BotReply> {
     let m: RegExpMatchArray | null;
     if (!said || /^(시작|안녕|안녕하세요|하이|hi|hello|ㅎㅇ)/i.test(said)) return this.menu(true);
     if (/^(도움말|도움|help|\?|사용법|뭐\s*할\s*수\s*있어)/i.test(said)) return this.help();
@@ -175,6 +203,10 @@ class Bot {
     if (/^발주(\s*목록|\s*리스트|\s*할\s*것)?$/.test(said)) return this.reorder();
     if (/^(오늘\s*)?(매출|판매)(\s*보기)?$/.test(said)) return this.sales();
 
+    if ((m = said.match(/^(?:주문|예약)\s*(?:목록|리스트|보기|확인)?\s*(\d+)?$/))) return this.orderList(Number(m[1] ?? 1));
+    if ((m = said.match(/^(오늘|내일)\s*픽업(?:\s*(?:목록|보기))?$/))) return this.pickups(m[1] === "오늘" ? 0 : 1);
+    if (/^결과(\s*보기)?$/.test(said)) return reply([text("받아 갈 결과가 없어요. 주문은 ‘주문 목록’에서 확인할 수 있어요.")], quick("주문 목록", "메뉴"));
+
     if ((m = said.match(/^가격\s*(?:기록|입력|등록|적기)\s*(.*)$/))) return this.startPrice(m[1]);
     if (/^(상품|재고)\s*(찾기|검색)?$/.test(said)) return this.askSearch("product");
     if ((m = said.match(/^(?:상품|재고|찾기|검색|가격|최저가)\s*(?:찾기|검색|비교)?\s*(.+)$/))) return this.productSearch(m[1]);
@@ -186,11 +218,14 @@ class Bot {
       return reply([text(`이미 ${this.user.name}님 계정과 연결돼 있어요.`)], MENU);
     }
 
-    return this.anything(said);
+    if (!viaAi && ORDER_RE.test(said)) return this.orderFlow(said);
+    return this.understand(said, viaAi);
   }
 
-  async continueFlow(s: BotSession, said: string): Promise<SkillResponse> {
+  async continueFlow(s: BotSession, said: string): Promise<BotReply> {
     switch (s.flow) {
+      case "ai_job":
+        return this.jobStep(s, said);
       case "sup_new":
         return this.newSupplierStep(s, said);
       case "sup_edit":
@@ -220,6 +255,9 @@ class Bot {
         text(
           [
             "이렇게 말해 보세요 🐾",
+            "• 주문 목록 / 오늘 픽업 / 내일 픽업",
+            "• 주문은 그대로 보내면 등록돼요 — 11/20 금 오후 3시 픽업 김포포 꽃다발 2.5만원",
+            "• 김포포 꽃다발 보냈어(완료) · 김포포 4시로 바꿔줘 · 김포포 주문 취소",
             "• 거래처 목록 / 거래처 도매꾹",
             "• 거래처 등록 / 거래처 수정 도매꾹",
             "• 거래처 상품 도매꾹 — 거기서 사는 상품·가격",
@@ -229,6 +267,7 @@ class Bot {
             "• 오늘 매출",
             "• 취소 — 하던 것 그만",
             this.user.role === "admin" ? "• 거래처 삭제 도매꾹 (관리자)" : "",
+            this.ctx.ai ? "\n💡 정해진 말이 아니어도 알아들어요. 예) 도매꾹 전화번호 뭐야? · 품절된 거 뭐 있어?" : "",
           ]
             .filter(Boolean)
             .join("\n"),
@@ -798,5 +837,207 @@ class Bot {
       s.note ? `\n${s.note}` : "",
     ].filter(Boolean).join("\n");
     return reply([card(`오늘 매출 · ${Number(mm)}월 ${Number(dd)}일`, desc, [link("앱 매출 화면", this.app("/sales"))])], MENU);
+  }
+
+  // --- AI: 정해진 말이 아닐 때 ------------------------------------------------
+
+  private timeLeft() {
+    return (this.ctx.deadline ?? Date.now() + 60_000) - Date.now();
+  }
+
+  /**
+   * 정해진 말이 아니면: 이름 하나로 바로 찾아지면 찾기 결과, 아니면 AI가 뜻을 알아내서
+   * 챗봇의 정해진 명령으로 실행해요. AI가 없거나 늦으면 지금처럼 이름으로 찾아요.
+   */
+  async understand(said: string, viaAi: boolean): Promise<BotReply> {
+    if (!viaAi && this.ctx.ai && said) {
+      const [sup, prods] = await Promise.all([this.findSuppliers(said), this.findProducts(said)]);
+      const clearHit = Boolean(sup.exact) || (said.length <= 15 && prods.length > 0 && prods.length <= 5);
+      if (!clearHit) {
+        const routed = await this.aiRoute(said);
+        if (routed) return routed;
+      }
+    }
+    return this.anything(said);
+  }
+
+  private async aiRoute(said: string): Promise<BotReply | null> {
+    const ai = this.ctx.ai;
+    // DB를 읽고 답을 만들 시간(약 1초)은 남겨 둬요
+    const budget = this.timeLeft() - 1000;
+    if (!ai || budget < 800) return null;
+    const suppliers = (await this.suppliers()).map((s) => s.name).slice(0, 80);
+    const r = await Promise.race([ai.route(said, { suppliers }).catch(() => null), sleep(budget).then(() => null)]);
+    if (!r) return null;
+    const q = clean(r.query ?? "");
+    switch (r.intent) {
+      case "orders":
+        return this.orderFlow(said);
+      case "order_list":
+        return this.orderList(1);
+      case "supplier":
+        return q ? this.supplierSearch(q) : this.supplierList(1);
+      case "supplier_list":
+        return this.supplierList(1);
+      case "supplier_products":
+        return q ? this.supplierProducts(q) : this.supplierList(1);
+      case "supplier_new":
+        return this.startNewSupplier(q);
+      case "supplier_edit":
+        return this.startEdit(q);
+      case "product":
+        return q ? this.productSearch(q) : this.askSearch("product");
+      case "price_record":
+        return this.startPrice(q);
+      case "reorder":
+        return this.reorder();
+      case "sales":
+        return this.sales();
+      case "help":
+        return this.help();
+      default:
+        return null;
+    }
+  }
+
+  // --- 주문 (꽃다발 등 예약) ----------------------------------------------------
+
+  /** 주문 비서(앱과 같은 AI)에게 맡겨요. 5초 안에 못 끝나면 ‘결과 보기’로 받아 가게 해서 두 번 등록되지 않아요. */
+  async orderFlow(said: string, history: OrderChatTurn[] = []): Promise<BotReply> {
+    const ai = this.ctx.ai;
+    if (!ai) {
+      return reply(
+        [text("주문 비서를 쓰려면 서버에 OPENAI_API_KEY가 필요해요. 지금은 앱의 주문 화면에서 직접 넣어 주세요.")],
+        quick("주문 목록", "메뉴"),
+      );
+    }
+    const work = ai.orderChat(said, history, this.user.profileId).then((r) => this.orderResult(r));
+    const failed = (e: unknown) => reply([text(`주문을 정리하지 못했어요 😢 ${errMsg(e)}\n다시 보내 주세요.`)], quick("주문 목록", "메뉴"));
+
+    // 블록에서 콜백을 켰으면: ‘정리 중’이라고 먼저 답하고, 다 되면 카카오로 보내요
+    if (this.ctx.callback) {
+      this.ctx.callback(work.catch(failed));
+      return callbackAck("주문을 정리하고 있어요 ⏳ 잠시만요!");
+    }
+
+    let first: SkillResponse | typeof SLOW;
+    try {
+      first = await Promise.race([work, sleep(this.timeLeft() - 300).then((): typeof SLOW => SLOW)]);
+    } catch (e) {
+      return failed(e);
+    }
+    if (first !== SLOW) return first;
+
+    // 늦어요: ‘정리 중’을 저장해 두고, 끝나면 결과를 저장 → ‘결과 보기’ 또는 같은 말을 다시 보내면 그걸 보여줘요
+    await this.setSession({ flow: "ai_job", step: "running", data: { said } });
+    this.ctx.defer?.(
+      work.then(
+        (res) => this.finishJob(said, "done", JSON.stringify(res)),
+        (e) => this.finishJob(said, "error", errMsg(e)),
+      ),
+    );
+    return reply([text("주문을 정리하고 있어요 ⏳\n몇 초 뒤에 ‘결과 보기’를 눌러 주세요.")], quick(["결과 보기", "결과"], "주문 목록"));
+  }
+
+  /** 늦게 끝난 주문 정리 결과를 저장해요 (그새 다른 걸 시작했으면 덮어쓰지 않아요) */
+  private async finishJob(said: string, step: "done" | "error", payload: string) {
+    const cur = await this.db.getSession(this.user.key);
+    if (!cur || cur.flow !== "ai_job" || cur.data.said !== said) return;
+    await this.db.setSession(this.user.key, {
+      flow: "ai_job",
+      step,
+      data: step === "done" ? { said, reply: payload } : { said, error: payload },
+      at: new Date().toISOString(),
+    });
+  }
+
+  async jobStep(s: BotSession, said: string): Promise<BotReply> {
+    const asking = /^(결과|결과\s*보기|됐어\??|다\s*됐어\??|어떻게\s*됐어\??)$/.test(said) || said === s.data.said;
+    if (!asking) {
+      // 다른 말이면 기다리던 결과는 놔두고 새 말을 처리해요 (주문은 앱 ‘주문 목록’에서 확인)
+      await this.setSession(null);
+      return this.command(said);
+    }
+    if (s.step === "running") {
+      if (this.now.getTime() - new Date(s.at).getTime() > JOB_STALE_MS) {
+        await this.setSession(null);
+        return reply(
+          [text("정리가 너무 오래 걸려서 멈췄어요 😢 ‘주문 목록’에서 들어갔는지 확인하고, 없으면 다시 보내 주세요.")],
+          quick("주문 목록", "메뉴"),
+        );
+      }
+      return reply([text("아직 정리하고 있어요 ⏳ 조금만 더 있다가 ‘결과 보기’를 눌러 주세요.")], quick(["결과 보기", "결과"], "주문 목록"));
+    }
+    await this.setSession(null);
+    if (s.step === "error") {
+      return reply([text(`주문을 정리하지 못했어요 😢 ${String(s.data.error ?? "")}\n다시 보내 주세요.`)], quick("주문 목록", "메뉴"));
+    }
+    try {
+      return JSON.parse(String(s.data.reply)) as SkillResponse;
+    } catch {
+      return reply([text("결과를 읽지 못했어요. ‘주문 목록’에서 확인해 주세요.")], quick("주문 목록", "메뉴"));
+    }
+  }
+
+  private orderLine(o: Order, today: string) {
+    const t = timeLabel(normTime(o.due_time));
+    return {
+      title: `${md(o.due_date)}${t ? ` ${t}` : ""} ${o.method === "delivery" ? "📦" : "🛍"} ${o.customer || "-"}`,
+      description: [o.item, o.price ? won(o.price) : "", o.status === "open" ? dLabel(daysUntil(o.due_date, today)) : ""]
+        .filter(Boolean)
+        .join(" · "),
+    };
+  }
+
+  private orderResult(r: OrderChatResult): SkillResponse {
+    const today = kstDay(this.now);
+    const lines = r.changes.map((c) => {
+      const l = this.orderLine(c.order, today);
+      return `✅ ${OP_LABEL[c.op]} ${l.title} · ${l.description}`;
+    });
+    const body = [r.reply, ...(lines.length ? ["", ...lines] : []), ...r.skipped.map((x) => `⚠️ ${x}`)].join("\n");
+    return reply([text(body)], quick("주문 목록", "오늘 픽업", "메뉴"));
+  }
+
+  private async openOrders(): Promise<Order[]> {
+    const all = await this.db.listOrders();
+    const when = (o: Order) => `${o.due_date} ${normTime(o.due_time) ?? "99:99"}`;
+    return all.filter((o) => o.status === "open").sort((a, b) => when(a).localeCompare(when(b)));
+  }
+
+  async orderList(page: number): Promise<SkillResponse> {
+    const today = kstDay(this.now);
+    const all = await this.openOrders();
+    if (!all.length) {
+      return reply(
+        [text("진행 중인 주문이 없어요.\n주문을 그대로 보내면 등록해요.\n예) 11/20 금 오후 3시 픽업 김포포 꽃다발 2.5만원")],
+        quick("메뉴"),
+      );
+    }
+    const pages = Math.ceil(all.length / PAGE);
+    const p = Math.min(Math.max(page, 1), pages);
+    const items: ListItem[] = all.slice((p - 1) * PAGE, p * PAGE).map((o) => this.orderLine(o, today));
+    const ship = all.filter((o) => o.method === "delivery" && daysUntil(o.due_date, today) <= 7).length;
+    return reply(
+      [
+        list(`진행 중인 주문 ${num(all.length)}건${pages > 1 ? ` (${p}/${pages})` : ""}`, items, [link("앱에서 보기", this.app("/orders"))]),
+        ...(ship ? [text(`📦 7일 안에 보낼 택배가 ${num(ship)}건 있어요.`)] : []),
+      ],
+      quick(p < pages && ["다음 ▶", `주문 목록 ${p + 1}`], p > 1 && ["◀ 이전", `주문 목록 ${p - 1}`], "오늘 픽업", "내일 픽업", "메뉴"),
+    );
+  }
+
+  async pickups(offset: 0 | 1): Promise<SkillResponse> {
+    const today = kstDay(this.now);
+    const day = new Date(`${today}T00:00:00Z`);
+    day.setUTCDate(day.getUTCDate() + offset);
+    const target = day.toISOString().slice(0, 10);
+    const label = offset === 0 ? "오늘" : "내일";
+    const list_ = (await this.openOrders()).filter((o) => o.method === "pickup" && o.due_date === target);
+    if (!list_.length) return reply([text(`${label}(${md(target)}) 픽업은 없어요.`)], quick("주문 목록", "메뉴"));
+    return reply(
+      [list(`${label} 픽업 ${num(list_.length)}건 · ${md(target)}`, list_.slice(0, PAGE).map((o) => this.orderLine(o, today)), [link("앱에서 보기", this.app("/orders"))])],
+      quick("주문 목록", offset === 0 ? "내일 픽업" : "오늘 픽업", "메뉴"),
+    );
   }
 }

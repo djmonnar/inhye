@@ -52,6 +52,11 @@ export async function askJson<T>(opts: {
   content: AiContent[];
   schema: object;
   maxOutputTokens?: number;
+  /** 기다릴 최대 시간 (기본 50초). 챗봇처럼 빨리 답해야 할 때 짧게 */
+  timeoutMs?: number;
+  /** 다른 모델 (예: 빠른 분류용 OPENAI_FAST_MODEL) */
+  model?: string;
+  effort?: "minimal" | "low" | "medium";
 }): Promise<T> {
   let res: Response;
   try {
@@ -59,15 +64,15 @@ export async function askJson<T>(opts: {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${API_KEY}` },
       body: JSON.stringify({
-        model: MODEL,
+        model: opts.model || MODEL,
         instructions: opts.instructions,
         input: [{ role: "user", content: opts.content }],
         text: { format: { type: "json_schema", name: opts.label.replace(/\W/g, "_"), strict: true, schema: opts.schema } },
-        reasoning: { effort: "low" },
+        reasoning: { effort: opts.effort ?? "low" },
         max_output_tokens: opts.maxOutputTokens ?? 4000,
         store: false,
       }),
-      signal: AbortSignal.timeout(50_000),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 50_000),
     });
   } catch (e) {
     if (e instanceof Error && e.name === "TimeoutError")
