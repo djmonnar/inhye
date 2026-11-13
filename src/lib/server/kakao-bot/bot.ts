@@ -233,6 +233,9 @@ class Bot {
             .filter(Boolean)
             .join("\n"),
         ),
+        card("자세한 사용법", "예시 대화와 자주 묻는 것을 한 페이지에 모아 뒀어요.", [
+          link("사용 안내 보기", this.app("/kakao-guide")),
+        ]),
       ],
       MENU,
     );

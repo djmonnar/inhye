@@ -135,6 +135,15 @@ export default function KakaoBotPage() {
               </li>
             ))}
           </ul>
+          <a
+            href="/kakao-guide"
+            target="_blank"
+            rel="noopener"
+            className="mt-3 inline-block text-sm font-bold text-berry-600 underline underline-offset-4"
+          >
+            직원용 사용 안내 페이지 열기 →
+          </a>
+          <p className="mt-1 text-xs text-ink-soft">로그인 없이 열려요. 링크를 단톡방에 올려 두면 편해요.</p>
         </section>
 
         {/* 관리자: 오픈빌더 설정 */}

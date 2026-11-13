@@ -34,6 +34,10 @@ const nextConfig: NextConfig = {
   // DB 바로 적용(/api/setup/schema)이 서버에서 schema.sql 을 읽어요
   outputFileTracingIncludes: { "/api/setup/schema": ["./public/schema.sql"] },
   serverExternalPackages: ["pg"],
+  // 직원용 챗봇 안내(로그인 없이 열리는 정적 페이지)
+  async rewrites() {
+    return [{ source: "/kakao-guide", destination: "/kakao-guide.html" }];
+  },
   env: {
     ...(supabaseUrl ? { NEXT_PUBLIC_SUPABASE_URL: supabaseUrl } : {}),
     ...(supabaseKey ? { NEXT_PUBLIC_SUPABASE_ANON_KEY: supabaseKey } : {}),

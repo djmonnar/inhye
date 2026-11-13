@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#fff8ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#221b17" media="(prefers-color-scheme: dark)">
+<meta name="description" content="포포하우스 관리 카카오톡 채널 챗봇 사용법 (직원용)">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>포포하우스 챗봇 안내</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+  /* 레이아웃: 폰 한 줄 읽기 — 위에 바로가기 칩, 아래로 할 일별 카드. 예시는 카톡 말풍선(내가 보낸 말 ↔ 챗봇 답) */
+  :root {
+    --bg: #fff8ef;
+    --surface: #ffffff;
+    --surface-2: #fcefe1;
+    --ink: #4a3a30;
+    --ink-soft: #8a7566;
+    --line: #f0dfd1;
+    --berry: #d95f82;
+    --berry-soft: #ffe3eb;
+    --butter: #ffe38a;
+    --butter-soft: #fff6d6;
+    --butter-ink: #6b4f05;
+    --matcha: #2a7d55;
+    --matcha-soft: #e2f7ec;
+    --soda: #2f7aa3;
+    --soda-soft: #e3f3fc;
+    --danger: #c9405a;
+    --shadow: 0 3px 0 0 #f0d7c6;
+    --font-cute: "Jua", "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+    --font-body: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #221b17; --surface: #2d2420; --surface-2: #372c26; --ink: #f3e7dd; --ink-soft: #c3ad9c;
+      --line: #4a3b33; --berry: #ff94af; --berry-soft: #4a2a33; --butter: #ffe38a; --butter-soft: #3f3620;
+      --butter-ink: #3b2c02; --matcha: #8fdcb2; --matcha-soft: #1f3b2d; --soda: #9fd3ef; --soda-soft: #1f3340;
+      --danger: #ff8fa2; --shadow: 0 3px 0 0 #120e0c; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #221b17; --surface: #2d2420; --surface-2: #372c26; --ink: #f3e7dd; --ink-soft: #c3ad9c;
+    --line: #4a3b33; --berry: #ff94af; --berry-soft: #4a2a33; --butter: #ffe38a; --butter-soft: #3f3620;
+    --butter-ink: #3b2c02; --matcha: #8fdcb2; --matcha-soft: #1f3b2d; --soda: #9fd3ef; --soda-soft: #1f3340;
+    --danger: #ff8fa2; --shadow: 0 3px 0 0 #120e0c; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.65;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0 48px; word-break: keep-all; overflow-wrap: anywhere;
+  }
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+  .wrap { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+  h1, h2, h3 { font-family: var(--font-cute); font-weight: 400; text-wrap: balance; margin: 0; line-height: 1.3; }
+  h1 { font-size: 30px; }
+  h2 { font-size: 22px; }
+  h3 { font-size: 17px; }
+  p { margin: 0; }
+  a { color: var(--berry); }
+
+  header.top { padding-top: 28px; display: flex; flex-direction: column; gap: 10px; }
+  .kicker { font-size: 13px; color: var(--ink-soft); letter-spacing: 0.02em; }
+  .lead { color: var(--ink-soft); max-width: 60ch; }
+
+  nav.jump {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+    padding-block: 10px; margin-inline: -4px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+  }
+  nav.jump::-webkit-scrollbar { display: none; }
+  nav.jump a {
+    flex: none; text-decoration: none; color: var(--ink); background: var(--surface); border: 2px solid var(--line);
+    border-radius: 999px; padding: 5px 12px; font-size: 13.5px; font-weight: 500;
+  }
+  nav.jump a:focus-visible, .cmd:focus-visible { outline: 3px solid var(--berry); outline-offset: 2px; }
+
+  section.card {
+    background: var(--surface); border: 2px solid var(--line); border-radius: 26px; box-shadow: var(--shadow);
+    padding: 20px; display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 64px;
+  }
+  .card-head { display: flex; align-items: center; gap: 10px; }
+  .card-head .ico {
+    flex: none; width: 38px; height: 38px; border-radius: 14px; display: grid; place-items: center; font-size: 19px;
+    background: var(--berry-soft);
+  }
+  .card-head .ico.m { background: var(--matcha-soft); }
+  .card-head .ico.s { background: var(--soda-soft); }
+  .card-head .ico.b { background: var(--butter-soft); }
+  .muted { color: var(--ink-soft); font-size: 14px; }
+
+  /* 따라 할 순서 (진짜 순서라서 번호를 써요) */
+  ol.steps { list-style: none; counter-reset: s; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  ol.steps li { counter-increment: s; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: start; }
+  ol.steps li::before {
+    content: counter(s); width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+    font-family: var(--font-cute); background: var(--berry-soft); color: var(--berry); font-size: 15px;
+  }
+
+  /* 명령어 칩: 누르면 복사 */
+  .cmd {
+    font: inherit; font-weight: 700; color: var(--butter-ink); background: var(--butter); border: 0; cursor: pointer;
+    border-radius: 10px; padding: 1px 9px; margin: 1px 0; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  }
+  .cmd::after { content: "⧉"; font-weight: 400; font-size: 12px; opacity: 0.55; }
+
+  /* 할 수 있는 말 표 */
+  .rows { display: flex; flex-direction: column; border-top: 2px dashed var(--line); }
+  .row { display: grid; grid-template-columns: minmax(0, 15.5em) minmax(0, 1fr); gap: 4px 14px; padding: 11px 0; border-bottom: 2px dashed var(--line); }
+  .row > div { min-width: 0; }
+  .row .what { color: var(--ink); }
+  .row .what small { display: block; color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
+  @media (max-width: 520px) { .row { grid-template-columns: minmax(0, 1fr); } }
+
+  /* 카톡 말풍선 예시 */
+  .chat { background: var(--surface-2); border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .chat .tag { font-size: 12px; color: var(--ink-soft); text-align: center; }
+  .me, .bot { max-width: 88%; padding: 9px 13px; border-radius: 18px; font-size: 14.5px; line-height: 1.55; min-width: 0; }
+  .me { align-self: flex-end; background: var(--butter); color: var(--butter-ink); border-top-right-radius: 6px; font-weight: 500; }
+  .bot { align-self: flex-start; background: var(--surface); border: 2px solid var(--line); border-top-left-radius: 6px; white-space: pre-line; }
+  .bot b { font-family: var(--font-cute); font-weight: 400; font-size: 15.5px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; align-self: flex-start; max-width: 100%; }
+  .chips span { font-size: 12.5px; border: 2px solid var(--line); background: var(--surface); border-radius: 999px; padding: 2px 10px; color: var(--ink); }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* 권한 표 */
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 320px; font-size: 14.5px; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 2px dashed var(--line); vertical-align: top; }
+  th { font-weight: 700; color: var(--ink-soft); font-size: 13px; }
+  td.ok { color: var(--matcha); font-weight: 700; white-space: nowrap; }
+  td.no { color: var(--danger); font-weight: 700; white-space: nowrap; }
+
+  .note { background: var(--matcha-soft); color: var(--ink); border-radius: 16px; padding: 11px 14px; font-size: 14.5px; }
+  .note.warn { background: var(--berry-soft); }
+  .note.info { background: var(--soda-soft); }
+
+  dl.faq { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+  dl.faq dt { font-weight: 700; }
+  dl.faq dd { margin: 2px 0 0; color: var(--ink-soft); }
+
+  .day { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .day div { background: var(--surface-2); border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+  .day .when { font-family: var(--font-cute); font-size: 16px; color: var(--berry); }
+
+  footer { text-align: center; color: var(--ink-soft); font-size: 13px; padding-top: 6px; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px);
+    background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-size: 14px; opacity: 0;
+    transition: opacity .2s, transform .2s; pointer-events: none; z-index: 20; max-width: calc(100% - 32px);
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  @media (prefers-reduced-motion: reduce) { #toast { transition: none; } html { scroll-behavior: auto; } }
+  html { scroll-behavior: smooth; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <p class="kicker">포포하우스 직원용 · 카카오톡 ‘포포하우스 관리’ 채널</p>
+    <h1>카톡으로 가게 일 보기 🐾</h1>
+    <p class="lead">거래처 연락처, 거래처별 가격, 발주할 상품, 오늘 매출을 카톡에서 바로 봐요. 아래 노란 글자를 누르면 복사돼요. 카톡에 붙여넣어 보내면 돼요.</p>
+  </header>
+
+  <nav class="jump" aria-label="바로가기">
+    <a href="#connect">처음 연결</a>
+    <a href="#basics">기본</a>
+    <a href="#suppliers">거래처</a>
+    <a href="#products">상품·재고</a>
+    <a href="#prices">가격 기록</a>
+    <a href="#reorder">발주</a>
+    <a href="#sales">매출</a>
+    <a href="#roles">권한</a>
+    <a href="#trouble">이럴 땐</a>
+  </nav>
+
+  <section class="card" id="connect">
+    <div class="card-head"><span class="ico" aria-hidden="true">🔗</span><h2>처음 한 번: 내 카톡 연결하기</h2></div>
+    <p class="muted">거래처 정보는 가게 사람만 봐야 해서, 포포하우스 앱 계정과 카톡을 한 번 연결해요. 사람마다 자기 계정으로 해요.</p>
+    <ol class="steps">
+      <li><div>카카오톡에서 <b>포포하우스 관리</b> 채널을 친구 추가해요.</div></li>
+      <li><div>포포하우스 앱 → <b>더보기 → <a href="/kakao-bot">카카오 챗봇</a></b> → <b>연결 코드 받기</b>를 눌러요. 6자리 숫자가 나와요.</div></li>
+      <li><div>10분 안에 채널 대화방에 <button class="cmd" data-cmd="연결 123456" type="button">연결 123456</button>처럼 그 숫자를 보내요.</div></li>
+      <li><div>‘OO님(직원) 계정과 연결됐어요 🎉’가 나오면 끝이에요.</div></li>
+    </ol>
+    <p class="note info">앱 계정이 아직 ‘승인 대기’면 챗봇도 못 써요. 관리자에게 앱 ‘직원 계정 관리’에서 승인해 달라고 해 주세요.</p>
+  </section>
+
+  <section class="card" id="basics">
+    <div class="card-head"><span class="ico b" aria-hidden="true">💬</span><h2>기본 사용법</h2></div>
+    <p>버튼만 눌러도 되고, 말로 보내도 돼요. 정확한 문장이 아니어도 괜찮고, 이름은 일부만 써도 찾아요.</p>
+    <div class="rows">
+      <div class="row"><div><button class="cmd" data-cmd="메뉴" type="button">메뉴</button></div><div class="what">바로가기 버튼이 나와요</div></div>
+      <div class="row"><div><button class="cmd" data-cmd="도움말" type="button">도움말</button></div><div class="what">할 수 있는 말 목록</div></div>
+      <div class="row"><div><button class="cmd" data-cmd="취소" type="button">취소</button></div><div class="what">하던 것 그만하기 <small>등록하다가 멈추고 싶을 때. 15분 동안 아무것도 안 보내면 저절로 처음으로 돌아가요</small></div></div>
+    </div>
+  </section>
+
+  <section class="card" id="suppliers">
+    <div class="card-head"><span class="ico" aria-hidden="true">🏪</span><h2>거래처 보기·관리</h2></div>
+    <div class="rows">
+      <div class="row"><div><button class="cmd" data-cmd="거래처 목록" type="button">거래처 목록</button></div><div class="what">⭐ 자주 쓰는 곳부터 5곳씩 <small>누르면 그 거래처 정보로 가요. ‘다음 ▶’으로 더 보기</small></div></div>
+      <div class="row"><div><button class="cmd" data-cmd="거래처 도매꾹" type="button">거래처 도매꾹</button></div><div class="what">종류·담당자·전화·주문 조건·메모 <small>‘사이트 열기’ ‘전화하기’ 버튼이 같이 나와요</small></div></div>
+      <div class="row"><div><button class="cmd" data-cmd="거래처 상품 도매꾹" type="button">거래처 상품 도매꾹</button></div><div class="what">거기서 사는 상품과 그 거래처 가격·재고 <small>다른 곳이 더 싸면 ‘OO 더 쌈’이라고 알려줘요</small></div></div>
+      <div class="row"><div><button class="cmd" data-cmd="거래처 등록" type="button">거래처 등록</button></div><div class="what">하나씩 물어봐요 <small>이름 → 종류 → 사이트 → 담당자 → 전화 → 주문 조건 → 메모. 모르면 ‘건너뛰기’, 다 안 채워도 ‘여기까지 저장’</small></div></div>
+      <div class="row"><div><button class="cmd" data-cmd="거래처 수정 도매꾹" type="button">거래처 수정 도매꾹</button></div><div class="what">고칠 칸 고르기 → 새 값 보내기 <small>‘지우기’로 비우기, ‘자주 쓰는 곳’은 누르면 ⭐ 켜고 꺼요</small></div></div>
+    </div>
+    <div class="chat" aria-label="거래처 등록 예시 대화">
+      <p class="tag">예시 대화</p>
+      <div class="me">거래처 등록</div>
+      <div class="bot">새 거래처 이름을 보내 주세요.</div>
+      <div class="me">동대문 리본상가</div>
+      <div class="bot">어떤 곳이에요?</div>
+      <div class="chips"><span>온라인</span><span>도매</span><span>오프라인</span><span>기타</span></div>
+      <div class="me">오프라인</div>
+      <div class="bot">사이트 주소가 있으면 보내 주세요. (없으면 ‘건너뛰기’)</div>
+      <div class="me">여기까지 저장</div>
+      <div class="bot">‘동대문 리본상가’ 거래처를 등록했어요 ✨ 앱에도 바로 보여요.</div>
+    </div>
+    <p class="note">챗봇에서 등록·수정한 건 포포하우스 앱에 바로 나와요. 같은 거래처 목록을 써요.</p>
+  </section>
+
+  <section class="card" id="products">
+    <div class="card-head"><span class="ico s" aria-hidden="true">📦</span><h2>상품·재고 찾기</h2></div>
+    <div class="rows">
+      <div class="row"><div><button class="cmd" data-cmd="상품 곰돌이" type="button">상품 곰돌이</button></div><div class="what">재고·판매가·원가·마진, 거래처별 가격 <small>그냥 ‘곰돌이’만 보내도 찾아요</small></div></div>
+      <div class="row"><div><span class="cmd" style="cursor:default" aria-hidden="true">바코드 숫자</span></div><div class="what">바코드 번호로 바로 찾기 <small>예: 8801234567893</small></div></div>
+    </div>
+    <div class="chat" aria-label="상품 찾기 예시 대화">
+      <p class="tag">예시 대화</p>
+      <div class="me">상품 곰돌이</div>
+      <div class="bot"><b>곰돌이 털 키링</b>
+재고 3개 (발주 기준 5개)
+판매가 4,500원 · 원가 1,800원 · 마진 60%
+
+거래처별 가격
+🏆 1688 1,200원 · 3일 전
+• 도매꾹 1,800원 (주) · 1일 전
+
+💡 1688에서 사면 개당 600원 아껴요</div>
+      <div class="chips"><span>다시 주문하기</span><span>가격 기록</span><span>앱에서 보기</span></div>
+    </div>
+    <p class="muted">🏆 = 제일 싼 곳, (주) = 평소에 사는 주 거래처, ‘오래됨’ = 60일 넘게 확인 안 한 가격이에요.</p>
+  </section>
+
+  <section class="card" id="prices">
+    <div class="card-head"><span class="ico m" aria-hidden="true">🏷️</span><h2>가격 기록하기</h2></div>
+    <p>같은 물건도 거래처마다, 때마다 값이 달라요. 도매 사이트나 시장에서 가격을 보면 바로 적어 두세요. 나중에 어디가 제일 싼지 알려줘요.</p>
+    <ol class="steps">
+      <li><div><button class="cmd" data-cmd="가격 기록 곰돌이" type="button">가격 기록 곰돌이</button> 보내기 (상품 이름 대신 바코드도 돼요)</div></li>
+      <li><div>거래처 고르기: 버튼을 누르거나 이름을 보내요</div></li>
+      <li><div>개당 가격 보내기: <span class="num">1800</span>, <span class="num">1,800원</span>, <span class="num">2만</span>, <span class="num">1만5천</span> 다 돼요</div></li>
+      <li><div><b>기록하기</b>를 눌러요. 상품 원가까지 바꾸려면 <b>원가도 바꾸기</b></div></li>
+    </ol>
+    <div class="chat" aria-label="가격 기록 예시 대화">
+      <p class="tag">예시 대화</p>
+      <div class="me">가격 기록 곰돌이</div>
+      <div class="bot">‘곰돌이 털 키링’ 어느 거래처 가격이에요?</div>
+      <div class="chips"><span>1688</span><span>도매꾹</span><span>취소</span></div>
+      <div class="me">남대문</div>
+      <div class="bot">남대문 꽃님상가에서 ‘곰돌이 털 키링’ 개당 얼마예요?</div>
+      <div class="me">1,500원</div>
+      <div class="bot">개당 1,500원으로 기록할까요? (지금 원가 1,800원)</div>
+      <div class="chips"><span>기록하기</span><span>원가도 바꾸기</span><span>취소</span></div>
+    </div>
+    <p class="note">앱에서 <b>입고 등록</b>할 때 ‘산 곳’과 ‘개당 매입가’를 적으면 가격이 저절로 기록돼요. 따로 안 적어도 돼요.</p>
+  </section>
+
+  <section class="card" id="reorder">
+    <div class="card-head"><span class="ico b" aria-hidden="true">🚚</span><h2>발주 목록</h2></div>
+    <div class="rows">
+      <div class="row"><div><button class="cmd" data-cmd="발주 목록" type="button">발주 목록</button></div><div class="what">품절·품절 임박 상품을 거래처별 카드로 <small>지금 재고/발주 기준 → 추천 수량, 개당 가격, 예상 금액. 더 싼 거래처가 있으면 같이 보여줘요</small></div></div>
+    </div>
+    <div class="chat" aria-label="발주 목록 예시">
+      <p class="tag">예시 카드</p>
+      <div class="me">발주 목록</div>
+      <div class="bot"><b>도매꾹 · 1개</b>
+• 곰돌이 털 키링 3/5 → 7개 · 1,800원
+  ↳ 1688 1,200원 더 쌈
+예상 12,600원
+🚚 3만원 이상 무료배송</div>
+      <div class="chips"><span>주문하러 가기</span><span>앱 발주 화면</span></div>
+    </div>
+    <p class="muted">‘3/5 → 7개’ = 지금 3개, 5개 이하면 발주, 7개 주문 추천이에요. 추천 수량은 앱 발주 화면과 같은 계산이에요.</p>
+  </section>
+
+  <section class="card" id="sales">
+    <div class="card-head"><span class="ico s" aria-hidden="true">📈</span><h2>오늘 매출</h2></div>
+    <div class="rows">
+      <div class="row"><div><button class="cmd" data-cmd="오늘 매출" type="button">오늘 매출</button></div><div class="what">빅솔론 키오스크 오늘 판매 합계·개수, 많이 팔린 상품 5개 <small>빅솔론 답이 늦으면 앱에 마지막으로 가져온 매출로 보여줘요</small></div></div>
+    </div>
+  </section>
+
+  <section class="card" id="roles">
+    <div class="card-head"><span class="ico" aria-hidden="true">🙋</span><h2>누가 무엇을 할 수 있나요</h2></div>
+    <p class="muted">챗봇 권한은 앱 계정 권한과 같아요.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">할 일</th><th scope="col">직원</th><th scope="col">관리자</th></tr></thead>
+        <tbody>
+          <tr><td>거래처·상품·재고·발주·매출 보기</td><td class="ok">✓</td><td class="ok">✓</td></tr>
+          <tr><td>거래처 등록·수정</td><td class="ok">✓</td><td class="ok">✓</td></tr>
+          <tr><td>가격 기록, 원가 바꾸기</td><td class="ok">✓</td><td class="ok">✓</td></tr>
+          <tr><td>거래처 삭제 (<button class="cmd" data-cmd="거래처 삭제 " type="button">거래처 삭제 이름</button>)</td><td class="no">✕</td><td class="ok">✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note info">상품 등록·사진, 입고·출고, 라벨 인쇄는 포포하우스 앱에서 해요.</p>
+  </section>
+
+  <section class="card" id="trouble">
+    <div class="card-head"><span class="ico m" aria-hidden="true">🛟</span><h2>이럴 땐</h2></div>
+    <dl class="faq">
+      <div><dt>‘계정 연결이 필요해요’가 나와요</dt><dd>아직 연결 전이거나 연결이 끊겼어요. 앱에서 새 연결 코드를 받아 <button class="cmd" data-cmd="연결 " type="button">연결 숫자</button>로 다시 보내 주세요.</dd></div>
+      <div><dt>‘코드가 틀렸거나 10분이 지났어요’</dt><dd>코드는 10분 동안 한 번만 써요. 앱에서 ‘새 연결 코드 받기’를 눌러 주세요.</dd></div>
+      <div><dt>‘조금 오래 걸리고 있어요’</dt><dd>잠깐 바빴어요. 같은 말을 한 번 더 보내 주세요.</dd></div>
+      <div><dt>엉뚱한 상품이 나오거나 못 찾아요</dt><dd>이름을 조금 더 길게 쓰거나 바코드 숫자로 찾아보세요.</dd></div>
+      <div><dt>등록하다가 꼬였어요</dt><dd><button class="cmd" data-cmd="취소" type="button">취소</button>를 보내고 처음부터 다시 하면 돼요.</dd></div>
+      <div><dt>다른 폰으로 바꿨어요 / 연결을 끊고 싶어요</dt><dd><button class="cmd" data-cmd="연결 해제" type="button">연결 해제</button>를 보내거나, 앱 → 더보기 → 카카오 챗봇에서 끊을 수 있어요.</dd></div>
+    </dl>
+  </section>
+
+  <section class="card" id="routine">
+    <div class="card-head"><span class="ico b" aria-hidden="true">☀️</span><h2>이렇게 써 보세요</h2></div>
+    <div class="day">
+      <div><span class="when">아침</span><span><b>발주 목록</b> 보고 카드에서 바로 ‘주문하러 가기’</span></div>
+      <div><span class="when">물건 보러 갈 때</span><span>가격 보이면 바로 <b>가격 기록</b></span></div>
+      <div><span class="when">새 거래처 생기면</span><span><b>거래처 등록</b> 하고 이어서 <b>가격 기록</b></span></div>
+      <div><span class="when">마감 전</span><span><b>오늘 매출</b> 확인</span></div>
+    </div>
+  </section>
+
+  <footer>예시의 상품·거래처·가격은 설명용이에요. 궁금한 건 관리자에게 물어봐 주세요 🐾<br><a href="/">포포하우스 앱 열기</a></footer>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  (function () {
+    var toast = document.getElementById("toast");
+    var timer;
+    function show(msg) {
+      toast.textContent = msg;
+      toast.classList.add("show");
+      clearTimeout(timer);
+      timer = setTimeout(function () { toast.classList.remove("show"); }, 1800);
+    }
+    function selectText(el) {
+      try {
+        var r = document.createRange();
+        r.selectNodeContents(el);
+        var s = window.getSelection();
+        s.removeAllRanges();
+        s.addRange(r);
+      } catch (e) {}
+    }
+    document.querySelectorAll("button.cmd[data-cmd]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var text = btn.getAttribute("data-cmd");
+        var label = text.trim();
+        var tail = text !== label ? " — 뒤에 이름이나 숫자를 붙여 보내요" : "";
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () {
+            show("‘" + label + "’ 복사했어요" + tail);
+          }, function () {
+            selectText(btn);
+            show("글자를 길게 눌러 복사해 주세요");
+          });
+        } else {
+          selectText(btn);
+          show("글자를 길게 눌러 복사해 주세요");
+        }
+      });
+    });
+  })();
+</script>
+</body>
+</html>
