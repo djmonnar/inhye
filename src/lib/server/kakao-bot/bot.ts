@@ -8,6 +8,7 @@ import {
   callbackAck,
   card,
   carousel,
+  isCallbackAck,
   link,
   list,
   quick,
@@ -20,7 +21,8 @@ import {
   type SkillRequest,
   type SkillResponse,
 } from "./kakao";
-import type { BotAi, BotDb, BotSession, BotUser } from "./types";
+import { HOWTO_RE, howto, howtoTopic, topicFromQuery, type HowtoTopic } from "./howto";
+import type { AiRoute, BotAi, BotDb, BotSession, BotUser } from "./types";
 
 /**
  * 포포하우스 카카오 챗봇 — 오픈빌더의 폴백·웰컴 블록이 이 스킬을 불러요(말 전체를 여기서 해석).
@@ -192,6 +194,12 @@ class Bot {
     if (/^연결\s*(해제|끊기|끊어)/.test(said)) return this.unlink();
     if (/^연결/.test(said)) return reply([text(`이미 ${this.user.name}님 계정과 연결돼 있어요.`)], MENU);
 
+    // 방법을 묻는 말 (“발주 어떻게 넣어?”) → 그 주제 사용법. 거래처·상품 이름이 들어 있으면 그걸 묻는 거라 건너뛰어요
+    if (HOWTO_RE.test(said) && !/어떻게\s*(?:됐|되었|돼\s*가|되고)/.test(said)) {
+      const topic = howtoTopic(said);
+      if (topic && !(await this.mentionsName(said))) return this.howtoReply(topic);
+    }
+
     if ((m = said.match(/^거래처\s*상품\s*(.+)$/))) return this.supplierProducts(m[1]);
     if ((m = said.match(/^거래처\s*(?:목록|리스트|전체|보기)?\s*(\d+)?$/))) return this.supplierList(Number(m[1] ?? 1));
     if ((m = said.match(/^거래처\s*(?:등록|추가)\s*(.*)$/))) return this.startNewSupplier(m[1]);
@@ -267,7 +275,8 @@ class Bot {
             "• 오늘 매출",
             "• 취소 — 하던 것 그만",
             this.user.role === "admin" ? "• 거래처 삭제 도매꾹 (관리자)" : "",
-            this.ctx.ai ? "\n💡 정해진 말이 아니어도 알아들어요. 예) 도매꾹 전화번호 뭐야? · 품절된 거 뭐 있어?" : "",
+            "\n❓ 방법이 궁금하면: 발주 어떻게 해? · 주문 어떻게 넣어? · 가격 기록 어떻게 해?",
+            this.ctx.ai ? "💡 정해진 말이 아니어도 알아들어요. 예) 도매꾹 전화번호 뭐야? · 품절된 거 뭐 있어?" : "",
           ]
             .filter(Boolean)
             .join("\n"),
@@ -278,6 +287,23 @@ class Bot {
       ],
       MENU,
     );
+  }
+
+  howtoReply(topic: HowtoTopic): SkillResponse {
+    const h = howto(topic);
+    const outputs = [text(h.text)];
+    if (h.app) outputs.push(card(h.app.label, "앱에서 하면 더 편해요.", [link("열기", this.app(h.app.path))]));
+    return reply(outputs, quick(...h.tryIt, "도움말", "메뉴"));
+  }
+
+  /** 말 속에 거래처나 상품 이름이 들어 있나 (두 글자 이상) */
+  private async mentionsName(said: string): Promise<boolean> {
+    const n = norm(said);
+    const [sups, prods] = await Promise.all([this.suppliers(), this.products()]);
+    return [...sups.map((x) => x.name), ...prods.map((x) => x.name)].some((name) => {
+      const k = norm(name);
+      return k.length >= 2 && n.includes(k);
+    });
   }
 
   async unlink(): Promise<SkillResponse> {
@@ -327,6 +353,22 @@ class Bot {
     if (sup.exact && !prods.length) return this.supplierCard(sup.exact);
     if (prods.length === 1 && !sup.hits.length) return this.productCard(prods[0]);
     if (!sup.hits.length && !prods.length) {
+      if (/\s/.test(q) || /[?？]$/.test(q)) {
+        // 이름 하나가 아니라 문장이에요 → ‘못 찾았어요’보다 무슨 말을 할 수 있는지 알려줘요
+        return reply(
+          [
+            text(
+              [
+                "무슨 말인지 잘 모르겠어요 🥲 이렇게 말해 보세요.",
+                "• 발주 목록 · 주문 목록 · 오늘 매출",
+                "• 상품 곰돌이 · 거래처 도매꾹",
+                "• 방법이 궁금하면: 발주 어떻게 해? · 주문 어떻게 넣어?",
+              ].join("\n"),
+            ),
+          ],
+          MENU,
+        );
+      }
       return reply([text(`${j(`‘${q}’`, "로")} 찾은 게 없어요. 아래에서 골라 보거나 ‘도움말’을 보내 주세요.`)], MENU);
     }
     const items: ListItem[] = [
@@ -847,31 +889,76 @@ class Bot {
 
   /**
    * 정해진 말이 아니면: 이름 하나로 바로 찾아지면 찾기 결과, 아니면 AI가 뜻을 알아내서
-   * 챗봇의 정해진 명령으로 실행해요. AI가 없거나 늦으면 지금처럼 이름으로 찾아요.
+   * 챗봇의 정해진 명령으로 실행해요. AI가 없거나 늦거나 모르면 낱말(발주·매출…)로 한 번 더, 그래도 없으면 이름 찾기.
    */
   async understand(said: string, viaAi: boolean): Promise<BotReply> {
-    if (!viaAi && this.ctx.ai && said) {
+    if (!viaAi && said) {
       const [sup, prods] = await Promise.all([this.findSuppliers(said), this.findProducts(said)]);
       const clearHit = Boolean(sup.exact) || (said.length <= 15 && prods.length > 0 && prods.length <= 5);
       if (!clearHit) {
-        const routed = await this.aiRoute(said);
-        if (routed) return routed;
+        if (this.ctx.ai) {
+          const routed = await this.aiRoute(said);
+          if (routed) return routed;
+        }
+        const kw = await this.keywordRoute(said);
+        if (kw) return kw;
       }
     }
     return this.anything(said);
+  }
+
+  /** AI 없이 낱말로 고르기 (AI가 늦거나 모를 때의 안전망) */
+  private async keywordRoute(said: string): Promise<SkillResponse | null> {
+    const sups = await this.suppliers();
+    const n = norm(said);
+    const named = sups.filter((x) => norm(x.name).length >= 2 && n.includes(norm(x.name)));
+    if (named.length === 1) return this.supplierCard(named[0]);
+    if (/발주|품절|재주문|채워\s*(?:넣|야)|부족/.test(said)) return this.reorder();
+    if (/매출|팔린|팔렸|판매\s*(?:얼마|금액|현황)/.test(said)) return this.sales();
+    if (/(?:주문|예약)\s*(?:목록|뭐|몇|있)/.test(said)) return this.orderList(1);
+    if (/거래처\s*(?:목록|뭐|몇|전체)/.test(said)) return this.supplierList(1);
+    if (/도움|뭐\s*할\s*수|기능/.test(said)) return this.help();
+    const topic = HOWTO_RE.test(said) ? howtoTopic(said) : null;
+    return topic ? this.howtoReply(topic) : null;
   }
 
   private async aiRoute(said: string): Promise<BotReply | null> {
     const ai = this.ctx.ai;
     // DB를 읽고 답을 만들 시간(약 1초)은 남겨 둬요
     const budget = this.timeLeft() - 1000;
-    if (!ai || budget < 800) return null;
-    const suppliers = (await this.suppliers()).map((s) => s.name).slice(0, 80);
-    const r = await Promise.race([ai.route(said, { suppliers }).catch(() => null), sleep(budget).then(() => null)]);
-    if (!r) return null;
+    // 콜백을 켰으면 늦어도 괜찮아요: ‘알아보고 있어요’라고 먼저 답하고 결과는 나중에 보내요
+    const callback = this.ctx.callback;
+    if (!ai || (budget < 800 && !callback)) return null;
+    const suppliers = (await this.suppliers()).map((x) => x.name).slice(0, 80);
+    const t0 = Date.now();
+    const routing = ai.route(said, { suppliers }, { timeoutMs: callback ? 9000 : 2600 }).catch(() => null);
+    const r = await Promise.race([routing, sleep(Math.max(budget, 0)).then((): typeof SLOW => SLOW)]);
+    if (r === SLOW) {
+      console.warn(`[kakao ai] route: no answer in ${Date.now() - t0}ms${callback ? " → callback" : " → fallback"}`);
+      if (!callback) return null;
+      callback(
+        routing.then(async (late) => {
+          const out = late ? await this.dispatch(late, said, true) : null;
+          return out && !isCallbackAck(out) ? out : (await this.keywordRoute(said)) ?? (await this.anything(said));
+        }),
+      );
+      return callbackAck("무슨 말인지 알아보고 있어요 ⏳");
+    }
+    console.info(`[kakao ai] route: ${r ? r.intent : "failed"} in ${Date.now() - t0}ms`);
+    return r ? this.dispatch(r, said, false) : null;
+  }
+
+  /** AI가 고른 뜻 → 챗봇의 정해진 명령. late = 콜백으로 나중에 보내는 중(주문 정리를 끝까지 기다려요) */
+  private async dispatch(r: AiRoute, said: string, late: boolean): Promise<BotReply | null> {
     const q = clean(r.query ?? "");
     switch (r.intent) {
       case "orders":
+        if (late && this.ctx.ai) {
+          return this.ctx.ai.orderChat(said, [], this.user.profileId).then(
+            (res) => this.orderResult(res),
+            (e) => reply([text(`주문을 정리하지 못했어요 😢 ${errMsg(e)}\n다시 보내 주세요.`)], quick("주문 목록", "메뉴")),
+          );
+        }
         return this.orderFlow(said);
       case "order_list":
         return this.orderList(1);
@@ -893,6 +980,10 @@ class Bot {
         return this.reorder();
       case "sales":
         return this.sales();
+      case "howto": {
+        const topic = topicFromQuery(r.query, said);
+        return topic ? this.howtoReply(topic) : this.help();
+      }
       case "help":
         return this.help();
       default:

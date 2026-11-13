@@ -21,6 +21,7 @@ const INTENTS: AiIntent[] = [
   "price_record",
   "reorder",
   "sales",
+  "howto",
   "help",
   "unknown",
 ];
@@ -42,9 +43,10 @@ function instructions(suppliers: string[]) {
 - supplier_edit: 거래처 정보 고치기. query = 거래처 이름
 - product: 상품 재고·판매가·원가·어디서 샀는지·최저가. query = 상품 이름 (질문·조사 빼고 핵심 이름만)
 - price_record: 상품의 매입가(거래처 가격) 적기. query = 상품 이름
-- reorder: 발주, 품절·채워야 할 것, 뭐 주문해야 해
+- reorder: 발주할 것 보여 줘, 품절·채워야 할 것, 뭐 주문해야 해 (목록을 달라는 말)
 - sales: 오늘 매출·판매
-- help: 사용법, 뭐 할 수 있어
+- howto: 어떤 일을 ‘어떻게 하는지’ 방법을 묻는 말. query = 주제 하나(reorder 발주·입고 / orders 예약 주문 / supplier 거래처 / price 가격 기록 / product 상품·재고 / sales 매출 / label 라벨 인쇄). 예) "발주 어떻게 넣어?" → howto, reorder
+- help: 챗봇 전체 사용법, 뭐 할 수 있어
 - unknown: 위에 없음 (인사·잡담 포함)
 
 거래처 이름 목록: ${suppliers.join(", ") || "(없음)"}
@@ -55,7 +57,8 @@ export function makeBotAi(): BotAi | undefined {
   if (!hasOpenAI()) return undefined;
   const fast = (process.env.OPENAI_FAST_MODEL ?? "").trim() || undefined;
   return {
-    async route(said, hints): Promise<AiRoute | null> {
+    async route(said, hints, opts): Promise<AiRoute | null> {
+      const t0 = Date.now();
       try {
         const out = await askJson<{ intent: AiIntent; query: string | null }>({
           label: "kakao_route",
@@ -63,13 +66,15 @@ export function makeBotAi(): BotAi | undefined {
           content: [{ type: "input_text", text: said.slice(0, 500) }],
           schema: SCHEMA,
           maxOutputTokens: 600,
-          timeoutMs: 2600,
+          timeoutMs: opts?.timeoutMs ?? 2600,
           model: fast,
           effort: "low",
         });
         if (!INTENTS.includes(out.intent)) return null;
         return { intent: out.intent, query: out.query?.trim() || null };
-      } catch {
+      } catch (e) {
+        // 왜 못 골랐는지 로그에만 (말 내용은 안 남겨요)
+        console.warn(`[kakao ai] route error after ${Date.now() - t0}ms:`, e instanceof Error ? e.message : e);
         return null;
       }
     },

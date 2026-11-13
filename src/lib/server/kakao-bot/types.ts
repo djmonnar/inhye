@@ -62,6 +62,7 @@ export type AiIntent =
   | "price_record"
   | "reorder"
   | "sales"
+  | "howto"
   | "help"
   | "unknown";
 
@@ -74,7 +75,7 @@ export interface AiRoute {
 /** 챗봇의 AI (OpenAI, 서버 전용) — 테스트에선 가짜로 바꿔 끼워요 */
 export interface BotAi {
   /** 정해진 말이 아닐 때 뜻 알아내기. 늦거나 실패하면 null */
-  route(said: string, hints: { suppliers: string[] }): Promise<AiRoute | null>;
+  route(said: string, hints: { suppliers: string[] }, opts?: { timeoutMs?: number }): Promise<AiRoute | null>;
   /** 주문 비서 (앱과 같은 두뇌). userId = 연결된 앱 계정 */
   orderChat(message: string, history: OrderChatTurn[], userId: string): Promise<OrderChatResult>;
 }

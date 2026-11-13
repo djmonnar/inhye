@@ -35,7 +35,7 @@ src/components/       ui.tsx(공용 UI), OrderChat(주문 비서 — 주문 화�
                       SourcePrices(상품 화면 ‘거래처별 가격’ + 가격 기록 시트), labels.tsx(라벨 공용), SendLabelSheet, AiFillSheet, PromoSheet, Mascot
 src/lib/store/        데이터 계층 인터페이스(types.ts) + supabase-store.ts + demo-store.ts
 src/lib/server/       서버 전용: admin.ts(서비스 키, 권한), schema.ts(pg로 schema.sql 적용), orders.ts(주문 비서·알림 글), kakao.ts(나에게 보내기), pos.ts, bixolon.ts, openai.ts, ai-*.ts, fetch-page.ts
-                      kakao-bot/: bot.ts(챗봇 말 해석·대화 흐름·주문 — DB 없이 시험 가능), ai.ts(AI 해석기·주문 비서 연결), kakao.ts(오픈빌더 응답·길이 제한·콜백), types.ts(BotDb·BotAi), supabase-db.ts
+                      kakao-bot/: bot.ts(챗봇 말 해석·대화 흐름·주문 — DB 없이 시험 가능), ai.ts(AI 해석기·주문 비서 연결), howto.ts(“발주 어떻게 해?” 사용법 답), kakao.ts(오픈빌더 응답·길이 제한·콜백), types.ts(BotDb·BotAi), supabase-db.ts
 src/lib/              excel.ts(빅솔론 양식), tspl.ts / labelCanvas.ts / usbPrinter.ts(라벨 직접 인쇄),
                       format.ts, queries.ts, report.ts, sources.ts(거래처별 가격 정렬·최저가 — 앱·챗봇 공용), josa.ts(을/를·이/가 조사),
                       orderParse.ts(주문 한 줄을 AI 없이 바로 읽기 — 주문 비서 앞단)
