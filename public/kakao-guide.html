@@ -85,14 +85,9 @@
     background: var(--surface); border: 2px solid var(--line); border-radius: 26px; box-shadow: var(--shadow);
     padding: 20px; display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 64px;
   }
-  .card-head { display: flex; align-items: center; gap: 10px; }
-  .card-head .ico {
-    flex: none; width: 38px; height: 38px; border-radius: 14px; display: grid; place-items: center; font-size: 19px;
-    background: var(--berry-soft);
-  }
-  .card-head .ico.m { background: var(--matcha-soft); }
-  .card-head .ico.s { background: var(--soda-soft); }
-  .card-head .ico.b { background: var(--butter-soft); }
+  /* 제목 앞 이모지는 상자 없이 글자처럼 */
+  .card-head { display: flex; align-items: baseline; gap: 8px; }
+  .card-head .ico { flex: none; font-size: 21px; line-height: 1; }
   .muted { color: var(--ink-soft); font-size: 14px; }
 
   /* 따라 할 순서 (진짜 순서라서 번호를 써요) */
