@@ -72,7 +72,9 @@ const isClear = (s: string) => /^(지우기|비우기|삭제)$/.test(s);
 
 export async function handleSkill(body: SkillRequest, ctx: BotContext): Promise<SkillResponse> {
   const key = body.userRequest?.user?.id?.trim();
-  const said = clean(String(body.userRequest?.utterance ?? ""));
+  // 웰컴 블록(대화방에 처음 들어올 때)은 어떤 말이 오든 인사·연결 안내로 답해요
+  const welcome = /웰컴|welcome/i.test(`${body.userRequest?.block?.name ?? ""} ${body.intent?.name ?? ""}`);
+  const said = welcome ? "" : clean(String(body.userRequest?.utterance ?? ""));
   if (!key) return reply([text("카카오 사용자 정보를 받지 못했어요. 채널 대화방에서 다시 말을 걸어 주세요.")]);
 
   const user = await ctx.db.findUser(key);

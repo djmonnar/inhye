@@ -6,6 +6,7 @@
  */
 
 export interface SkillRequest {
+  intent?: { id?: string; name?: string };
   userRequest?: {
     utterance?: string;
     user?: { id?: string; type?: string; properties?: Record<string, unknown> };
