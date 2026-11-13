@@ -15,19 +15,24 @@ export const maxDuration = 60;
  * 카카오 i 오픈빌더 스킬 서버. 오픈빌더 → 스킬 → URL에 https://<사이트>/api/kakao/skill,
  * 헤더값에 X-Popo-Key = (Vercel 환경변수 KAKAO_SKILL_SECRET 과 같은 값)을 넣어요.
  * 카카오는 5초 안에 답을 못 받으면 오류를 보여주니, 4.3초가 넘으면 ‘다시 보내 달라’고 먼저 답해요.
- * 주문 비서(AI)는 3.8초 안에 못 끝나면 ‘결과 보기’로 받아 가게 하고(bot.ts), 블록에서 콜백을 켜면
- * ‘정리 중’이라고 먼저 답한 뒤 다 되면 userRequest.callbackUrl로 보내요(5분 안에 한 번).
+ * 주문 비서는 정해진 모양이면 AI 없이 바로 끝나요. AI가 3.8초 안에 못 끝나면: 블록에서 콜백을 켰으면
+ * ‘정리 중’이라고 먼저 답한 뒤 다 되면 userRequest.callbackUrl로 보내고(5분 안에 한 번), 아니면 ‘결과 보기’(bot.ts).
  */
 const HEADER = "x-popo-key";
 const LIMIT_MS = 4300;
 
-/** 카카오가 준 콜백 주소만 써요 (https, 카카오 도메인) */
+/**
+ * 카카오가 준 콜백 주소 (https만). 이 요청은 X-Popo-Key 비밀값으로 카카오 것임을 이미 확인했어요.
+ * 주소의 도메인은 카카오가 바꿀 수 있어서 따로 막지 않고 기록만 남겨요.
+ */
 function kakaoCallbackUrl(raw: unknown): string | null {
   if (typeof raw !== "string" || !raw) return null;
   try {
     const u = new URL(raw);
-    if (u.protocol === "https:" && /(^|\.)kakao(enterprise)?\.com$/.test(u.hostname)) return u.toString();
-    console.warn("[kakao skill] callbackUrl host not trusted:", u.hostname);
+    if (u.protocol === "https:") {
+      console.info("[kakao skill] callback host:", u.hostname);
+      return u.toString();
+    }
   } catch {
     /* 이상한 주소는 무시 */
   }

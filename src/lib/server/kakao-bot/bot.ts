@@ -902,7 +902,10 @@ class Bot {
 
   // --- 주문 (꽃다발 등 예약) ----------------------------------------------------
 
-  /** 주문 비서(앱과 같은 AI)에게 맡겨요. 5초 안에 못 끝나면 ‘결과 보기’로 받아 가게 해서 두 번 등록되지 않아요. */
+  /**
+   * 주문 비서(앱과 같은 두뇌)에게 맡겨요. 정해진 모양은 AI 없이 바로, 아니면 AI.
+   * 5초 안에 못 끝나면: 콜백을 켰으면 자동으로 이어서 보내고, 아니면 ‘결과 보기’로 받아 가게 해서 두 번 등록되지 않아요.
+   */
   async orderFlow(said: string, history: OrderChatTurn[] = []): Promise<BotReply> {
     const ai = this.ctx.ai;
     if (!ai) {
@@ -914,12 +917,7 @@ class Bot {
     const work = ai.orderChat(said, history, this.user.profileId).then((r) => this.orderResult(r));
     const failed = (e: unknown) => reply([text(`주문을 정리하지 못했어요 😢 ${errMsg(e)}\n다시 보내 주세요.`)], quick("주문 목록", "메뉴"));
 
-    // 블록에서 콜백을 켰으면: ‘정리 중’이라고 먼저 답하고, 다 되면 카카오로 보내요
-    if (this.ctx.callback) {
-      this.ctx.callback(work.catch(failed));
-      return callbackAck("주문을 정리하고 있어요 ⏳ 잠시만요!");
-    }
-
+    // 정해진 모양의 주문은 AI 없이 바로 끝나요 → 기다릴 수 있는 만큼 기다렸다가 바로 답해요
     let first: SkillResponse | typeof SLOW;
     try {
       first = await Promise.race([work, sleep(this.timeLeft() - 300).then((): typeof SLOW => SLOW)]);
@@ -927,6 +925,12 @@ class Bot {
       return failed(e);
     }
     if (first !== SLOW) return first;
+
+    // 블록에서 콜백을 켰으면: ‘정리 중’이라고 먼저 답하고, 다 되면 카카오가 알아서 보여줘요 (누를 것 없음)
+    if (this.ctx.callback) {
+      this.ctx.callback(work.catch(failed));
+      return callbackAck("주문을 정리하고 있어요 ⏳ 잠시만요!");
+    }
 
     // 늦어요: ‘정리 중’을 저장해 두고, 끝나면 결과를 저장 → ‘결과 보기’ 또는 같은 말을 다시 보내면 그걸 보여줘요
     await this.setSession({ flow: "ai_job", step: "running", data: { said } });

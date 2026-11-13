@@ -1,4 +1,5 @@
 import { normTime, timeLabel } from "../day";
+import { parseOrderLine, parseQuickAction } from "../orderParse";
 import { adminClient } from "./admin";
 import { askJson, objectSchema, STRING } from "./openai";
 import type { Order, OrderChangeOp, OrderChatResult, OrderChatTurn, OrderMethod } from "../types";
@@ -128,6 +129,10 @@ export async function orderChat(
     throw new Error(error.message);
   }
   const orders = ((data ?? []) as Order[]).map((o) => ({ ...o, due_time: normTime(o.due_time) }));
+
+  // 정해진 모양(날짜·이름·상품… / ‘○○ 보냈어’ / ‘○○ 취소’)은 AI 없이 바로 — 빠르고 비용도 없어요
+  const quick = await quickPath(message, orders, today, callerId);
+  if (quick) return quick;
   // AI에게는 짧은 번호(1, 2, 3...)만 보여주고, 서버가 진짜 id로 바꿔요
   const refs = new Map<string, Order>();
   const listText = orders.map((o, i) => {
@@ -225,6 +230,55 @@ export async function orderChat(
   }
 
   return { reply: clip(out.reply, 1500) || "확인했어요.", changes, skipped };
+}
+
+const withTime = (o: Order) => ({ ...o, due_time: normTime(o.due_time) });
+
+/** AI 없이 처리할 수 있으면 결과를, 아니면 null (→ AI) */
+async function quickPath(message: string, orders: Order[], today: string, callerId: string): Promise<OrderChatResult | null> {
+  const db = adminClient();
+  const lines = message.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+  if (!lines.length || lines.length > 20) return null;
+
+  // ‘김포포 보냈어’ · ‘김포포 주문 취소’ — 진행 중인 주문 중 그 이름이 딱 하나일 때만
+  if (lines.length === 1) {
+    const a = parseQuickAction(lines[0]);
+    if (a) {
+      const hits = orders.filter((o) => o.status === "open" && o.customer === a.name);
+      if (hits.length !== 1) return null;
+      const patch = a.kind === "complete" ? { status: "done", done_at: new Date().toISOString() } : { status: "canceled" };
+      const { data, error } = await db.from("orders").update(patch).eq("id", hits[0].id).select("*").single();
+      if (error || !data) return null;
+      return {
+        reply: a.kind === "complete" ? `${a.name}님 주문 완료했어요! 🎉` : `${a.name}님 주문을 취소했어요.`,
+        changes: [{ op: a.kind === "complete" ? "complete" : "cancel", order: withTime(data as Order) }],
+        skipped: [],
+      };
+    }
+  }
+
+  // 주문 줄들 — 모든 줄을 읽을 수 있을 때만 (한 줄이라도 애매하면 전부 AI에게)
+  const parsed = lines.map((l) => parseOrderLine(l, today));
+  if (!parsed.every((x): x is NonNullable<typeof x> => x !== null)) return null;
+  const rows = parsed.map((x, i) => ({
+    customer: x.customer.slice(0, 40),
+    item: x.item.slice(0, 80),
+    price: x.price,
+    due_date: x.due_date,
+    due_time: x.due_time,
+    method: x.method,
+    memo: x.memo?.slice(0, 300) ?? null,
+    source_text: lines[i].slice(0, 1000),
+    created_by: callerId,
+  }));
+  const { data, error } = await db.from("orders").insert(rows).select("*");
+  if (error || !data) return null;
+  const created = (data as Order[]).map(withTime);
+  return {
+    reply: created.length > 1 ? `주문 ${created.length}건 등록했어요!` : "주문 등록했어요!",
+    changes: created.map((o) => ({ op: "create" as const, order: o })),
+    skipped: parsed.flatMap((x) => (x.note ? [x.note] : [])),
+  };
 }
 
 // ---------------------------------------------------------------------------

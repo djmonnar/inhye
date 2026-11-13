@@ -37,7 +37,8 @@ src/lib/store/        데이터 계층 인터페이스(types.ts) + supabase-stor
 src/lib/server/       서버 전용: admin.ts(서비스 키, 권한), schema.ts(pg로 schema.sql 적용), orders.ts(주문 비서·알림 글), kakao.ts(나에게 보내기), pos.ts, bixolon.ts, openai.ts, ai-*.ts, fetch-page.ts
                       kakao-bot/: bot.ts(챗봇 말 해석·대화 흐름·주문 — DB 없이 시험 가능), ai.ts(AI 해석기·주문 비서 연결), kakao.ts(오픈빌더 응답·길이 제한·콜백), types.ts(BotDb·BotAi), supabase-db.ts
 src/lib/              excel.ts(빅솔론 양식), tspl.ts / labelCanvas.ts / usbPrinter.ts(라벨 직접 인쇄),
-                      format.ts, queries.ts, report.ts, sources.ts(거래처별 가격 정렬·최저가 — 앱·챗봇 공용), josa.ts(을/를·이/가 조사)
+                      format.ts, queries.ts, report.ts, sources.ts(거래처별 가격 정렬·최저가 — 앱·챗봇 공용), josa.ts(을/를·이/가 조사),
+                      orderParse.ts(주문 한 줄을 AI 없이 바로 읽기 — 주문 비서 앞단)
 public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해도 안전해야 함)
 ```
 
@@ -77,7 +78,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 | Xprinter 라벨 | ✅ PC 드라이버 인쇄 · 안드로이드 USB 직접(TSPL) · 노트북 인쇄 스테이션 | [printing.md](docs/wiki/printing.md) |
 | OpenAI | ✅ 사진→상품정보, 링크→상품정보, 홍보글, 가게 리포트, 주문 비서 (`OPENAI_API_KEY`) | [features.md](docs/wiki/features.md) |
 | 카카오톡 ‘나에게 보내기’ | ✅ 연결·테스트 발송 확인(2026-11-10). 보내는 시간은 주문 화면에서 선택(스키마 v4 `app_settings`) | [orders-kakao.md](docs/wiki/orders-kakao.md) |
-| 카카오 챗봇 (오픈빌더 스킬) | 🟡 코드 완료(2026-11-13, 메모리 DB로 대화 시험) + **AI 해석·주문 비서**(5초 넘으면 ‘결과 보기’, 콜백 켜면 자동 사용). 남은 것: 스키마 v6 적용, `KAKAO_SKILL_SECRET`, 오픈빌더 스킬·폴백/웰컴 블록·채널 연결, (선택) 콜백 켜기 | [suppliers-kakao-bot.md](docs/wiki/suppliers-kakao-bot.md) |
+| 카카오 챗봇 (오픈빌더 스킬) | ✅ 카톡에서 주문 등록 동작 확인(2026-11-13) + **AI 해석·주문 비서**(정해진 모양 주문은 AI 없이 바로 `orderParse.ts`, AI가 5초 넘으면 ‘결과 보기’, 콜백 켜면 자동 사용). 남은 것: 폴백 블록 콜백 켜기(켜면 ‘결과 보기’ 없이 자동) | [suppliers-kakao-bot.md](docs/wiki/suppliers-kakao-bot.md) |
 
 ## 7. 다음에 할 일 (열린 문제)
 
