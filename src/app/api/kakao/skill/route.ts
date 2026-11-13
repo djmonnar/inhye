@@ -36,6 +36,7 @@ function kakaoCallbackUrl(raw: unknown): string | null {
   } catch {
     /* 이상한 주소는 무시 */
   }
+  console.warn("[kakao skill] callback url ignored (not https)");
   return null;
 }
 
