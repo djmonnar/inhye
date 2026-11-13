@@ -60,14 +60,42 @@ export function useCategories(): string[] {
   }, [data]);
 }
 
+/** 거래처별 가격 전체 (가격 기록은 ["sources", "logs", ...]) */
+export function useSources() {
+  return useQuery({ queryKey: ["sources"], queryFn: () => store().listSources() });
+}
+
+export function usePriceLogs(filter: { productId?: string; supplierId?: string }, limit = 30) {
+  return useQuery({
+    queryKey: ["sources", "logs", filter.productId ?? "", filter.supplierId ?? "", limit],
+    queryFn: () => store().listPriceLogs(filter, limit),
+  });
+}
+
 /** Refetch after a write. */
 export function useRefresh() {
   const qc = useQueryClient();
   return useCallback(
-    (...keys: ("products" | "suppliers" | "moves" | "members" | "print-jobs" | "pos" | "orders" | "kakao")[]) =>
-      Promise.all(keys.map((k) => qc.invalidateQueries({ queryKey: [k] }))),
+    (
+      ...keys: (
+        | "products"
+        | "suppliers"
+        | "moves"
+        | "members"
+        | "print-jobs"
+        | "pos"
+        | "orders"
+        | "kakao"
+        | "sources"
+        | "kakao-bot"
+      )[]
+    ) => Promise.all(keys.map((k) => qc.invalidateQueries({ queryKey: [k] }))),
     [qc],
   );
+}
+
+export function useKakaoBot() {
+  return useQuery({ queryKey: ["kakao-bot"], queryFn: () => store().kakaoBotStatus(), retry: false });
 }
 
 export function useOrders() {

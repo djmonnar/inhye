@@ -21,6 +21,7 @@
 | `OPENAI_API_KEY` | **비밀** | AI 기능 (주문 비서 포함) |
 | `KAKAO_REST_API_KEY` / `KAKAO_CLIENT_SECRET` | **비밀** | 카카오톡 ‘나에게 보내기’ 주문 알림 ([orders-kakao.md](orders-kakao.md)) |
 | `CRON_SECRET` | **비밀** | 매일 아침 알림(Vercel Cron, `vercel.json`) 호출 확인 |
+| `KAKAO_SKILL_SECRET` | **비밀** | 카카오 챗봇 스킬 요청 확인 — 오픈빌더 스킬 헤더 `X-Popo-Key`와 같은 값 ([suppliers-kakao-bot.md](suppliers-kakao-bot.md)) |
 | `OPENAI_MODEL` | | (선택) 모델 바꾸기 |
 | `BIXOLON_API_KEY` | **비밀** | 빅솔론 매장키 (ASP 외부 연결 관리 → 연동 키 발급) |
 | `BIXOLON_API_BASE` | | (선택) API 주소, 기본 `https://api.bixolon-pos.com` |

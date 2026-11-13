@@ -6,6 +6,7 @@ import type {
   Member,
   MemberInput,
   MoveInput,
+  KakaoBotStatus,
   KakaoStatus,
   Order,
   OrderChatResult,
@@ -17,14 +18,18 @@ import type {
   PosStatus,
   PosSyncResult,
   PosSyncRun,
+  PriceInput,
+  PriceLog,
   PrintJob,
   PrintRequest,
   Product,
   ProductInput,
+  ProductSource,
   PromoDraft,
   PromoRequest,
   ReportFacts,
   Role,
+  SourcePatch,
   StockMove,
   Supplier,
   SupplierInput,
@@ -47,6 +52,19 @@ export interface DataStore {
   listSuppliers(): Promise<Supplier[]>;
   saveSupplier(input: SupplierInput, id?: string): Promise<Supplier>;
   deleteSupplier(id: string): Promise<void>;
+
+  /** 거래처별 가격 전체 (상품·거래처 화면에서 걸러 써요) */
+  listSources(): Promise<ProductSource[]>;
+  /** 가격 기록, 최신순. productId 또는 supplierId로 걸러요 */
+  listPriceLogs(filter: { productId?: string; supplierId?: string }, limit?: number): Promise<PriceLog[]>;
+  /** 가격 기록: 거래처별 최근 가격을 바꾸고 기록을 한 줄 남겨요 (없던 거래처면 새로 붙여요) */
+  recordPrice(input: PriceInput): Promise<void>;
+  /** 거래처별 가격 줄의 링크·구매처 상품명·메모만 고쳐요 */
+  updateSource(id: string, patch: SourcePatch): Promise<void>;
+  /** 관리자만. 이 상품을 그 거래처에서 더는 안 사요 */
+  deleteSource(id: string): Promise<void>;
+  /** 이 거래처를 상품의 주 거래처로 (구매 링크·상품명·원가도 그 줄 값으로) */
+  setMainSource(source: ProductSource): Promise<void>;
 
   /** Newest first. Without productId returns recent moves across all products. */
   listMoves(productId?: string, limit?: number): Promise<StockMove[]>;
@@ -102,6 +120,13 @@ export interface DataStore {
   kakaoTest(): Promise<{ sent: boolean; text: string }>;
   /** 매일 알림 보낼 시각(한국 0~23시) 바꾸기 (관리자) */
   kakaoSetHour(hour: number): Promise<void>;
+
+  /** 카카오 챗봇: 연결 상태·연결된 사람 */
+  kakaoBotStatus(): Promise<KakaoBotStatus>;
+  /** 카카오 챗봇: 내 계정 연결 코드(6자리, 10분) 받기 */
+  kakaoBotCode(): Promise<{ code: string; expires_at: string }>;
+  /** 카카오 챗봇 연결 끊기 (자기 것, 관리자는 누구 것이든) */
+  kakaoBotUnlink(key: string): Promise<void>;
 }
 
 export class StoreError extends Error {}

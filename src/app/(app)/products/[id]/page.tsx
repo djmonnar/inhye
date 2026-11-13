@@ -22,6 +22,7 @@ import { BarcodeSvg } from "@/components/BarcodeSvg";
 import { PromoSheet } from "@/components/PromoSheet";
 import { useAuth, useToast } from "@/components/providers";
 import { SendLabelSheet } from "@/components/SendLabelSheet";
+import { SourcePrices } from "@/components/SourcePrices";
 import { StockSheet } from "@/components/StockSheet";
 import { KIND_LABEL, KIND_STYLE } from "@/components/SupplierSheet";
 import {
@@ -204,7 +205,7 @@ export default function ProductDetailPage() {
 
         {/* 구매처 */}
         <section className="card p-4">
-          <p className="mb-3 font-cute text-lg">🛒 어디서 샀더라?</p>
+          <p className="mb-3 font-cute text-lg">🛒 주 거래처</p>
           {supplier ? (
             <Link href={`/suppliers/${supplier.id}`} className="flex items-center gap-2 rounded-2xl bg-cream p-3">
               <span className={`badge ${KIND_STYLE[supplier.kind]}`}>{KIND_LABEL[supplier.kind]}</span>
@@ -250,6 +251,8 @@ export default function ProductDetailPage() {
             </div>
           </div>
         </section>
+
+        <SourcePrices product={product} />
 
         {/* 메모 / 빅솔론 */}
         {(product.memo || product.kiosk_code || product.description) && (

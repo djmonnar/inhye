@@ -3,6 +3,7 @@
 import {
   BarChart3,
   BookOpen,
+  Bot,
   ChevronRight,
   FileSpreadsheet,
   Flower2,
@@ -42,7 +43,8 @@ export default function MorePage() {
     { href: "/excel", icon: FileSpreadsheet, label: "엑셀 · 빅솔론 대량등록", desc: "빅솔론 대량작업 엑셀 내보내기/가져오기, 백업" },
     { href: "/labels", icon: Printer, label: "바코드 라벨 · 가격표 인쇄", desc: "바코드 없는 상품에 붙일 라벨 만들기" },
     { href: "/print-station", icon: Printer, label: "인쇄 스테이션 (노트북)", desc: "폰에서 보낸 라벨을 노트북이 자동으로 인쇄" },
-    { href: "/suppliers", icon: Store, label: "구매처 관리", desc: "소품 산 곳 모아보기" },
+    { href: "/suppliers", icon: Store, label: "구매처 관리", desc: "소품 산 곳 모아보기 · 거래처별 가격" },
+    { href: "/kakao-bot", icon: Bot, label: "카카오 챗봇", desc: "카톡으로 거래처 · 발주 · 재고 · 매출 보기" },
     { href: "/history", icon: History, label: "입고 · 출고 기록", desc: "언제 무엇이 들어오고 나갔는지" },
     ...(user?.role === "admin"
       ? [{ href: "/members", icon: Users, label: "직원 계정 관리", desc: "알바생·가족 계정 만들기, 권한 바꾸기" }]

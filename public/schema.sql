@@ -54,7 +54,7 @@ create trigger on_auth_user_created
 create or replace function public.app_status() returns json
 language sql stable security definer set search_path = public as $$
   select json_build_object(
-    'version', 5,
+    'version', 6,
     'has_admin', exists (select 1 from public.profiles where role = 'admin')
   );
 $$;
@@ -512,6 +512,221 @@ create policy "settings read" on public.app_settings for select to authenticated
 drop policy if exists "settings admin update" on public.app_settings;
 create policy "settings admin update" on public.app_settings for update to authenticated
   using (public.is_admin()) with check (public.is_admin());
+
+-- ---------------------------------------------------------------------
+-- 8. 거래처별 가격 (스키마 v6)
+--    같은 상품도 거래처마다 값이 달라요 → 상품 × 거래처마다 최근 개당 가격 한 줄(product_sources)
+--    + 확인할 때마다 쌓이는 가격 기록(price_logs). products.supplier_id 는 ‘주 거래처’,
+--    products.cost_price 는 마진 계산용 ‘지금 원가’로 그대로 둬요.
+-- ---------------------------------------------------------------------
+create table if not exists public.product_sources (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid not null references public.products (id) on delete cascade,
+  supplier_id uuid not null references public.suppliers (id) on delete cascade,
+  price integer check (price is null or price >= 0),
+  price_at timestamptz,
+  purchase_url text,
+  supplier_sku text,
+  memo text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (product_id, supplier_id)
+);
+create index if not exists product_sources_supplier_idx on public.product_sources (supplier_id);
+
+create table if not exists public.price_logs (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid not null references public.products (id) on delete cascade,
+  supplier_id uuid not null references public.suppliers (id) on delete cascade,
+  price integer not null check (price >= 0),
+  source text not null default 'manual' check (source in ('manual', 'stock_in', 'chatbot', 'import')),
+  stock_move_id uuid unique references public.stock_moves (id) on delete set null,
+  memo text,
+  created_by_name text,
+  noted_at timestamptz not null default now()
+);
+create index if not exists price_logs_product_idx on public.price_logs (product_id, noted_at desc);
+create index if not exists price_logs_supplier_idx on public.price_logs (supplier_id, noted_at desc);
+
+drop trigger if exists product_sources_touch on public.product_sources;
+create trigger product_sources_touch before update on public.product_sources
+  for each row execute function public.touch_updated_at();
+
+-- 가격 기록은 이 함수로: 거래처별 최근 가격을 바꾸고 기록도 한 줄 남겨요.
+-- 앱(로그인한 직원)과 챗봇 서버(서비스 키) 둘 다 써요.
+create or replace function public.record_price(
+  p_product_id uuid,
+  p_supplier_id uuid,
+  p_price integer,
+  p_purchase_url text default null,
+  p_supplier_sku text default null,
+  p_memo text default null,
+  p_source text default 'manual',
+  p_set_cost boolean default false,
+  p_by_name text default null
+) returns void
+language plpgsql security invoker set search_path = public as $$
+begin
+  if not (public.is_member() or current_user in ('service_role', 'postgres')) then
+    raise exception '권한이 없어요';
+  end if;
+  if p_price is null or p_price < 0 then
+    raise exception '가격을 확인해 주세요';
+  end if;
+
+  insert into public.product_sources as ps (product_id, supplier_id, price, price_at, purchase_url, supplier_sku, memo)
+  values (p_product_id, p_supplier_id, p_price, now(),
+          nullif(trim(p_purchase_url), ''), nullif(trim(p_supplier_sku), ''), nullif(trim(p_memo), ''))
+  on conflict (product_id, supplier_id) do update
+     set price = excluded.price,
+         price_at = excluded.price_at,
+         purchase_url = coalesce(excluded.purchase_url, ps.purchase_url),
+         supplier_sku = coalesce(excluded.supplier_sku, ps.supplier_sku),
+         memo = coalesce(excluded.memo, ps.memo);
+
+  insert into public.price_logs (product_id, supplier_id, price, source, memo, created_by_name)
+  values (p_product_id, p_supplier_id, p_price, coalesce(p_source, 'manual'), nullif(trim(p_memo), ''),
+          coalesce(p_by_name, (select display_name from public.profiles where id = auth.uid())));
+
+  if p_set_cost then
+    update public.products set cost_price = p_price where id = p_product_id;
+  end if;
+end $$;
+
+-- 입고할 때 거래처·개당 가격을 적으면 가격 기록도 자동으로 남아요.
+create or replace function public.price_from_stock_in() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.kind = 'in' and new.supplier_id is not null and coalesce(new.unit_cost, 0) > 0 then
+    insert into public.product_sources as ps (product_id, supplier_id, price, price_at)
+    values (new.product_id, new.supplier_id, new.unit_cost, new.created_at)
+    on conflict (product_id, supplier_id) do update
+       set price = excluded.price, price_at = excluded.price_at
+     where ps.price_at is null or ps.price_at <= excluded.price_at;
+    insert into public.price_logs (product_id, supplier_id, price, source, stock_move_id, created_by_name, noted_at)
+    values (new.product_id, new.supplier_id, new.unit_cost, 'stock_in', new.id, new.created_by_name, new.created_at)
+    on conflict (stock_move_id) do nothing;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists stock_moves_price on public.stock_moves;
+create trigger stock_moves_price after insert on public.stock_moves
+  for each row execute function public.price_from_stock_in();
+
+-- 상품의 주 거래처는 항상 거래처별 가격에도 한 줄 있게 해요 (구매 링크·구매처 상품명도 채워요).
+create or replace function public.source_from_product() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.supplier_id is null then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' then
+    if new.supplier_id is not distinct from old.supplier_id
+       and new.purchase_url is not distinct from old.purchase_url
+       and new.supplier_sku is not distinct from old.supplier_sku then
+      return new;
+    end if;
+  end if;
+  insert into public.product_sources as ps (product_id, supplier_id, price, price_at, purchase_url, supplier_sku)
+  values (new.id, new.supplier_id, nullif(new.cost_price, 0),
+          case when new.cost_price > 0 then now() end, new.purchase_url, new.supplier_sku)
+  on conflict (product_id, supplier_id) do update
+     set purchase_url = coalesce(excluded.purchase_url, ps.purchase_url),
+         supplier_sku = coalesce(excluded.supplier_sku, ps.supplier_sku),
+         price = coalesce(ps.price, excluded.price),
+         price_at = coalesce(ps.price_at, excluded.price_at);
+  return new;
+end $$;
+
+drop trigger if exists products_source on public.products;
+create trigger products_source after insert or update on public.products
+  for each row execute function public.source_from_product();
+
+-- 처음 v6로 올릴 때 한 번만: 지금까지의 입고 기록 → 가격 기록, 상품의 주 거래처·입고 가격 → 거래처별 가격.
+-- (거래처별 가격 표가 비어 있을 때만 채워요 — 나중에 다시 실행해도 지운 줄이 되살아나지 않게)
+do $$
+begin
+  if exists (select 1 from public.product_sources) then
+    return;
+  end if;
+
+  insert into public.price_logs (product_id, supplier_id, price, source, stock_move_id, created_by_name, noted_at)
+  select m.product_id, m.supplier_id, m.unit_cost, 'stock_in', m.id, m.created_by_name, m.created_at
+    from public.stock_moves m
+    join public.suppliers s on s.id = m.supplier_id
+   where m.kind = 'in' and coalesce(m.unit_cost, 0) > 0
+  on conflict (stock_move_id) do nothing;
+
+  insert into public.product_sources (product_id, supplier_id, price, price_at, purchase_url, supplier_sku)
+  select p.id, p.supplier_id, nullif(p.cost_price, 0), case when p.cost_price > 0 then p.updated_at end,
+         p.purchase_url, p.supplier_sku
+    from public.products p
+   where p.supplier_id is not null
+  on conflict (product_id, supplier_id) do nothing;
+
+  insert into public.product_sources as ps (product_id, supplier_id, price, price_at)
+  select distinct on (l.product_id, l.supplier_id) l.product_id, l.supplier_id, l.price, l.noted_at
+    from public.price_logs l
+   order by l.product_id, l.supplier_id, l.noted_at desc
+  on conflict (product_id, supplier_id) do update
+     set price = excluded.price, price_at = excluded.price_at
+   where ps.price_at is null or ps.price_at < excluded.price_at;
+end $$;
+
+alter table public.product_sources enable row level security;
+alter table public.price_logs enable row level security;
+grant select, insert, update, delete on public.product_sources, public.price_logs to authenticated;
+grant execute on function public.record_price(uuid, uuid, integer, text, text, text, text, boolean, text) to authenticated;
+
+drop policy if exists "sources read" on public.product_sources;
+create policy "sources read" on public.product_sources for select to authenticated using (public.is_member());
+drop policy if exists "sources insert" on public.product_sources;
+create policy "sources insert" on public.product_sources for insert to authenticated with check (public.is_member());
+drop policy if exists "sources update" on public.product_sources;
+create policy "sources update" on public.product_sources for update to authenticated
+  using (public.is_member()) with check (public.is_member());
+drop policy if exists "sources delete" on public.product_sources;
+create policy "sources delete" on public.product_sources for delete to authenticated using (public.is_admin());
+
+drop policy if exists "price logs read" on public.price_logs;
+create policy "price logs read" on public.price_logs for select to authenticated using (public.is_member());
+drop policy if exists "price logs insert" on public.price_logs;
+create policy "price logs insert" on public.price_logs for insert to authenticated with check (public.is_member());
+drop policy if exists "price logs delete" on public.price_logs;
+create policy "price logs delete" on public.price_logs for delete to authenticated using (public.is_admin());
+
+-- ---------------------------------------------------------------------
+-- 9. 카카오 챗봇 (스키마 v6) — 서버(서비스 키)만 읽고 써요. 정책 없음.
+--    kakao_bot_users: 카카오 사용자(봇 사용자 키) ↔ 앱 계정. 권한은 앱 계정의 역할을 그대로 따라요.
+--    kakao_bot_codes: 앱에서 받은 6자리 연결 코드 (10분)
+--    kakao_bot_sessions: 거래처 등록처럼 여러 번 주고받는 대화의 진행 상태
+-- ---------------------------------------------------------------------
+create table if not exists public.kakao_bot_users (
+  bot_user_key text primary key,
+  profile_id uuid not null references public.profiles (id) on delete cascade,
+  linked_at timestamptz not null default now(),
+  last_seen_at timestamptz
+);
+create index if not exists kakao_bot_users_profile_idx on public.kakao_bot_users (profile_id);
+
+create table if not exists public.kakao_bot_codes (
+  code text primary key,
+  profile_id uuid not null references public.profiles (id) on delete cascade,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.kakao_bot_sessions (
+  bot_user_key text primary key,
+  state jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.kakao_bot_users enable row level security;
+alter table public.kakao_bot_codes enable row level security;
+alter table public.kakao_bot_sessions enable row level security;
+revoke all on public.kakao_bot_users, public.kakao_bot_codes, public.kakao_bot_sessions from anon, authenticated;
 
 -- 새로 만든 표·함수를 API가 바로 알아보게 해요 (schema cache 새로고침)
 notify pgrst, 'reload schema';

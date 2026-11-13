@@ -232,7 +232,7 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
           .addPrintJobs([{ product_id: saved.id, copies: sent, style: "label" }], user?.display_name ?? "")
           .catch(() => (sent = 0));
       }
-      await refresh("products", "moves", "print-jobs");
+      await refresh("products", "moves", "print-jobs", "sources");
       toast(
         product ? "수정했어요!" : sent ? `등록 완료! 라벨 ${sent}장 노트북으로 보냈어요` : "새 상품을 등록했어요!",
         "wow",

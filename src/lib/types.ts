@@ -162,6 +162,60 @@ export interface MoveInput {
   update_cost?: boolean;
 }
 
+/** 상품 × 거래처 한 줄: 그 거래처에서 사는 최근 개당 가격 (같은 상품도 거래처마다 달라요) */
+export interface ProductSource {
+  id: string;
+  product_id: string;
+  supplier_id: string;
+  /** 최근 개당 매입가 (모르면 null) */
+  price: number | null;
+  /** 그 가격을 확인한 때 */
+  price_at: string | null;
+  purchase_url: string | null;
+  supplier_sku: string | null;
+  /** 최소 주문 수량, 묶음 단위 같은 메모 */
+  memo: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PriceSource = "manual" | "stock_in" | "chatbot" | "import";
+
+export interface PriceLog {
+  id: string;
+  product_id: string;
+  supplier_id: string;
+  price: number;
+  source: PriceSource;
+  memo: string | null;
+  created_by_name: string | null;
+  noted_at: string;
+}
+
+export interface PriceInput {
+  product_id: string;
+  supplier_id: string;
+  price: number;
+  purchase_url?: string | null;
+  supplier_sku?: string | null;
+  memo?: string | null;
+  /** 상품의 ‘지금 원가’도 이 가격으로 바꿔요 */
+  set_cost?: boolean;
+}
+
+export type SourcePatch = Partial<Pick<ProductSource, "purchase_url" | "supplier_sku" | "memo">>;
+
+/** 카카오 챗봇 연결 상태 (더보기 → 카카오 챗봇) */
+export interface KakaoBotStatus {
+  demo?: boolean;
+  /** Vercel에 KAKAO_SKILL_SECRET 이 있는지 (없으면 챗봇이 답하지 않아요) */
+  secretConfigured: boolean;
+  /** 챗봇 스킬 주소 (오픈빌더에 넣을 값) */
+  skillUrl: string;
+  /** 연결된 카카오 사용자. 관리자는 전체, 직원은 자기 것만 */
+  links: { key: string; name: string; role: Role; linked_at: string; last_seen_at: string | null; mine: boolean }[];
+}
+
 export interface Member extends AppUser {
   created_at: string;
 }

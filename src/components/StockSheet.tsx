@@ -74,7 +74,8 @@ function StockForm({
         memo: memo.trim() || null,
         update_cost: mode === "in" && updateCost,
       });
-      await refresh("products", "moves");
+      // 입고 + 거래처 + 개당 가격이면 거래처별 가격도 자동으로 바뀌어요
+      await refresh("products", "moves", "sources");
       toast(`재고 ${num(result)}개가 됐어요`, mode === "in" ? "wow" : "happy");
       onDone();
     } catch (e) {
@@ -133,6 +134,9 @@ function StockForm({
             <p className="text-right text-sm text-ink-soft">
               이번 입고 금액 <b className="text-ink">{won(unitCost * qty)}</b>
             </p>
+          )}
+          {unitCost > 0 && supplierId && (
+            <p className="text-xs text-ink-soft">🏷️ 산 곳의 개당 가격도 ‘거래처별 가격’에 같이 기록돼요</p>
           )}
         </>
       )}

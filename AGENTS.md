@@ -28,15 +28,16 @@ npm run build
 
 ```
 src/app/(app)/        로그인 후 화면: 홈, products, scan, reorder, suppliers, excel, labels,
-                      print-station, sales(+receipts), orders, report, members, guide, history, more
+                      print-station, sales(+receipts), orders, report, members, guide, history, more, kakao-bot(챗봇 연결)
 src/app/login, setup  로그인(자동 로그인) / 처음 설정(SQL 안내, 관리자 계정)
-src/app/api/          setup/admin, setup/schema(DB에 schema.sql 바로 적용), members, pos/status, pos/sync, pos/live(빅솔론 하루치 바로 보기, 저장 없음), pos/receipts(영수증별, 저장 없음), orders/chat(주문 비서), kakao/{status,connect,callback,test}, cron/orders(매일 알림), ai/{product,link,promo,report}
+src/app/api/          setup/admin, setup/schema(DB에 schema.sql 바로 적용), members, pos/status, pos/sync, pos/live(빅솔론 하루치 바로 보기, 저장 없음), pos/receipts(영수증별, 저장 없음), orders/chat(주문 비서), kakao/{status,connect,callback,test}, kakao/skill(카카오 챗봇 스킬 서버), kakao/bot(챗봇 연결 코드·연결 관리), cron/orders(매일 알림), ai/{product,link,promo,report}
 src/components/       ui.tsx(공용 UI), OrderChat(주문 비서 — 주문 화면·홈 떠 있는 버튼 공용), WhenPicker(날짜·시간 버튼), DayNav, ProductForm, BarcodeScanner, StockSheet, SupplierSheet,
-                      labels.tsx(라벨 공용), SendLabelSheet, AiFillSheet, PromoSheet, Mascot
+                      SourcePrices(상품 화면 ‘거래처별 가격’ + 가격 기록 시트), labels.tsx(라벨 공용), SendLabelSheet, AiFillSheet, PromoSheet, Mascot
 src/lib/store/        데이터 계층 인터페이스(types.ts) + supabase-store.ts + demo-store.ts
 src/lib/server/       서버 전용: admin.ts(서비스 키, 권한), schema.ts(pg로 schema.sql 적용), orders.ts(주문 비서·알림 글), kakao.ts(나에게 보내기), pos.ts, bixolon.ts, openai.ts, ai-*.ts, fetch-page.ts
+                      kakao-bot/: bot.ts(챗봇 말 해석·대화 흐름 — DB 없이 시험 가능), kakao.ts(오픈빌더 응답·길이 제한), types.ts(BotDb), supabase-db.ts
 src/lib/              excel.ts(빅솔론 양식), tspl.ts / labelCanvas.ts / usbPrinter.ts(라벨 직접 인쇄),
-                      format.ts, queries.ts, report.ts
+                      format.ts, queries.ts, report.ts, sources.ts(거래처별 가격 정렬·최저가 — 앱·챗봇 공용), josa.ts(을/를·이/가 조사)
 public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해도 안전해야 함)
 ```
 
@@ -76,6 +77,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 | Xprinter 라벨 | ✅ PC 드라이버 인쇄 · 안드로이드 USB 직접(TSPL) · 노트북 인쇄 스테이션 | [printing.md](docs/wiki/printing.md) |
 | OpenAI | ✅ 사진→상품정보, 링크→상품정보, 홍보글, 가게 리포트, 주문 비서 (`OPENAI_API_KEY`) | [features.md](docs/wiki/features.md) |
 | 카카오톡 ‘나에게 보내기’ | ✅ 연결·테스트 발송 확인(2026-11-10). 보내는 시간은 주문 화면에서 선택(스키마 v4 `app_settings`) | [orders-kakao.md](docs/wiki/orders-kakao.md) |
+| 카카오 챗봇 (오픈빌더 스킬) | 🟡 코드 완료(2026-11-13, 메모리 DB로 대화 시험). 남은 것: 스키마 v6 적용, `KAKAO_SKILL_SECRET`, 오픈빌더 스킬·폴백/웰컴 블록·채널 연결 | [suppliers-kakao-bot.md](docs/wiki/suppliers-kakao-bot.md) |
 
 ## 7. 다음에 할 일 (열린 문제)
 
@@ -84,6 +86,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 3. (선택) 건별 매출 `GET /api/external/v2/sales`로 영수증 단위·즉시 반영·취소/반품 상태 받기 — 실제 응답의 `salesGoods` 필드 이름을 확인한 뒤에.
 4. `src/lib/report.ts`는 아직 판매를 출고 기록으로 계산해요 → `pos_sales`가 들어오면 그걸 쓰도록.
 5. ✅ 카카오톡 연결·테스트 발송 확인. 스키마 v5(알림 시간 설정 + 주문 픽업 시간) 적용은 `/setup` ‘앱에서 바로 실행’으로.
+6. **거래처별 가격 + 카카오 챗봇 (스키마 v6, 2026-11-13)**: `/setup`에서 v6 적용 → Vercel `KAKAO_SKILL_SECRET` → 오픈빌더 설정([suppliers-kakao-bot.md](docs/wiki/suppliers-kakao-bot.md) ‘처음 설정’). 다음 후보: 발주 화면에도 ‘더 싼 거래처’ 표시, 엑셀 백업에 거래처별 가격 포함.
 
 결정·발견 기록은 [`docs/wiki/decisions.md`](docs/wiki/decisions.md)에 날짜순으로 있어요.
 

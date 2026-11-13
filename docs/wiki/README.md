@@ -10,6 +10,7 @@
 | [hielpay.md](hielpay.md) | 히엘페이(카드 결제) 조사 결과 |
 | [printing.md](printing.md) | Xprinter 라벨 프린터, TSPL 직접 인쇄, 노트북 인쇄 스테이션, 바코드 |
 | [orders-kakao.md](orders-kakao.md) | 예약 주문 · 주문 비서(채팅) · 카카오톡 ‘나에게 보내기’ 알림 · 카카오 디벨로퍼스 설정 |
+| [suppliers-kakao-bot.md](suppliers-kakao-bot.md) | 거래처별 가격(같은 상품도 거래처마다 값이 달라요) · 카카오 챗봇(오픈빌더 스킬) 설정·권한·명령어 |
 | [setup-deploy.md](setup-deploy.md) | Supabase · Vercel 설정, 환경변수, 계정/권한, 현재 설정 상태 |
 | [decisions.md](decisions.md) | 날짜순 결정·발견 기록 |
 

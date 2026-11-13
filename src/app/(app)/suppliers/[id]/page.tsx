@@ -7,8 +7,10 @@ import { useMemo, useState } from "react";
 import { useAuth, useToast } from "@/components/providers";
 import { KIND_LABEL, KIND_STYLE, SupplierSheet } from "@/components/SupplierSheet";
 import { ConfirmSheet, EmptyState, Loading, PageHeader, ProductThumb, StockBadge } from "@/components/ui";
-import { ensureUrl, hostOf, num, won } from "@/lib/format";
-import { useMoves, useProducts, useRefresh, useSuppliers } from "@/lib/queries";
+import { ensureUrl, hostOf, num, relTime, won } from "@/lib/format";
+import { useMoves, useProducts, useRefresh, useSources, useSuppliers } from "@/lib/queries";
+import { j } from "@/lib/josa";
+import { cheapest } from "@/lib/sources";
 import { store } from "@/lib/store";
 
 export default function SupplierDetailPage() {
@@ -24,10 +26,26 @@ export default function SupplierDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const supplier = suppliers?.find((s) => s.id === id);
-  const items = useMemo(
-    () => products.filter((p) => p.supplier_id === id).sort((a, b) => a.stock_qty - b.stock_qty),
-    [products, id],
-  );
+  const { data: sources = [] } = useSources();
+  /** 이 거래처에서 사는 상품: 주 거래처인 상품 + 거래처별 가격에 이 거래처가 있는 상품 */
+  const items = useMemo(() => {
+    const here = new Map(sources.filter((s) => s.supplier_id === id).map((s) => [s.product_id, s]));
+    return products
+      .filter((p) => p.supplier_id === id || here.has(p.id))
+      .map((p) => {
+        const mine = here.get(p.id);
+        const best = cheapest(sources.filter((s) => s.product_id === p.id));
+        return {
+          p,
+          price: mine?.price ?? (p.supplier_id === id ? p.cost_price || null : null),
+          priceAt: mine?.price_at ?? null,
+          isMain: p.supplier_id === id,
+          cheaperElsewhere: best && best.supplier_id !== id && mine?.price != null && best.price != null && best.price < mine.price ? best : null,
+        };
+      })
+      .sort((a, b) => a.p.stock_qty - b.p.stock_qty);
+  }, [products, sources, id]);
+  const supName = (sid: string) => suppliers?.find((s) => s.id === sid)?.name ?? "";
   const bought = useMemo(() => {
     const ins = moves.filter((m) => m.supplier_id === id && m.qty > 0);
     return { count: ins.length, amount: ins.reduce((n, m) => n + (m.unit_cost ?? 0) * m.qty, 0) };
@@ -112,13 +130,24 @@ export default function SupplierDetailPage() {
             <p className="card p-4 text-center text-sm text-ink-soft">아직 연결된 상품이 없어요</p>
           ) : (
             <ul className="space-y-2">
-              {items.map((p) => (
+              {items.map(({ p, price, priceAt, isMain, cheaperElsewhere }) => (
                 <li key={p.id}>
                   <Link href={`/products/${p.id}`} className="card flex items-center gap-3 p-2.5">
                     <ProductThumb product={p} className="h-12 w-12" frame="rounded-xl border-2" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">{p.name}</p>
-                      <p className="text-xs text-ink-soft">원가 {won(p.cost_price)}</p>
+                      <p className="truncate text-sm font-semibold">
+                        {p.name}
+                        {!isMain && <span className="ml-1 text-xs font-normal text-ink-faint">(다른 곳이 주 거래처)</span>}
+                      </p>
+                      <p className="text-xs text-ink-soft">
+                        여기 {price != null ? won(price) : "가격 미확인"}
+                        {priceAt ? ` · ${relTime(priceAt)}` : ""}
+                      </p>
+                      {cheaperElsewhere && (
+                        <p className="text-xs text-matcha-700">
+                          {j(supName(cheaperElsewhere.supplier_id), "이")} {j(won(cheaperElsewhere.price), "로")} 더 싸요
+                        </p>
+                      )}
                     </div>
                     <StockBadge product={p} />
                   </Link>

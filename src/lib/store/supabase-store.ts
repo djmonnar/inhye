@@ -9,6 +9,7 @@ import type {
   AppUser,
   BulkProductRow,
   Member,
+  KakaoBotStatus,
   KakaoStatus,
   Order,
   OrderChatResult,
@@ -19,9 +20,11 @@ import type {
   PosStatus,
   PosSyncResult,
   PosSyncRun,
+  PriceLog,
   PrintJob,
   Product,
   ProductInput,
+  ProductSource,
   PromoDraft,
   Supplier,
   SupplierInput,
@@ -183,6 +186,54 @@ export function createSupabaseStore(): DataStore {
 
     async deleteSupplier(id) {
       const { error } = await sb.from("suppliers").delete().eq("id", id);
+      if (error) fail(error);
+    },
+
+    async listSources() {
+      const { data, error } = await sb.from("product_sources").select("*").limit(20000);
+      if (error) fail(error);
+      return data as ProductSource[];
+    },
+
+    async listPriceLogs(filter, limit = 50) {
+      let q = sb.from("price_logs").select("*").order("noted_at", { ascending: false }).limit(limit);
+      if (filter.productId) q = q.eq("product_id", filter.productId);
+      if (filter.supplierId) q = q.eq("supplier_id", filter.supplierId);
+      const { data, error } = await q;
+      if (error) fail(error);
+      return data as PriceLog[];
+    },
+
+    async recordPrice(input) {
+      const { error } = await sb.rpc("record_price", {
+        p_product_id: input.product_id,
+        p_supplier_id: input.supplier_id,
+        p_price: Math.round(input.price),
+        p_purchase_url: input.purchase_url ?? null,
+        p_supplier_sku: input.supplier_sku ?? null,
+        p_memo: input.memo ?? null,
+        p_source: "manual",
+        p_set_cost: input.set_cost ?? false,
+      });
+      if (error) fail(error);
+    },
+
+    async updateSource(id, patch) {
+      const { error } = await sb.from("product_sources").update(patch).eq("id", id);
+      if (error) fail(error);
+    },
+
+    async deleteSource(id) {
+      const { error } = await sb.from("product_sources").delete().eq("id", id);
+      if (error) fail(error);
+    },
+
+    async setMainSource(src) {
+      const patch: Partial<Product> = { supplier_id: src.supplier_id };
+      if (src.purchase_url) patch.purchase_url = src.purchase_url;
+      if (src.supplier_sku) patch.supplier_sku = src.supplier_sku;
+      if (src.price != null) patch.cost_price = src.price;
+      const { error } = await sb.from("products").update(patch).eq("id", src.product_id);
       if (error) fail(error);
     },
 
@@ -414,6 +465,18 @@ export function createSupabaseStore(): DataStore {
 
     async kakaoSetHour(hour) {
       await api<{ ok: boolean }>("/api/kakao/hour", "POST", { hour });
+    },
+
+    async kakaoBotStatus() {
+      return api<KakaoBotStatus>("/api/kakao/bot", "GET");
+    },
+
+    async kakaoBotCode() {
+      return api<{ code: string; expires_at: string }>("/api/kakao/bot", "POST", {});
+    },
+
+    async kakaoBotUnlink(key) {
+      await api<{ ok: boolean }>("/api/kakao/bot", "DELETE", { key });
     },
   };
 }

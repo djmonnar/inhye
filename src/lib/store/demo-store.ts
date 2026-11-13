@@ -3,9 +3,12 @@ import { setRemember, getRemember } from "../supabase";
 import type {
   AppUser,
   Order,
+  PriceInput,
+  PriceLog,
   PrintJob,
   Product,
   ProductInput,
+  ProductSource,
   StockMove,
   Supplier,
   SupplierInput,
@@ -96,6 +99,91 @@ async function getProducts(): Promise<Product[]> {
   return s.products;
 }
 
+/** 거래처별 가격: 처음엔 상품의 주 거래처로 만들고, 같은 상품을 다른 곳에서 더 싸게 파는 예시도 하나 넣어요. */
+async function getSources(): Promise<ProductSource[]> {
+  const existing = await load<ProductSource[] | null>("sources", null);
+  if (existing) return existing;
+  const products = await getProducts();
+  const suppliers = await load<Supplier[]>("suppliers", []);
+  const now = new Date().toISOString();
+  const sources: ProductSource[] = products
+    .filter((p) => p.supplier_id && suppliers.some((s) => s.id === p.supplier_id))
+    .map((p) => ({
+      id: crypto.randomUUID(), product_id: p.id, supplier_id: p.supplier_id as string,
+      price: p.cost_price || null, price_at: p.cost_price ? p.updated_at : null,
+      purchase_url: p.purchase_url, supplier_sku: p.supplier_sku, memo: null, created_at: now, updated_at: now,
+    }));
+  const bear = products.find((p) => p.id === "p1");
+  if (bear && suppliers.some((s) => s.id === "s-1688")) {
+    sources.push({
+      id: crypto.randomUUID(), product_id: bear.id, supplier_id: "s-1688", price: 1200,
+      price_at: new Date(Date.now() - 3 * 86400000).toISOString(), purchase_url: "https://www.1688.com",
+      supplier_sku: null, memo: "50개 이상 주문, 배대지 2~3주", created_at: now, updated_at: now,
+    });
+  }
+  await save("sources", sources);
+  return sources;
+}
+
+/** 서버의 record_price()와 같은 일: 거래처별 최근 가격 바꾸기 + 기록 한 줄 */
+async function demoRecordPrice(
+  input: PriceInput & { source?: PriceLog["source"]; at?: string },
+): Promise<void> {
+  const sources = await getSources();
+  const at = input.at ?? new Date().toISOString();
+  const clean = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null);
+  const idx = sources.findIndex((s) => s.product_id === input.product_id && s.supplier_id === input.supplier_id);
+  if (idx >= 0) {
+    const prev = sources[idx];
+    sources[idx] = {
+      ...prev, price: input.price, price_at: at, updated_at: at,
+      purchase_url: clean(input.purchase_url) ?? prev.purchase_url,
+      supplier_sku: clean(input.supplier_sku) ?? prev.supplier_sku,
+      memo: clean(input.memo) ?? prev.memo,
+    };
+  } else {
+    sources.push({
+      id: crypto.randomUUID(), product_id: input.product_id, supplier_id: input.supplier_id,
+      price: input.price, price_at: at, purchase_url: clean(input.purchase_url),
+      supplier_sku: clean(input.supplier_sku), memo: clean(input.memo), created_at: at, updated_at: at,
+    });
+  }
+  await save("sources", sources);
+  const logs = await load<PriceLog[]>("price_logs", []);
+  logs.push({
+    id: crypto.randomUUID(), product_id: input.product_id, supplier_id: input.supplier_id, price: input.price,
+    source: input.source ?? "manual", memo: clean(input.memo), created_by_name: readUser()?.display_name ?? null,
+    noted_at: at,
+  });
+  await save("price_logs", logs);
+  if (input.set_cost) {
+    const products = await getProducts();
+    await save("products", products.map((p) => (p.id === input.product_id ? { ...p, cost_price: input.price } : p)));
+  }
+}
+
+/** 서버의 source_from_product 트리거와 같은 일: 주 거래처는 거래처별 가격에도 한 줄 있게 */
+async function ensureMainSource(p: Product) {
+  if (!p.supplier_id) return;
+  const sources = await getSources();
+  const idx = sources.findIndex((s) => s.product_id === p.id && s.supplier_id === p.supplier_id);
+  const now = new Date().toISOString();
+  if (idx < 0) {
+    sources.push({
+      id: crypto.randomUUID(), product_id: p.id, supplier_id: p.supplier_id, price: p.cost_price || null,
+      price_at: p.cost_price ? now : null, purchase_url: p.purchase_url, supplier_sku: p.supplier_sku,
+      memo: null, created_at: now, updated_at: now,
+    });
+  } else {
+    const s = sources[idx];
+    sources[idx] = {
+      ...s, purchase_url: p.purchase_url ?? s.purchase_url, supplier_sku: p.supplier_sku ?? s.supplier_sku,
+      price: s.price ?? (p.cost_price || null), price_at: s.price_at ?? (p.cost_price ? now : null),
+    };
+  }
+  await save("sources", sources);
+}
+
 function readUser(): AppUser | null {
   try {
     const raw = localStorage.getItem(USER_KEY) ?? sessionStorage.getItem(USER_KEY);
@@ -162,6 +250,7 @@ export function createDemoStore(): DataStore {
         list.push(result);
       }
       await save("products", list);
+      await ensureMainSource(result);
       return result;
     },
 
@@ -170,6 +259,8 @@ export function createDemoStore(): DataStore {
       await save("products", list.filter((p) => p.id !== id));
       const moves = await load<StockMove[]>("moves", []);
       await save("moves", moves.filter((m) => m.product_id !== id));
+      await save("sources", (await getSources()).filter((s) => s.product_id !== id));
+      await save("price_logs", (await load<PriceLog[]>("price_logs", [])).filter((l) => l.product_id !== id));
     },
 
     async bulkSaveProducts(rows) {
@@ -223,6 +314,50 @@ export function createDemoStore(): DataStore {
       await save("suppliers", list.filter((s) => s.id !== id));
       const products = await getProducts();
       await save("products", products.map((p) => (p.supplier_id === id ? { ...p, supplier_id: null } : p)));
+      await save("sources", (await getSources()).filter((s) => s.supplier_id !== id));
+      await save("price_logs", (await load<PriceLog[]>("price_logs", [])).filter((l) => l.supplier_id !== id));
+    },
+
+    async listSources() {
+      return getSources();
+    },
+
+    async listPriceLogs(filter, limit = 50) {
+      const logs = await load<PriceLog[]>("price_logs", []);
+      return logs
+        .filter((l) => (!filter.productId || l.product_id === filter.productId) && (!filter.supplierId || l.supplier_id === filter.supplierId))
+        .sort((a, b) => b.noted_at.localeCompare(a.noted_at))
+        .slice(0, limit);
+    },
+
+    async recordPrice(input) {
+      if (!(input.price >= 0)) throw new StoreError("가격을 확인해 주세요.");
+      await demoRecordPrice({ ...input, price: Math.round(input.price) });
+    },
+
+    async updateSource(id, patch) {
+      const sources = await getSources();
+      const idx = sources.findIndex((s) => s.id === id);
+      if (idx < 0) throw new StoreError("거래처 가격을 찾을 수 없어요.");
+      sources[idx] = { ...sources[idx], ...patch, updated_at: new Date().toISOString() };
+      await save("sources", sources);
+    },
+
+    async deleteSource(id) {
+      await save("sources", (await getSources()).filter((s) => s.id !== id));
+    },
+
+    async setMainSource(src) {
+      const products = await getProducts();
+      const p = products.find((x) => x.id === src.product_id);
+      if (!p) throw new StoreError("상품을 찾을 수 없어요.");
+      await store.saveProduct({
+        ...p,
+        supplier_id: src.supplier_id,
+        purchase_url: src.purchase_url ?? p.purchase_url,
+        supplier_sku: src.supplier_sku ?? p.supplier_sku,
+        cost_price: src.price ?? p.cost_price,
+      }, p.id);
     },
 
     async listMoves(productId, limit = 100) {
@@ -245,12 +380,19 @@ export function createDemoStore(): DataStore {
       };
       await save("products", list);
       const moves = await load<StockMove[]>("moves", []);
+      const at = new Date().toISOString();
       moves.push({
         id: crypto.randomUUID(), product_id: m.product_id, kind: m.kind, qty: m.qty,
         unit_cost: m.unit_cost ?? null, supplier_id: m.supplier_id ?? null, memo: m.memo ?? null,
-        created_by_name: readUser()?.display_name ?? null, created_at: new Date().toISOString(),
+        created_by_name: readUser()?.display_name ?? null, created_at: at,
       });
       await save("moves", moves);
+      // 서버의 stock_moves_price 트리거와 같아요: 입고 + 거래처 + 개당 가격 → 가격 기록
+      if (m.kind === "in" && m.supplier_id && (m.unit_cost ?? 0) > 0) {
+        await demoRecordPrice({
+          product_id: m.product_id, supplier_id: m.supplier_id, price: m.unit_cost as number, source: "stock_in", at,
+        });
+      }
       return list[idx].stock_qty;
     },
 
@@ -468,6 +610,18 @@ export function createDemoStore(): DataStore {
     async kakaoSetHour() {
       throw new StoreError("체험 모드에서는 카카오톡 알림을 설정할 수 없어요.");
     },
+
+    async kakaoBotStatus() {
+      return { demo: true, secretConfigured: false, skillUrl: "", links: [] };
+    },
+
+    async kakaoBotCode() {
+      throw new StoreError("체험 모드에서는 카카오 챗봇을 연결할 수 없어요. Supabase를 먼저 연결해 주세요.");
+    },
+
+    async kakaoBotUnlink() {
+      throw new StoreError("체험 모드에서는 카카오 챗봇을 쓸 수 없어요.");
+    },
   };
   return store;
 }
@@ -482,4 +636,6 @@ export async function resetDemoData(empty: boolean) {
     await save("suppliers", s.suppliers);
   }
   await save("moves", []);
+  await save("sources", null);
+  await save("price_logs", []);
 }
