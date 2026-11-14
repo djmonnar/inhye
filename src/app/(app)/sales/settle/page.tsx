@@ -52,12 +52,12 @@ function GroupDetail({ g }: { g: SettleGroup }) {
   return (
     <section className="card p-4">
       <div className="mb-2 flex items-baseline justify-between gap-2">
-        <p className="font-cute text-lg">{g.key === OTHER ? "기타 (A·B로 시작하지 않는 분류)" : `${g.key} 묶음`}</p>
+        <p className="font-cute text-lg">{g.key === OTHER ? "기타 (A·B가 없는 분류)" : `${g.key} 묶음`}</p>
         <p className="text-sm font-semibold">{won(g.amount)}</p>
       </div>
       {g.key === OTHER && (
         <p className="mb-2 rounded-2xl bg-butter-100 px-3 py-2 text-xs text-butter-700">
-          분류명이 A·B로 시작하지 않는 상품이에요. 빅솔론에서 분류명을 ‘A …’ / ‘B …’로 고치면 그 묶음으로 들어가요.
+          분류명 앞이나 뒤에 A·B가 없는 상품이에요. 빅솔론에서 분류명에 ‘A’ / ‘B’를 붙이면 그 묶음으로 들어가요.
         </p>
       )}
       <ul className="divide-y-2 divide-dashed divide-line">
@@ -135,7 +135,7 @@ export default function SettlePage() {
 
   return (
     <div>
-      <PageHeader back title="A/B 정산" sub="빅솔론 분류명 앞글자로 나눠요" />
+      <PageHeader back title="A/B 정산" sub="빅솔론 분류명의 A·B로 나눠요" />
       <div className="space-y-4">
         <section className="card space-y-3 p-4">
           <Segmented<Period>

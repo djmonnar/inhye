@@ -1,16 +1,22 @@
 import type { PosSettleItem } from "./types";
 
 /**
- * A/B 정산: 빅솔론 상품 분류명 앞글자로 묶어요.
- *   "A 포포하우스" · "A 실크플라워" → A,  "B 인형" · "B TY 베어" · "B피규어" → B
- *   앞글자가 영문 한 글자가 아니면(“EVENT”, 분류 없음) → 기타 (빅솔론에서 분류명을 고치면 들어가요)
+ * A/B 정산: 빅솔론 상품 분류명의 앞이나 뒤에 붙은 영문 한 글자로 묶어요.
+ *   앞: "A 포포하우스" · "B TY 베어" · "B피규어" → A / B
+ *   뒤: "인형 B" · "실크플라워 A" · "피규어S B" · "인형B" → B / A
+ *   둘 다 없으면(“EVENT”, “피규어S”, 분류 없음) → 기타 (빅솔론에서 분류명을 고치면 들어가요)
  */
 
 export const OTHER = "기타";
 
 export function groupOf(category: string): string {
-  const m = /^\s*([A-Za-z])(?![A-Za-z])/.exec(category ?? "");
-  return m ? m[1].toUpperCase() : OTHER;
+  const c = category ?? "";
+  // 앞: 영문 한 글자 + (띄어쓰기·한글·끝) — "BTS 굿즈"처럼 단어면 아니에요
+  const head = /^\s*([A-Za-z])(?![A-Za-z])/.exec(c);
+  if (head) return head[1].toUpperCase();
+  // 뒤: 띄어 쓴 영문 한 글자("인형 B"), 또는 한글 바로 뒤의 A·B("인형B") — "피규어S"의 S는 아니에요
+  const tail = /[\s_\-./(\[]([A-Za-z])[\s)\]]*$/.exec(c) ?? /[가-힣]([AaBb])\s*$/.exec(c);
+  return tail ? tail[1].toUpperCase() : OTHER;
 }
 
 export interface SettleCategory {
