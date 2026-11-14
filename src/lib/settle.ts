@@ -151,3 +151,70 @@ export function isSettleAsk(said: string): boolean {
   if (new RegExp(`(?:${names})`).test(said) && /매출|판매|얼마|금액|팔|벌/.test(said)) return true;
   return /(?<![A-Za-z])[ABab](?![A-Za-z])\s*(?:분류|묶음|쪽)?\s*(?:매출|판매|금액|얼마)|(?:분류|묶음)\s*[ABab](?![A-Za-z])/.test(said);
 }
+
+// ---------------------------------------------------------------------------
+// 말로 묻는 매출 날짜: "어제 매출 얼마야", "11/13 매출", "그저께 몇 개 팔렸어", "금요일 매출"
+// 기간(이번 주·지난달·11월)이면 정산(A/B 합계)으로 답해요.
+// ---------------------------------------------------------------------------
+
+export type SalesWhen = { kind: "day"; day: string; label: string } | { kind: "period" } | { kind: "future"; day: string };
+
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+/** 매출을 물은 날 (없으면 오늘). today = 한국 날짜 YYYY-MM-DD */
+export function salesWhen(said: string, today: string): SalesWhen {
+  if (/이번\s*주|지난\s*주|저번\s*주|이번\s*달|이달|지난\s*달|저번\s*달|전\s*달|(?<![\d/.]\s*)\d{1,2}\s*월(?!\s*\d)/.test(said)) return { kind: "period" };
+  const y = Number(today.slice(0, 4));
+  const m = Number(today.slice(5, 7));
+  const d = Number(today.slice(8, 10));
+  const label = (day: string) => {
+    const diff = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86400000);
+    if (diff === 0) return "오늘";
+    if (diff === 1) return "어제";
+    if (diff === 2) return "그저께";
+    return `${Number(day.slice(5, 7))}월 ${Number(day.slice(8, 10))}일(${WEEKDAYS[new Date(`${day}T00:00:00Z`).getUTCDay()]})`;
+  };
+  const real = (yy: number, mm: number, dd: number) => {
+    const iso = `${yy}-${pad(mm)}-${pad(dd)}`;
+    const t = new Date(`${iso}T00:00:00Z`);
+    return t.getUTCMonth() + 1 === mm && t.getUTCDate() === dd ? iso : null;
+  };
+  const pick = (day: string | null): SalesWhen | null => (day ? (day > today ? { kind: "future", day } : { kind: "day", day, label: label(day) }) : null);
+
+  if (/모레/.test(said) && !/그저께|그제/.test(said)) return { kind: "future", day: addDays(today, 2) };
+  if (/내일/.test(said)) return { kind: "future", day: addDays(today, 1) };
+  if (/그저께|그제|엊그제/.test(said)) return pick(addDays(today, -2))!;
+  if (/어제/.test(said)) return pick(addDays(today, -1))!;
+  if (/오늘/.test(said)) return pick(today)!;
+  const md = said.match(/(\d{1,2})\s*[/.월]\s*(\d{1,2})\s*일?/);
+  if (md) {
+    const mm = Number(md[1]);
+    const dd = Number(md[2]);
+    const day = real(y, mm, dd);
+    // 아직 안 온 날이면 작년 같은 날로 (12/31을 1월에 물을 때)
+    const fixed = day && day > today ? real(y - 1, mm, dd) : day;
+    const out = pick(fixed);
+    if (out) return out;
+  }
+  const dOnly = said.match(/(?<![\d/.월]\s*)(\d{1,2})\s*일/);
+  if (dOnly) {
+    const dd = Number(dOnly[1]);
+    const [yy, mm] = dd > d ? (m === 1 ? [y - 1, 12] : [y, m - 1]) : [y, m];
+    const out = pick(real(yy, mm, dd));
+    if (out) return out;
+  }
+  const wd = said.match(/(지난\s*)?([월화수목금토일])요일/);
+  if (wd) {
+    const want = WEEKDAYS.indexOf(wd[2]);
+    const now = new Date(`${today}T00:00:00Z`).getUTCDay();
+    let back = (now - want + 7) % 7;
+    if (wd[1] && back === 0) back = 7;
+    return pick(addDays(today, -back))!;
+  }
+  return pick(today)!;
+}
+
+/** 매출을 묻는 말인지 (“판매가”처럼 가격을 묻는 말은 아니에요) */
+export function isSalesAsk(said: string): boolean {
+  return /매출|팔린|팔렸|판매(?!\s*가)|얼마\s*(?:팔|벌)|몇\s*개\s*팔/.test(said);
+}

@@ -1,7 +1,7 @@
 import { actDay, normTime, timeLabel } from "../../day";
 import { margin, num, relTime, won } from "../../format";
 import { j } from "../../josa";
-import { groupLabel, GROUP_OWNER, isSettleAsk, OTHER, settle, settlePeriod, settleWho } from "../../settle";
+import { groupLabel, GROUP_OWNER, isSalesAsk, isSettleAsk, OTHER, salesWhen, settle, settlePeriod, settleWho } from "../../settle";
 import { cheaperThanMain, isStale, sortSources, suggestQty } from "../../sources";
 import type { Order, OrderChangeOp, OrderChatResult, OrderChatTurn, Product, ProductSource, Supplier, SupplierInput, SupplierKind } from "../../types";
 import {
@@ -248,6 +248,10 @@ class Bot {
     if (/^(오늘\s*)?(매출|판매)(\s*보기)?$/.test(said)) return this.sales();
     // 정산 · A/B(인혜/경령) 매출 — “이번달 a 분류 정산금액 얼마야?”, “인혜 매출”, “경령 지난달 정산”
     if (isSettleAsk(said)) return this.settleReply(said);
+    // 날짜를 붙인 매출 — “어제 매출 얼마야”, “11/13 매출”, “금요일 몇 개 팔렸어” (상품·거래처 이름이 있으면 그걸 묻는 거라 아래로)
+    if (isSalesAsk(said) && !ORDER_RE.test(said.replace(/\d{1,2}\s*[/.월]\s*\d{1,2}\s*일?/g, "")) && !(await this.mentionsName(said))) {
+      return this.salesAsk(said);
+    }
 
     if ((m = said.match(/^(?:주문|예약)\s*(?:목록|리스트|보기|확인)?\s*(\d+)?$/))) return this.orderList(Number(m[1] ?? 1));
     if ((m = said.match(/^(오늘|내일)\s*픽업(?:\s*(?:목록|보기))?$/))) return this.pickups(m[1] === "오늘" ? 0 : 1);
@@ -971,8 +975,17 @@ class Bot {
     );
   }
 
-  async sales(): Promise<SkillResponse> {
-    const day = kstDay(this.now);
+  /** 말에서 날짜를 읽어 그날 매출로 (기간이면 정산 합계로, 아직 안 온 날이면 알려줘요) */
+  async salesAsk(said: string): Promise<SkillResponse> {
+    const w = salesWhen(said, kstDay(this.now));
+    if (w.kind === "period") return this.settleReply(said);
+    if (w.kind === "future") {
+      return reply([text(`${md(w.day)}은 아직 안 온 날이에요. 오늘이나 지난 날짜로 물어봐 주세요.`)], quick("오늘 매출", "어제 매출", "메뉴"));
+    }
+    return this.sales(w.day, w.label);
+  }
+
+  async sales(day = kstDay(this.now), label = "오늘"): Promise<SkillResponse> {
     const s = await this.db.todaySales(day);
     if (s.source === "none") {
       return reply([text(s.note ?? "빅솔론 매출이 아직 연결되지 않았어요. 앱의 매출 화면에서 연결 상태를 확인해 주세요.")], MENU);
@@ -981,11 +994,15 @@ class Bot {
     const top = [...s.items].sort((a, b) => b.qty - a.qty || b.amount - a.amount).slice(0, 5);
     const desc = [
       `${won(s.amount)} · ${num(s.qty)}개 팔렸어요`,
-      top.length ? "\n많이 팔린 상품" : "아직 판매가 없어요",
+      top.length ? "\n많이 팔린 상품" : label === "오늘" ? "아직 판매가 없어요" : "이날은 판매가 없어요",
       ...top.map((it, i) => `${i + 1}. ${it.name} ${num(it.qty)}개 · ${won(it.amount)}`),
       s.note ? `\n${s.note}` : "",
     ].filter(Boolean).join("\n");
-    return reply([card(`오늘 매출 · ${Number(mm)}월 ${Number(dd)}일`, desc, [link("앱 매출 화면", this.app("/sales"))])], MENU);
+    const title = /월 \d+일/.test(label) ? `${label} 매출` : `${label} 매출 · ${Number(mm)}월 ${Number(dd)}일`;
+    return reply(
+      [card(title, desc, [link("앱 매출 화면", this.app(`/sales${label === "오늘" ? "" : `?day=${day}`}`))])],
+      label === "어제" ? quick("오늘 매출", "그저께 매출", "이번 주 매출", "메뉴") : quick("어제 매출", "이번 주 매출", "이번 달 정산", "메뉴"),
+    );
   }
 
   // --- AI: 정해진 말이 아닐 때 ------------------------------------------------
@@ -1022,7 +1039,7 @@ class Bot {
     if (named.length === 1) return this.supplierCard(named[0]);
     if (/발주|품절|재주문|채워\s*(?:넣|야)|부족/.test(said)) return this.reorder();
     if (isSettleAsk(said) || /정산/.test(said)) return this.settleReply(said);
-    if (/매출|팔린|팔렸|판매\s*(?:얼마|금액|현황)/.test(said)) return this.sales();
+    if (/매출|팔린|팔렸|판매\s*(?:얼마|금액|현황)/.test(said)) return this.salesAsk(said);
     if (/(?:주문|예약)\s*(?:목록|뭐|몇|있)/.test(said)) return this.orderList(1);
     if (/거래처\s*(?:목록|뭐|몇|전체)/.test(said)) return this.supplierList(1);
     if (/도움|뭐\s*할\s*수|기능/.test(said)) return this.help();
@@ -1072,7 +1089,7 @@ class Bot {
       case "reorder":
         return this.reorder();
       case "sales":
-        return this.sales();
+        return this.salesAsk(said);
       case "settle":
         return this.settleReply(said);
       case "howto": {

@@ -39,6 +39,12 @@ function LiveSales({ products }: { products: Product[] }) {
   const refresh = useRefresh();
   const [today] = useState(kstToday);
   const [day, setDay] = useState(today);
+  useEffect(() => {
+    // 카톡 챗봇 ‘어제 매출’ 버튼처럼 ?day=YYYY-MM-DD 로 들어오면 그날을 보여줘요
+    const d = new URLSearchParams(window.location.search).get("day");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 주소의 날짜는 화면이 뜬 뒤에만 읽을 수 있어요
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today) setDay(d);
+  }, [today]);
   const [data, setData] = useState<PosLive | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
