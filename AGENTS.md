@@ -90,6 +90,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 6. **거래처별 가격 + 카카오 챗봇 (스키마 v6, 2026-11-13)**: `/setup`에서 v6 적용 → Vercel `KAKAO_SKILL_SECRET` → 오픈빌더 설정([suppliers-kakao-bot.md](docs/wiki/suppliers-kakao-bot.md) ‘처음 설정’). 다음 후보: 발주 화면에도 ‘더 싼 거래처’ 표시, 엑셀 백업에 거래처별 가격 포함.
 7. **택배 출고일 (스키마 v7, 2026-11-14)**: `orders.ship_date` — `/setup`에서 v7 적용(‘앱에서 바로 실행’). D-day·알림 기준은 `actDay()`(택배는 출고일, 없으면 받는 날).
 8. **빅솔론이 상품 원본 (2026-11-14)**: 상품 등록은 빅솔론에서만. 앱은 판매에 나온 새 상품을 자동 등록(`registerUnknownGoods`, 태그 `빅솔론 자동 등록`, 바코드 없음 → 스캔 화면 ‘이미 있는 상품에 붙이기’). 빅솔론에 상품 목록·등록 외부 API 문의 중 — 관리자 화면 API는 쓰지 않기.
+9. **(열림) 택배 ‘받는 날 미정’ 표시 (2026-11-14 발견)**: 출고일만 적힌 택배 주문은 `due_date`(받는 날)에도 출고일이 그대로 들어가요 — `src/lib/orderParse.ts`(`else if (ship) due = ship`)와 `src/lib/server/orders.ts` AI 지시(“출고일만 있으면 due_date도 같게”). 확인한 도착일처럼 보일 수 있음. 운영에 배포돼 있음(커밋 18d1786부터). 고칠 때: 받는 날을 모른다는 표시(예: `orders.due_unknown boolean`, 스키마 v8)를 두고 목록·챗봇·알림에서 ‘받는 날 미정’으로, AI 지시와 빠른 읽기도 그 표시를 쓰게. 출고 알림·D-day는 이미 출고일(`actDay`) 기준이라 그대로.
 
 결정·발견 기록은 [`docs/wiki/decisions.md`](docs/wiki/decisions.md)에 날짜순으로 있어요.
 
