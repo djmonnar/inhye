@@ -1,6 +1,7 @@
 import { actDay, normTime, timeLabel } from "../../day";
 import { margin, num, relTime, won } from "../../format";
 import { j } from "../../josa";
+import { groupLabel, GROUP_OWNER, isSettleAsk, OTHER, settle, settlePeriod, settleWho } from "../../settle";
 import { cheaperThanMain, isStale, sortSources, suggestQty } from "../../sources";
 import type { Order, OrderChangeOp, OrderChatResult, OrderChatTurn, Product, ProductSource, Supplier, SupplierInput, SupplierKind } from "../../types";
 import {
@@ -48,7 +49,7 @@ const ROLE_LABEL = { admin: "관리자", staff: "직원", pending: "승인 대�
 const SESSION_MS = 15 * 60 * 1000;
 const PAGE = 5;
 
-const MENU = quick("주문 목록", "거래처 목록", "발주 목록", "상품 찾기", "가격 기록", "오늘 매출", "거래처 등록", "도움말");
+const MENU = quick("주문 목록", "거래처 목록", "발주 목록", "상품 찾기", "가격 기록", "오늘 매출", "이번 달 정산", "거래처 등록", "도움말");
 const CANCEL = quick("취소");
 
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
@@ -245,6 +246,8 @@ class Bot {
 
     if (/^발주(\s*목록|\s*리스트|\s*할\s*것)?$/.test(said)) return this.reorder();
     if (/^(오늘\s*)?(매출|판매)(\s*보기)?$/.test(said)) return this.sales();
+    // 정산 · A/B(인혜/경령) 매출 — “이번달 a 분류 정산금액 얼마야?”, “인혜 매출”, “경령 지난달 정산”
+    if (isSettleAsk(said)) return this.settleReply(said);
 
     if ((m = said.match(/^(?:주문|예약)\s*(?:목록|리스트|보기|확인)?\s*(\d+)?$/))) return this.orderList(Number(m[1] ?? 1));
     if ((m = said.match(/^(오늘|내일)\s*픽업(?:\s*(?:목록|보기))?$/))) return this.pickups(m[1] === "오늘" ? 0 : 1);
@@ -324,6 +327,8 @@ class Bot {
             "• 가격 기록 곰돌이 — 거래처마다 값 적기",
             "• 발주 목록 — 품절·품절 임박을 거래처별로",
             "• 오늘 매출",
+            "• 이번 달 정산 · 지난달 정산 — A(인혜) · B(경령) 나눠서",
+            "• 인혜 매출 얼마야? · 경령 10월 정산",
             "• 취소 — 하던 것 그만",
             this.user.role === "admin" ? "• 거래처 삭제 도매꾹 (관리자)" : "",
             "\n❓ 방법이 궁금하면: 발주 어떻게 해? · 주문 어떻게 넣어? · 가격 기록 어떻게 해?",
@@ -915,6 +920,57 @@ class Bot {
     return reply(outputs, MENU);
   }
 
+  /** A/B 정산 (A = 인혜, B = 경령) — 빅솔론 기간 합계를 분류명 A·B로 나눠요 */
+  async settleReply(said: string): Promise<SkillResponse> {
+    const today = kstDay(this.now);
+    const p = settlePeriod(said, today);
+    const who = settleWho(said);
+    let items;
+    try {
+      items = await this.db.settleItems(p.start, p.end);
+    } catch (e) {
+      return reply([text(`정산을 불러오지 못했어요 😢 ${errMsg(e)}`)], MENU);
+    }
+    const s = settle(items);
+    const range = p.start === p.end ? md(p.start) : `${md(p.start)}~${md(p.end)}`;
+    const line = (key: string) => {
+      const g = s.groups.find((x) => x.key === key);
+      return `${groupLabel(key)}  ${won(g?.amount ?? 0)} (${num(g?.qty ?? 0)}개)`;
+    };
+    const keys = [...new Set([...Object.keys(GROUP_OWNER), ...s.groups.map((g) => g.key)])].filter(
+      (k) => k !== OTHER || s.groups.some((g) => g.key === OTHER),
+    );
+    const late = p.end === today ? "\n(오늘 판매는 10분쯤 늦게 반영돼요)" : "";
+    const again = (k: string) => [p.word, GROUP_OWNER[k] ?? k, "정산"].filter(Boolean).join(" ");
+    const otherPeriod = p.word === "지난달" ? "이번 달" : "지난달";
+
+    let body: string;
+    let qr: (string | [string, string])[];
+    if (who) {
+      const g = s.groups.find((x) => x.key === who);
+      const others = keys.filter((k) => k !== who && k !== OTHER);
+      body = [
+        `🧾 ${GROUP_OWNER[who] ?? who}(${who}) ${p.label} 정산 · ${range}`,
+        `${won(g?.amount ?? 0)} · ${num(g?.qty ?? 0)}개`,
+        ...(g?.categories.length ? ["", "분류별", ...g.categories.slice(0, 5).map((c) => `• ${c.name} ${won(c.amount)} (${num(c.qty)}개)`)] : []),
+        ...(others.length ? ["", ...others.map((k) => `(${line(k)})`)] : []),
+      ].join("\n");
+      qr = [...others.map((k) => again(k)), `${otherPeriod} ${GROUP_OWNER[who] ?? who} 정산`, "메뉴"];
+    } else {
+      body = [
+        `🧾 ${p.label} 정산 · ${range}`,
+        ...keys.map((k) => line(k)),
+        `합계  ${won(s.amount)} (${num(s.qty)}개)`,
+        ...(s.groups.some((g) => g.key === OTHER) ? ["", "기타 = 분류명에 A·B가 없는 상품 (빅솔론에서 고치면 들어가요)"] : []),
+      ].join("\n");
+      qr = [...Object.keys(GROUP_OWNER).map((k) => again(k)), `${otherPeriod} 정산`, "메뉴"];
+    }
+    return reply(
+      [text(body + late), card("자세히 보기", "분류별 · 상품별, 엑셀로 받기", [link("앱 A/B 정산", this.app("/sales/settle"))])],
+      quick(...qr),
+    );
+  }
+
   async sales(): Promise<SkillResponse> {
     const day = kstDay(this.now);
     const s = await this.db.todaySales(day);
@@ -965,6 +1021,7 @@ class Bot {
     const named = sups.filter((x) => norm(x.name).length >= 2 && n.includes(norm(x.name)));
     if (named.length === 1) return this.supplierCard(named[0]);
     if (/발주|품절|재주문|채워\s*(?:넣|야)|부족/.test(said)) return this.reorder();
+    if (isSettleAsk(said) || /정산/.test(said)) return this.settleReply(said);
     if (/매출|팔린|팔렸|판매\s*(?:얼마|금액|현황)/.test(said)) return this.sales();
     if (/(?:주문|예약)\s*(?:목록|뭐|몇|있)/.test(said)) return this.orderList(1);
     if (/거래처\s*(?:목록|뭐|몇|전체)/.test(said)) return this.supplierList(1);
@@ -1016,6 +1073,8 @@ class Bot {
         return this.reorder();
       case "sales":
         return this.sales();
+      case "settle":
+        return this.settleReply(said);
       case "howto": {
         const topic = topicFromQuery(r.query, said);
         return topic ? this.howtoReply(topic) : this.help();

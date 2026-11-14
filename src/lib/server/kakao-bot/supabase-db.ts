@@ -2,7 +2,7 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { normTime } from "../../day";
 import type { Order, Product, ProductSource, Role, Supplier } from "../../types";
 import { adminClient } from "../admin";
-import { fetchBixolonDay, PosNotReady } from "../bixolon";
+import { fetchBixolonDay, fetchBixolonGoods, PosNotReady } from "../bixolon";
 import type { BotDb, BotSession, BotUser, TodaySales } from "./types";
 
 /** 챗봇 서버용 데이터 — 서비스 키로 읽고 쓰지만, 권한은 bot.ts가 연결된 앱 계정의 역할로 확인해요. */
@@ -167,6 +167,15 @@ export function supabaseBotDb(): BotDb {
         items,
         note: "빅솔론에서 바로 못 받아서, 앱에 마지막으로 가져온 매출 기준이에요.",
       };
+    },
+
+    async settleItems(start, end) {
+      try {
+        return await fetchBixolonGoods(start, end);
+      } catch (e) {
+        if (e instanceof PosNotReady) throw new Error("빅솔론 매출이 아직 연결되지 않았어요. 앱의 매출 화면에서 연결 상태를 확인해 주세요.");
+        throw e;
+      }
     },
 
     async listOrders() {

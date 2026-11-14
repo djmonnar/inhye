@@ -1,4 +1,4 @@
-import type { Order, OrderChatResult, OrderChatTurn, PriceInput, Product, ProductSource, Role, Supplier, SupplierInput } from "../../types";
+import type { Order, OrderChatResult, OrderChatTurn, PosSettleItem, PriceInput, Product, ProductSource, Role, Supplier, SupplierInput } from "../../types";
 
 /** 연결된 카카오 사용자 = 앱 계정 (권한도 앱 계정 그대로) */
 export interface BotUser {
@@ -46,6 +46,8 @@ export interface BotDb {
   listSources(): Promise<ProductSource[]>;
   recordPrice(input: PriceInput, byName: string): Promise<void>;
   todaySales(day: string): Promise<TodaySales>;
+  /** 기간 상품별 판매 + 빅솔론 분류명 (A/B 정산, 최대 31일) */
+  settleItems(start: string, end: string): Promise<PosSettleItem[]>;
   /** 진행 중인 주문 (날짜·시간순) */
   listOrders(): Promise<Order[]>;
 }
@@ -63,6 +65,7 @@ export type AiIntent =
   | "price_record"
   | "reorder"
   | "sales"
+  | "settle"
   | "howto"
   | "help"
   | "unknown";

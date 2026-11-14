@@ -21,6 +21,7 @@ const INTENTS: AiIntent[] = [
   "price_record",
   "reorder",
   "sales",
+  "settle",
   "howto",
   "help",
   "unknown",
@@ -44,7 +45,8 @@ function instructions(suppliers: string[]) {
 - product: 상품 재고·판매가·원가·어디서 샀는지·최저가. query = 상품 이름 (질문·조사 빼고 핵심 이름만)
 - price_record: 상품의 매입가(거래처 가격) 적기. query = 상품 이름
 - reorder: 발주할 것 보여 줘, 품절·채워야 할 것, 뭐 주문해야 해 (목록을 달라는 말)
-- sales: 오늘 매출·판매
+- sales: 오늘 매출·판매 (전체 합계만 물을 때)
+- settle: 정산, A·B 분류(묶음)별 매출, “인혜 매출”(A), “경령 매출”(B), 이번 달·지난달·N월 매출 합계. query = 원문 그대로
 - howto: 어떤 일을 ‘어떻게 하는지’ 방법을 묻는 말. query = 주제 하나(reorder 발주·입고 / orders 예약 주문 / supplier 거래처 / price 가격 기록 / product 상품·재고 / sales 매출 / label 라벨 인쇄). 예) "발주 어떻게 넣어?" → howto, reorder
 - help: 챗봇 전체 사용법, 뭐 할 수 있어
 - unknown: 위에 없음 (인사·잡담 포함)

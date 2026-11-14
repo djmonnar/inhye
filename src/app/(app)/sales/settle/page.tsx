@@ -7,7 +7,7 @@ import { useToast } from "@/components/providers";
 import { EmptyState, Loading, PageHeader, Segmented } from "@/components/ui";
 import { kstToday, shiftDay } from "@/lib/day";
 import { num, relTime, won } from "@/lib/format";
-import { OTHER, settle, settleText, type SettleGroup } from "@/lib/settle";
+import { groupLabel, OTHER, settle, settleText, type SettleGroup } from "@/lib/settle";
 import { store } from "@/lib/store";
 
 /**
@@ -36,7 +36,7 @@ function GroupTile({ g, total }: { g: SettleGroup; total: number }) {
   return (
     <div className="rounded-3xl border-2 border-line bg-white p-3">
       <p className="flex items-baseline justify-between gap-2">
-        <span className="font-cute text-lg">{g.key === OTHER ? "기타" : `${g.key} 묶음`}</span>
+        <span className="font-cute text-lg">{groupLabel(g.key)}</span>
         <span className="text-xs text-ink-soft">{share}%</span>
       </p>
       <p className="mt-1 font-cute text-2xl text-ink">{won(g.amount)}</p>
@@ -52,7 +52,7 @@ function GroupDetail({ g }: { g: SettleGroup }) {
   return (
     <section className="card p-4">
       <div className="mb-2 flex items-baseline justify-between gap-2">
-        <p className="font-cute text-lg">{g.key === OTHER ? "기타 (A·B가 없는 분류)" : `${g.key} 묶음`}</p>
+        <p className="font-cute text-lg">{g.key === OTHER ? "기타 (A·B가 없는 분류)" : groupLabel(g.key)}</p>
         <p className="text-sm font-semibold">{won(g.amount)}</p>
       </div>
       {g.key === OTHER && (
@@ -135,7 +135,7 @@ export default function SettlePage() {
 
   return (
     <div>
-      <PageHeader back title="A/B 정산" sub="빅솔론 분류명의 A·B로 나눠요" />
+      <PageHeader back title="A/B 정산" sub="A = 인혜 · B = 경령 (빅솔론 분류명의 A·B)" />
       <div className="space-y-4">
         <section className="card space-y-3 p-4">
           <Segmented<Period>

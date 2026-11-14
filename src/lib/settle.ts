@@ -9,6 +9,15 @@ import type { PosSettleItem } from "./types";
 
 export const OTHER = "기타";
 
+/** 묶음 주인 — A는 인혜 매출, B는 경령 매출 (사장님이 정한 것, 2026-11-14) */
+export const GROUP_OWNER: Record<string, string> = { A: "인혜", B: "경령" };
+
+/** "A · 인혜" / "B · 경령" / "기타" / "C 묶음" */
+export function groupLabel(key: string): string {
+  if (key === OTHER) return "기타";
+  return GROUP_OWNER[key] ? `${key} · ${GROUP_OWNER[key]}` : `${key} 묶음`;
+}
+
 export function groupOf(category: string): string {
   const c = category ?? "";
   // 앞: 영문 한 글자 + (띄어쓰기·한글·끝) — "BTS 굿즈"처럼 단어면 아니에요
@@ -70,7 +79,75 @@ export function settle(items: PosSettleItem[]): Settlement {
 export function settleText(s: Settlement, start: string, end: string, won: (n: number) => string, num: (n: number) => string) {
   const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
   const lines = [`🌸 포포하우스 정산 ${md(start)}~${md(end)}`];
-  for (const g of s.groups) lines.push(`${g.key === OTHER ? "기타" : `${g.key}`}: ${won(g.amount)} (${num(g.qty)}개)`);
+  for (const g of s.groups) lines.push(`${groupLabel(g.key)}: ${won(g.amount)} (${num(g.qty)}개)`);
   lines.push(`합계: ${won(s.amount)} (${num(s.qty)}개)`);
   return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// 말로 묻는 정산 (카톡 챗봇): "이번달 a 분류 정산금액 얼마야?", "인혜 매출", "경령 지난달 정산"
+// ---------------------------------------------------------------------------
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const addDays = (day: string, n: number) => new Date(Date.parse(`${day}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+const lastDayOf = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+
+export interface SettlePeriod {
+  start: string;
+  end: string;
+  /** "11월", "지난달(10월)", "오늘", "이번 주" … */
+  label: string;
+  /** 다시 물을 때 붙일 말 ("지난달", "11월", "") */
+  word: string;
+}
+
+/** 말에서 기간 찾기 (없으면 이번 달). today = 한국 날짜 YYYY-MM-DD */
+export function settlePeriod(said: string, today: string): SettlePeriod {
+  const y = Number(today.slice(0, 4));
+  const m = Number(today.slice(5, 7));
+  const month = (yy: number, mm: number, word: string, label: string): SettlePeriod => {
+    const start = `${yy}-${pad(mm)}-01`;
+    const endOfMonth = `${yy}-${pad(mm)}-${pad(lastDayOf(yy, mm))}`;
+    return { start, end: endOfMonth < today ? endOfMonth : today, label, word };
+  };
+  if (/지난\s*달|저번\s*달|전\s*달|지난\s*월/.test(said)) {
+    const [yy, mm] = m === 1 ? [y - 1, 12] : [y, m - 1];
+    return month(yy, mm, "지난달", `지난달(${mm}월)`);
+  }
+  if (/어제/.test(said)) {
+    const d = addDays(today, -1);
+    return { start: d, end: d, label: "어제", word: "어제" };
+  }
+  if (/오늘/.test(said)) return { start: today, end: today, label: "오늘", word: "오늘" };
+  const dow = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7; // 월요일 = 0
+  if (/지난\s*주|저번\s*주/.test(said)) {
+    const start = addDays(today, -dow - 7);
+    return { start, end: addDays(start, 6), label: "지난주", word: "지난주" };
+  }
+  if (/이번\s*주/.test(said)) return { start: addDays(today, -dow), end: today, label: "이번 주", word: "이번 주" };
+  const mm = said.match(/(\d{1,2})\s*월/);
+  if (mm && Number(mm[1]) >= 1 && Number(mm[1]) <= 12) {
+    const n = Number(mm[1]);
+    const yy = n > m ? y - 1 : y; // 아직 안 온 달이면 작년
+    return month(yy, n, `${n}월`, `${n}월`);
+  }
+  return month(y, m, "", `${m}월`);
+}
+
+/** 누구 정산인지: A(인혜) / B(경령) / 둘 다(null) */
+export function settleWho(said: string): string | null {
+  const owners = Object.entries(GROUP_OWNER);
+  const hit = new Set<string>();
+  for (const [key, name] of owners) if (said.includes(name)) hit.add(key);
+  for (const m of said.matchAll(/(?<![A-Za-z])([ABab])(?![A-Za-z])/g)) hit.add(m[1].toUpperCase());
+  return hit.size === 1 ? [...hit][0] : null;
+}
+
+/** 정산을 묻는 말인지 (주문 줄·숫자 날짜는 아니에요) */
+export function isSettleAsk(said: string): boolean {
+  if (/\d{1,2}\s*[/.]\s*\d{1,2}|픽업|택배|꽃다발|출고/.test(said)) return false;
+  if (/정산/.test(said)) return true;
+  const names = Object.values(GROUP_OWNER).join("|");
+  if (new RegExp(`(?:${names})`).test(said) && /매출|판매|얼마|금액|팔|벌/.test(said)) return true;
+  return /(?<![A-Za-z])[ABab](?![A-Za-z])\s*(?:분류|묶음|쪽)?\s*(?:매출|판매|금액|얼마)|(?:분류|묶음)\s*[ABab](?![A-Za-z])/.test(said);
 }

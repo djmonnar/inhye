@@ -3,7 +3,7 @@
  * 그 주제의 짧은 안내 + 바로 해 볼 버튼을 줘요. AI 해석기도 howto로 골라서 여기로 와요.
  */
 
-export type HowtoTopic = "reorder" | "orders" | "supplier" | "price" | "product" | "sales" | "label";
+export type HowtoTopic = "reorder" | "orders" | "supplier" | "price" | "product" | "sales" | "settle" | "label";
 
 export interface Howto {
   text: string;
@@ -19,6 +19,7 @@ export const HOWTO_RE = /어떻게|어케|어떡해|방법|하는\s*법|쓰는\s
 /** 말 속 주제 — 앞에 있을수록 먼저 봐요 (‘거래처에 주문’은 발주, ‘주문’만은 예약 주문) */
 const TOPICS: [HowtoTopic, RegExp][] = [
   ["reorder", /발주|품절|재주문|다시\s*주문|사입|입고|채워|거래처에\s*주문|물건\s*주문/],
+  ["settle", /정산|인혜|경령/],
   ["label", /라벨|프린터|인쇄|출력|스티커/],
   ["price", /가격\s*기록|매입가|원가|최저가|거래처별\s*가격|가격\s*비교|더\s*싼/],
   ["orders", /주문|예약|꽃다발|픽업|택배|손님/],
@@ -117,6 +118,18 @@ export function howto(topic: HowtoTopic): Howto {
         ].join("\n"),
         tryIt: ["오늘 매출"],
         app: { label: "앱 매출 화면", path: "/sales" },
+      };
+    case "settle":
+      return {
+        text: [
+          "정산은 이렇게 봐요 🧾",
+          "• A 분류 = 인혜 매출, B 분류 = 경령 매출 (빅솔론 분류명 앞이나 뒤의 A·B로 나눠요)",
+          "• 이번 달 정산 · 지난달 정산 · 10월 정산",
+          "• 인혜 매출 얼마야? · 경령 지난달 정산 · 이번 주 a 매출",
+          "• 분류별 · 상품별 자세히, 엑셀은 앱 A/B 정산 화면에서",
+        ].join("\n"),
+        tryIt: ["이번 달 정산", "지난달 정산"],
+        app: { label: "앱 A/B 정산", path: "/sales/settle" },
       };
     case "label":
       return {

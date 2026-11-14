@@ -1,5 +1,5 @@
 import type { Cell, Workbook } from "exceljs";
-import type { Settlement } from "./settle";
+import { groupLabel, type Settlement } from "./settle";
 import { normalizeBarcode, parseNum } from "./format";
 import type { BulkProductRow, Product, Supplier } from "./types";
 
@@ -166,8 +166,8 @@ export async function buildSettleWorkbook(s: Settlement, start: string, end: str
     { header: "금액", width: 14 },
   ];
   for (const g of s.groups) {
-    for (const c of g.categories) sum.addRow([g.key, c.name, c.qty, c.amount]);
-    const r = sum.addRow([g.key, `${g.key} 합계`, g.qty, g.amount]);
+    for (const c of g.categories) sum.addRow([groupLabel(g.key), c.name, c.qty, c.amount]);
+    const r = sum.addRow([groupLabel(g.key), `${groupLabel(g.key)} 합계`, g.qty, g.amount]);
     r.font = { bold: true };
   }
   const total = sum.addRow(["", "전체 합계", s.qty, s.amount]);
@@ -179,7 +179,7 @@ export async function buildSettleWorkbook(s: Settlement, start: string, end: str
   styleHeader(sum.getRow(1));
 
   for (const g of s.groups) {
-    const ws = wb.addWorksheet(g.key);
+    const ws = wb.addWorksheet(groupLabel(g.key).replace(/[\\/?*[\]:]/g, " "));
     ws.columns = [
       { header: "분류", width: 22 },
       { header: "상품", width: 30 },
