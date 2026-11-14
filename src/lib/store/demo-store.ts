@@ -556,7 +556,7 @@ export function createDemoStore(): DataStore {
     async listOrders() {
       const list = await load<Order[]>("orders", []);
       return [...list]
-        .map((o) => ({ ...o, due_time: o.due_time ?? null }))
+        .map((o) => ({ ...o, due_time: o.due_time ?? null, ship_date: o.ship_date ?? null }))
         .sort((a, b) => `${a.due_date} ${a.due_time ?? "99"}`.localeCompare(`${b.due_date} ${b.due_time ?? "99"}`));
     },
 
@@ -574,6 +574,7 @@ export function createDemoStore(): DataStore {
         result = {
           id: crypto.randomUUID(),
           status: "open",
+          ship_date: null,
           source_text: null,
           done_at: null,
           created_at: now,

@@ -172,7 +172,7 @@ export function supabaseBotDb(): BotDb {
     async listOrders() {
       const { data, error } = await sb.from("orders").select("*").eq("status", "open").order("due_date").limit(200);
       if (error) dbFail(error, "주문 불러오기");
-      return (data as Order[]).map((o) => ({ ...o, due_time: normTime(o.due_time) }));
+      return (data as Order[]).map((o) => ({ ...o, due_time: normTime(o.due_time), ship_date: o.ship_date ?? null }));
     },
   };
 }

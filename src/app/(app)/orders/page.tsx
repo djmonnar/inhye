@@ -8,7 +8,7 @@ import { DayChips, TimeChips } from "@/components/WhenPicker";
 import { useAuth, useToast } from "@/components/providers";
 import { EmptyState, Field, Loading, MoneyInput, PageHeader, Segmented, Sheet } from "@/components/ui";
 import { IS_DEMO } from "@/lib/config";
-import { kstToday, timeLabel } from "@/lib/day";
+import { actDay, kstToday, timeLabel } from "@/lib/day";
 import { num, won } from "@/lib/format";
 import { useKakaoStatus, useOrders, useRefresh } from "@/lib/queries";
 import { store } from "@/lib/store";
@@ -25,10 +25,21 @@ const blank = (today: string): OrderInput => ({
   due_date: today,
   due_time: null,
   method: "pickup",
+  ship_date: null,
   memo: null,
   contact: null,
   address: null,
 });
+
+/**
+ * 저장할 값: 출고일은 택배일 때만, 그리고 넣었거나 원래 있던 걸 지울 때만 보내요
+ * (예전 DB(v6)에 출고일 칸이 없어도 출고일 없는 주문은 그대로 저장돼요).
+ */
+function toInput(f: OrderInput, existing: Order | null): OrderInput {
+  const { ship_date, ...rest } = f;
+  const ship = f.method === "delivery" ? (ship_date ?? null) : null;
+  return ship || existing?.ship_date ? { ...rest, ship_date: ship } : rest;
+}
 
 /** 주문 직접 추가 / 고치기 */
 function OrderSheet({ order, onClose, today }: { order: Order | "new" | null; onClose: () => void; today: string }) {
@@ -52,6 +63,7 @@ function OrderSheet({ order, onClose, today }: { order: Order | "new" | null; on
             due_date: order.due_date,
             due_time: order.due_time,
             method: order.method,
+            ship_date: order.ship_date,
             memo: order.memo,
             contact: order.contact,
             address: order.address,
@@ -88,9 +100,25 @@ function OrderSheet({ order, onClose, today }: { order: Order | "new" | null; on
           onChange={(v) => set("method", v)}
         />
         <div>
-          <p className="label">{f.method === "delivery" ? "도착 희망 날짜" : "픽업 날짜"}</p>
+          <p className="label">{f.method === "delivery" ? "받는 날 (도착 희망)" : "픽업 날짜"}</p>
           <DayChips value={f.due_date} today={today} onChange={(d) => set("due_date", d)} />
         </div>
+        {f.method === "delivery" && (
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <p className="label">출고일 (보내는 날, 선택)</p>
+              {f.ship_date && (
+                <button type="button" className="btn-ghost btn-sm" onClick={() => set("ship_date", null)}>
+                  지우기
+                </button>
+              )}
+            </div>
+            <DayChips value={f.ship_date ?? ""} today={today} onChange={(d) => set("ship_date", d)} />
+            {f.ship_date && f.ship_date > f.due_date && (
+              <p className="mt-1 text-xs text-danger">출고일이 받는 날보다 늦어요. 날짜를 확인해 주세요.</p>
+            )}
+          </div>
+        )}
         <div>
           <p className="label">{f.method === "delivery" ? "시간 (선택)" : "픽업 시간"}</p>
           <TimeChips value={f.due_time} onChange={(t) => set("due_time", t)} />
@@ -121,23 +149,23 @@ function OrderSheet({ order, onClose, today }: { order: Order | "new" | null; on
           type="button"
           className="btn-primary w-full"
           disabled={busy || !valid}
-          onClick={() => run(() => store().saveOrder(f, existing?.id), existing ? "고쳤어요" : "주문을 넣었어요")}
+          onClick={() => run(() => store().saveOrder(toInput(f, existing), existing?.id), existing ? "고쳤어요" : "주문을 넣었어요")}
         >
           저장
         </button>
         {existing && (
           <div className="grid grid-cols-2 gap-2">
             {existing.status === "open" ? (
-              <button type="button" className="btn-soft btn-sm" disabled={busy} onClick={() => run(() => store().saveOrder({ ...f, status: "done" }, existing.id), "완료했어요")}>
+              <button type="button" className="btn-soft btn-sm" disabled={busy} onClick={() => run(() => store().saveOrder({ ...toInput(f, existing), status: "done" }, existing.id), "완료했어요")}>
                 <Check size={16} /> 완료
               </button>
             ) : (
-              <button type="button" className="btn-soft btn-sm" disabled={busy} onClick={() => run(() => store().saveOrder({ ...f, status: "open" }, existing.id), "다시 진행 중이에요")}>
+              <button type="button" className="btn-soft btn-sm" disabled={busy} onClick={() => run(() => store().saveOrder({ ...toInput(f, existing), status: "open" }, existing.id), "다시 진행 중이에요")}>
                 <RotateCcw size={16} /> 다시 진행
               </button>
             )}
             {existing.status !== "canceled" ? (
-              <button type="button" className="btn-ghost btn-sm text-danger" disabled={busy} onClick={() => run(() => store().saveOrder({ ...f, status: "canceled" }, existing.id), "주문을 취소했어요")}>
+              <button type="button" className="btn-ghost btn-sm text-danger" disabled={busy} onClick={() => run(() => store().saveOrder({ ...toInput(f, existing), status: "canceled" }, existing.id), "주문을 취소했어요")}>
                 <X size={16} /> 주문 취소
               </button>
             ) : (
@@ -277,12 +305,12 @@ function Orders() {
 
   const list = useMemo(() => {
     const filtered = orders.filter((o) => (tab === "all" ? true : tab === "open" ? o.status === "open" : o.status === "done"));
-    const when = (o: Order) => `${o.due_date} ${o.due_time ?? "99:99"}`;
+    const when = (o: Order) => `${actDay(o)} ${o.due_time ?? "99:99"}`;
     return filtered.sort((a, b) => (tab === "open" ? when(a).localeCompare(when(b)) : when(b).localeCompare(when(a))));
   }, [orders, tab]);
 
   const openOrders = orders.filter((o) => o.status === "open");
-  const shipSoon = openOrders.filter((o) => o.method === "delivery" && daysUntil(o.due_date, today) <= 7).length;
+  const shipSoon = openOrders.filter((o) => o.method === "delivery" && daysUntil(actDay(o), today) <= 7).length;
 
   async function complete(o: Order) {
     try {
@@ -350,7 +378,8 @@ function Orders() {
           ) : (
             <ul className="divide-y-2 divide-dashed divide-line">
               {list.map((o) => {
-                const d = daysUntil(o.due_date, today);
+                // 택배는 출고일 기준 D-day (없으면 받는 날)
+                const d = daysUntil(actDay(o), today);
                 const urgent = o.status === "open" && (d < 0 || (o.method === "delivery" ? d <= 7 : d <= 1));
                 return (
                   <li key={o.id} className={`flex items-center gap-2 py-2.5 ${o.status !== "open" ? "opacity-60" : ""}`}>
@@ -361,6 +390,9 @@ function Orders() {
                           {o.due_time ? ` ${timeLabel(o.due_time)}` : ""}
                         </span>
                         <MethodChip method={o.method} />
+                        {o.method === "delivery" && o.ship_date && (
+                          <span className="rounded-full bg-matcha-100 px-2 py-0.5 text-[11px] text-matcha-700">출고 {md(o.ship_date)}</span>
+                        )}
                         {o.status === "open" ? (
                           <span className={`rounded-full px-2 py-0.5 text-[11px] ${urgent ? (d < 0 ? "bg-danger/10 text-danger" : "bg-butter-100 text-butter-700") : "bg-cream-deep text-ink-soft"}`}>
                             {dLabel(d)}

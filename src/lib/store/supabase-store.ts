@@ -39,6 +39,8 @@ function fail(error: PostgrestError | { message: string; code?: string } | null)
     throw new StoreError("권한이 없어요. 관리자에게 문의해 주세요.");
   if (code === "PGRST205" || code === "42P01")
     throw new StoreError("DB 테이블이 아직 없어요. 설정 화면에서 SQL을 실행해 주세요.");
+  if (code === "PGRST204" || code === "42703")
+    throw new StoreError("DB 업데이트가 필요해요. 설정 화면(/setup)에서 ‘앱에서 바로 실행’을 눌러 주세요.");
   throw new StoreError(msg || "알 수 없는 오류가 발생했어요.");
 }
 
@@ -426,7 +428,7 @@ export function createSupabaseStore(): DataStore {
         .order("due_date")
         .limit(500);
       if (error) fail(error);
-      return (data as Order[]).map((o) => ({ ...o, due_time: normTime(o.due_time) }));
+      return (data as Order[]).map((o) => ({ ...o, due_time: normTime(o.due_time), ship_date: o.ship_date ?? null }));
     },
 
     async saveOrder(input: OrderInput, id?: string) {
@@ -438,7 +440,7 @@ export function createSupabaseStore(): DataStore {
       const { data, error } = await q.select("*").single();
       if (error) fail(error);
       const o = data as Order;
-      return { ...o, due_time: normTime(o.due_time) };
+      return { ...o, due_time: normTime(o.due_time), ship_date: o.ship_date ?? null };
     },
 
     async deleteOrder(id) {

@@ -1,4 +1,4 @@
-import { normTime, timeLabel } from "../day";
+import { actDay, normTime, timeLabel } from "../day";
 import { parseOrderLine, parseQuickAction } from "../orderParse";
 import { adminClient } from "./admin";
 import { askJson, objectSchema, STRING } from "./openai";
@@ -36,6 +36,7 @@ const ACTION = objectSchema({
   price: { type: ["integer", "null"] },
   due_date: NSTR,
   due_time: NSTR,
+  ship_date: NSTR,
   method: { type: ["string", "null"], enum: ["pickup", "delivery", null] },
   memo: NSTR,
   contact: NSTR,
@@ -51,6 +52,7 @@ type Action = {
   price: number | null;
   due_date: string | null;
   due_time: string | null;
+  ship_date: string | null;
   method: OrderMethod | null;
   memo: string | null;
   contact: string | null;
@@ -66,12 +68,14 @@ function instructions(today: string) {
 - 날짜(월/일, 요일은 참고용) → due_date "YYYY-MM-DD". 연도가 없으면 오늘 이후 가장 가까운 날로(오늘보다 2달 넘게 지난 날짜면 내년).
 - 시간(주로 픽업 시간) → due_time "HH:MM" 24시간제. "오후 3시"→"15:00", "3시 반"→"15:30", "11시"→"11:00"(가게 시간이라 1~8시는 오후로: "4시"→"16:00"), "저녁 7시"→"19:00". 시간이 없으면 null.
 - "픽업" → method "pickup", "택배"/"배송" → "delivery". 없으면 "pickup".
+- 택배의 출고일·발송일(가게에서 보내는 날, "11/21 출고", "출고 11/21", "21일에 보내요") → ship_date "YYYY-MM-DD". 받는 날·도착일은 due_date. 출고일만 있고 받는 날이 없으면 due_date도 출고일과 같게. 출고일이 있으면 method "delivery". 픽업이면 ship_date null.
 - 사람 이름 → customer, 상품 → item, 가격: "2.5만원"→25000, "3만"→30000, "25,000원"→25000.
 - 괄호 안이나 덧붙인 말("라넌으로 변경", "리본 핑크", "선입금 완료") → memo. 전화번호 → contact, 주소 → address.
 - 여러 줄이면 줄마다 create 하나씩.
 
 [이미 있는 주문 바꾸기] 아래 ‘지금 주문 목록’의 #번호를 ref에 넣어.
-- 수정(날짜·시간·가격·상품·메모 등) → op "update", 바꿀 칸만 넣고 나머지는 null. 시간을 지우라고 하면 due_time "".
+- 수정(날짜·시간·출고일·가격·상품·메모 등) → op "update", 바꿀 칸만 넣고 나머지는 null. 시간을 지우라고 하면 due_time "", 출고일을 지우라고 하면 ship_date "".
+- ‘최근 대화’에서 방금 등록·수정한 주문을 이어서 말하면("가격은 3만원이야", "그거 4시로", "연핑크로 변경이야", "주소는 ~야") 그 주문을 update해. 이름이 없어도 방금 그 주문이면 돼. 상품을 바꾸는 말("○○ 꽃다발 + 연핑크")은 item을 고치고, 꽃·색 변경 같은 요청은 memo에 덧붙여.
 - "완료", "보냈어", "픽업해 갔어", "끝" → op "complete". 완료 취소/다시 진행 → "reopen".
 - "삭제", "취소", "빼줘" → op "cancel".
 - 이름·날짜·상품으로 어떤 주문인지 하나로 정해지지 않으면 actions에 넣지 말고 reply에서 어느 주문인지 물어봐.
@@ -88,6 +92,7 @@ function orderLine(o: Order, ref: string) {
     `#${ref}`,
     `${o.due_date}(${weekday(o.due_date)})${o.due_time ? ` ${o.due_time}` : ""}`,
     methodLabel(o.method),
+    o.ship_date ? `출고:${o.ship_date}(${weekday(o.ship_date)})` : "",
     o.customer || "-",
     o.item || "-",
     `${o.price}원`,
@@ -106,6 +111,12 @@ function has<T>(v: T | null | undefined): v is T {
 }
 /** "15:30" 같은 시간만 (형식이 이상하면 null) */
 const validTime = (v: string | null) => (v && /^\d{1,2}:\d{2}$/.test(v.trim()) ? normTime(v.trim()) : null);
+/** DB 줄 → 앱 모양 (시간 "HH:MM", 출고일 없으면 null — v6 DB엔 칸이 없어요) */
+const tidy = (o: Order): Order => ({ ...o, due_time: normTime(o.due_time), ship_date: o.ship_date ?? null });
+/** 출고일 칸이 없는 예전 DB(v6)에 출고일을 넣으려 할 때 */
+const NEEDS_V7 = "출고일을 저장하려면 DB 업데이트가 필요해요. 설정 화면(/setup)에서 ‘앱에서 바로 실행’을 눌러 주세요.";
+const missingColumn = (e: { code?: string; message?: string } | null) =>
+  Boolean(e && (e.code === "PGRST204" || e.code === "42703" || /ship_date/.test(e.message ?? "")));
 
 export async function orderChat(
   message: string,
@@ -128,7 +139,7 @@ export async function orderChat(
     }
     throw new Error(error.message);
   }
-  const orders = ((data ?? []) as Order[]).map((o) => ({ ...o, due_time: normTime(o.due_time) }));
+  const orders = ((data ?? []) as Order[]).map(tidy);
 
   // 정해진 모양(날짜·이름·상품… / ‘○○ 보냈어’ / ‘○○ 취소’)은 AI 없이 바로 — 빠르고 비용도 없어요
   const quick = await quickPath(message, orders, today, callerId);
@@ -168,13 +179,17 @@ export async function orderChat(
         skipped.push(`날짜를 못 읽어서 못 넣었어요: ${clip(a.customer, 20)} ${clip(a.item, 30)}`.trim());
         continue;
       }
+      const ship = validDay(a.ship_date);
+      const method = a.method === "delivery" || ship ? "delivery" : "pickup";
       const row = {
         customer: clip(a.customer, 40),
         item: clip(a.item, 80),
         price: Math.max(0, Math.round(a.price ?? 0)),
         due_date: due,
         due_time: validTime(a.due_time),
-        method: a.method === "delivery" ? "delivery" : "pickup",
+        method,
+        // 출고일이 있을 때만 칸을 보내요 (예전 DB에서도 다른 주문은 저장되게)
+        ...(ship && method === "delivery" ? { ship_date: ship } : {}),
         memo: clip(a.memo, 300) || null,
         contact: clip(a.contact, 40) || null,
         address: clip(a.address, 200) || null,
@@ -182,8 +197,8 @@ export async function orderChat(
         created_by: callerId,
       };
       const { data: created, error: e } = await db.from("orders").insert(row).select("*").single();
-      if (e || !created) skipped.push(`저장하지 못했어요: ${row.customer} ${row.item}`);
-      else changes.push({ op: "create", order: { ...(created as Order), due_time: normTime((created as Order).due_time) } });
+      if (e || !created) skipped.push(missingColumn(e) ? NEEDS_V7 : `저장하지 못했어요: ${row.customer} ${row.item}`);
+      else changes.push({ op: "create", order: tidy(created as Order) });
       continue;
     }
 
@@ -210,7 +225,16 @@ export async function orderChat(
           else skipped.push(`시간을 못 읽었어요: ${target.customer}`);
         }
       }
+      if (has(a.ship_date)) {
+        if (a.ship_date.trim() === "") patch.ship_date = null;
+        else {
+          const ship = validDay(a.ship_date);
+          if (ship) patch.ship_date = ship;
+          else skipped.push(`출고일을 못 읽었어요: ${target.customer}`);
+        }
+      }
       if (has(a.method)) patch.method = a.method === "delivery" ? "delivery" : "pickup";
+      if (patch.ship_date && (patch.method ?? target.method) !== "delivery") patch.method = "delivery";
       if (has(a.memo)) patch.memo = clip(a.memo, 300) || null;
       if (has(a.contact)) patch.contact = clip(a.contact, 40) || null;
       if (has(a.address)) patch.address = clip(a.address, 200) || null;
@@ -225,14 +249,12 @@ export async function orderChat(
       patch.status = "canceled";
     }
     const { data: updated, error: e } = await db.from("orders").update(patch).eq("id", target.id).select("*").single();
-    if (e || !updated) skipped.push(`바꾸지 못했어요: ${target.customer} ${target.item}`);
-    else changes.push({ op: a.op, order: { ...(updated as Order), due_time: normTime((updated as Order).due_time) } });
+    if (e || !updated) skipped.push(missingColumn(e) && "ship_date" in patch ? NEEDS_V7 : `바꾸지 못했어요: ${target.customer} ${target.item}`);
+    else changes.push({ op: a.op, order: tidy(updated as Order) });
   }
 
   return { reply: clip(out.reply, 1500) || "확인했어요.", changes, skipped };
 }
-
-const withTime = (o: Order) => ({ ...o, due_time: normTime(o.due_time) });
 
 /** AI 없이 처리할 수 있으면 결과를, 아니면 null (→ AI) */
 async function quickPath(message: string, orders: Order[], today: string, callerId: string): Promise<OrderChatResult | null> {
@@ -251,7 +273,7 @@ async function quickPath(message: string, orders: Order[], today: string, caller
       if (error || !data) return null;
       return {
         reply: a.kind === "complete" ? `${a.name}님 주문 완료했어요! 🎉` : `${a.name}님 주문을 취소했어요.`,
-        changes: [{ op: a.kind === "complete" ? "complete" : "cancel", order: withTime(data as Order) }],
+        changes: [{ op: a.kind === "complete" ? "complete" : "cancel", order: tidy(data as Order) }],
         skipped: [],
       };
     }
@@ -260,6 +282,8 @@ async function quickPath(message: string, orders: Order[], today: string, caller
   // 주문 줄들 — 모든 줄을 읽을 수 있을 때만 (한 줄이라도 애매하면 전부 AI에게)
   const parsed = lines.map((l) => parseOrderLine(l, today));
   if (!parsed.every((x): x is NonNullable<typeof x> => x !== null)) return null;
+  // 출고일이 한 줄이라도 있을 때만 그 칸을 보내요 (예전 DB에서도 출고일 없는 주문은 저장되게)
+  const anyShip = parsed.some((x) => x.ship_date);
   const rows = parsed.map((x, i) => ({
     customer: x.customer.slice(0, 40),
     item: x.item.slice(0, 80),
@@ -267,13 +291,15 @@ async function quickPath(message: string, orders: Order[], today: string, caller
     due_date: x.due_date,
     due_time: x.due_time,
     method: x.method,
+    ...(anyShip ? { ship_date: x.ship_date } : {}),
     memo: x.memo?.slice(0, 300) ?? null,
     source_text: lines[i].slice(0, 1000),
     created_by: callerId,
   }));
   const { data, error } = await db.from("orders").insert(rows).select("*");
+  if (error && anyShip && missingColumn(error)) throw new Error(NEEDS_V7);
   if (error || !data) return null;
-  const created = (data as Order[]).map(withTime);
+  const created = (data as Order[]).map(tidy);
   return {
     reply: created.length > 1 ? `주문 ${created.length}건 등록했어요!` : "주문 등록했어요!",
     changes: created.map((o) => ({ op: "create" as const, order: o })),
@@ -282,21 +308,24 @@ async function quickPath(message: string, orders: Order[], today: string, caller
 }
 
 // ---------------------------------------------------------------------------
-// 매일 아침 알림 글: 택배는 D-7부터(지난 것 포함), 픽업은 오늘·내일. 완료/취소는 빠져요.
+// 매일 아침 알림 글: 택배는 출고일(없으면 받는 날) D-7부터(지난 것 포함), 픽업은 오늘·내일. 완료/취소는 빠져요.
 // 카카오톡 텍스트 메시지는 200자까지라 넘치면 ‘외 N건’으로 줄여요.
 // ---------------------------------------------------------------------------
 
 export function buildBrief(orders: Order[], today = kstDate()): string | null {
   const md = (day: string) => `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))}(${weekday(day)})`;
   const dLabel = (n: number) => (n === 0 ? "오늘" : n > 0 ? `D-${n}` : `${-n}일 지남`);
-  const when = (o: Order) => `${o.due_date} ${normTime(o.due_time) ?? "99:99"}`;
+  const when = (o: Order) => `${actDay(o)} ${normTime(o.due_time) ?? "99:99"}`;
   const open = orders.filter((o) => o.status === "open").sort((a, b) => when(a).localeCompare(when(b)));
-  const ship = open.filter((o) => o.method === "delivery" && daysUntil(o.due_date, today) <= 7);
+  const ship = open.filter((o) => o.method === "delivery" && daysUntil(actDay(o), today) <= 7);
   const pick = open.filter((o) => o.method === "pickup" && [0, 1].includes(daysUntil(o.due_date, today)));
   if (!ship.length && !pick.length) return null;
 
   const lines: string[] = [];
-  for (const o of ship) lines.push(`📦 ${md(o.due_date)} ${dLabel(daysUntil(o.due_date, today))} ${o.customer} ${o.item}`.trim());
+  for (const o of ship) {
+    const d = actDay(o);
+    lines.push(`📦 ${md(d)} ${dLabel(daysUntil(d, today))}${o.ship_date ? " 출고" : ""} ${o.customer} ${o.item}`.trim());
+  }
   for (const o of pick) {
     const t = timeLabel(o.due_time);
     lines.push(`🛍 ${md(o.due_date)} ${daysUntil(o.due_date, today) === 0 ? "오늘" : "내일"}${t ? ` ${t}` : ""} 픽업 ${o.customer} ${o.item}`.trim());

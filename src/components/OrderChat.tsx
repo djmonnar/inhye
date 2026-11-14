@@ -140,6 +140,7 @@ export function OrderChat({ bare = false }: { bare?: boolean }) {
                           {c.order.due_time ? ` ${timeLabel(c.order.due_time)}` : ""}
                         </span>
                         <MethodChip method={c.order.method} />
+                        {c.order.method === "delivery" && c.order.ship_date && <span className="text-matcha-700">출고 {md(c.order.ship_date)}</span>}
                         <span className="min-w-0 truncate">
                           {c.order.customer} · {c.order.item} · {won(c.order.price)}
                         </span>

@@ -49,3 +49,11 @@ export function timeLabel(t: string | null | undefined): string {
   const ap = h === 0 ? "밤 12" : h < 12 ? `오전 ${h}` : h === 12 ? "낮 12" : `오후 ${h - 12}`;
   return min === "00" ? `${ap}시` : `${ap}:${min}`;
 }
+
+/**
+ * 가게가 챙겨야 하는 날: 택배는 출고일(없으면 받는 날), 픽업은 픽업일.
+ * D-day · 알림 · ‘7일 안에 보낼 택배’를 이 날짜로 계산해요.
+ */
+export function actDay(o: { method: string; due_date: string; ship_date?: string | null }): string {
+  return o.method === "delivery" && o.ship_date ? o.ship_date : o.due_date;
+}

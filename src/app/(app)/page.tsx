@@ -21,7 +21,7 @@ import { OrderChat } from "@/components/OrderChat";
 import { Loading, ProductThumb, Sheet } from "@/components/ui";
 import { SHOP_NAME } from "@/lib/config";
 import { needsKioskSync, num, relTime, stockLevel, won } from "@/lib/format";
-import { kstToday } from "@/lib/day";
+import { actDay, kstToday } from "@/lib/day";
 import { useMoves, useOrders, usePosSales, usePrintJobs, useProducts } from "@/lib/queries";
 
 function greeting() {
@@ -49,7 +49,7 @@ export default function HomePage() {
     const until = (day: string) => Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${kstDay}T00:00:00Z`)) / 86400000);
     const open = orders.filter((o) => o.status === "open");
     return {
-      ship: open.filter((o) => o.method === "delivery" && until(o.due_date) <= 7).length,
+      ship: open.filter((o) => o.method === "delivery" && until(actDay(o)) <= 7).length,
       pick: open.filter((o) => o.method === "pickup" && until(o.due_date) <= 1).length,
     };
   }, [orders, kstDay]);

@@ -88,6 +88,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 4. `src/lib/report.ts`는 아직 판매를 출고 기록으로 계산해요 → `pos_sales`가 들어오면 그걸 쓰도록.
 5. ✅ 카카오톡 연결·테스트 발송 확인. 스키마 v5(알림 시간 설정 + 주문 픽업 시간) 적용은 `/setup` ‘앱에서 바로 실행’으로.
 6. **거래처별 가격 + 카카오 챗봇 (스키마 v6, 2026-11-13)**: `/setup`에서 v6 적용 → Vercel `KAKAO_SKILL_SECRET` → 오픈빌더 설정([suppliers-kakao-bot.md](docs/wiki/suppliers-kakao-bot.md) ‘처음 설정’). 다음 후보: 발주 화면에도 ‘더 싼 거래처’ 표시, 엑셀 백업에 거래처별 가격 포함.
+7. **택배 출고일 (스키마 v7, 2026-11-14)**: `orders.ship_date` — `/setup`에서 v7 적용(‘앱에서 바로 실행’). D-day·알림 기준은 `actDay()`(택배는 출고일, 없으면 받는 날).
 
 결정·발견 기록은 [`docs/wiki/decisions.md`](docs/wiki/decisions.md)에 날짜순으로 있어요.
 

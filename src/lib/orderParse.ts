@@ -6,6 +6,7 @@
  *   → 2026-11-20 15:00 픽업, 김포포, 하치와레 꽃다발, 25000원, 메모 ‘라넌으로 변경’
  *
  *   "내일 4시 픽업 이토끼 꽃다발 3만원" (오늘·내일·모레도 돼요)
+ *   "11/23 월 택배 박고양 꽃다발 3만원 11/21 출고" → 받는 날 11/23, 출고일 11/21 (출고일만 있으면 그날로)
  *
  *   "김포포 꽃다발 보냈어" / "김포포 완료" → 완료,  "김포포 주문 취소" → 취소
  */
@@ -20,7 +21,9 @@ export interface ParsedOrder {
   item: string;
   price: number;
   memo: string | null;
-  /** 요일이 날짜와 다를 때 알려줄 말 */
+  /** 택배 출고일(보내는 날), 없으면 null */
+  ship_date: string | null;
+  /** 요일이 날짜와 다를 때 등 알려줄 말 */
   note?: string;
 }
 
@@ -41,6 +44,21 @@ function pickYear(month: number, day: number, today: string): string | null {
 
 function addDays(day: string, n: number) {
   return new Date(Date.parse(`${day}T00:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+}
+
+const DAY_TOKEN = String.raw`\d{1,2}\s*[/.월]\s*\d{1,2}\s*일?|오늘|내일|모레`;
+const WEEK_TOKEN = String.raw`[월화수목금토일](?:요일)?`;
+/** "출고 11/21" · "출고일: 11/21" · "11/21 출고" · "11/21(토) 발송" · "내일 출고" */
+const SHIP_RE = new RegExp(
+  String.raw`(^|\s)(?:(?:출고|발송)\s*(?:일|날)?\s*[:：]?\s*(${DAY_TOKEN})(?:\s*${WEEK_TOKEN})?|(${DAY_TOKEN})(?:\s*${WEEK_TOKEN})?\s*(?:에\s*)?(?:출고|발송)(?:일|해요|할게요|예정)?)(?=\s|$)`,
+);
+
+/** "11/21" · "11.21" · "11월 21일" · "내일" → YYYY-MM-DD (없는 날이면 null) */
+function readDay(tok: string, today: string): string | null {
+  const rel = ["오늘", "내일", "모레"].indexOf(tok.trim());
+  if (rel >= 0) return addDays(today, rel);
+  const m = tok.match(/(\d{1,2})\s*[/.월]\s*(\d{1,2})/);
+  return m ? pickYear(Number(m[1]), Number(m[2]), today) : null;
 }
 
 /** "오후 3시 반", "3시 30분", "15:30", "4시"(가게 시간이라 1~8시는 오후) → "HH:MM" */
@@ -75,22 +93,35 @@ export function parseOrderLine(raw: string, today: string): ParsedOrder | null {
   let s = ` ${raw.trim()} `;
   if (!raw.trim()) return null;
 
-  // 괄호 안 말 → 메모
+  // 괄호 안 말 → 메모 (‘(금)’처럼 요일만 있으면 요일로 봐요)
   const memos: string[] = [];
   s = s.replace(/[(（]([^)）]*)[)）]/g, (_, m: string) => {
-    if (m.trim()) memos.push(m.trim());
+    const t = m.trim();
+    if (new RegExp(`^${WEEK_TOKEN}$`).test(t)) return ` ${t} `;
+    if (t) memos.push(t);
     return " ";
   });
 
-  // 날짜 (필수): 11/20 · 11.20 · 11월 20일 · 오늘/내일/모레
+  // 택배 출고일 (있으면 먼저 떼어 내요)
+  let ship: string | null = null;
+  const sm = s.match(SHIP_RE);
+  if (sm) {
+    ship = readDay(sm[2] ?? sm[3], today);
+    if (!ship) return null;
+    s = s.replace(sm[0], " ");
+  }
+  s = s.replace(/(^|\s)(?:도착일?|받는\s*날)\s*[:：]?(?=\s|$)/g, " ");
+
+  // 날짜: 11/20 · 11.20 · 11월 20일 · 오늘/내일/모레 (출고일만 있으면 그날로)
   let due: string | null;
   const dm = s.match(/(^|\s)(\d{1,2})\s*[/.월]\s*(\d{1,2})\s*일?(?=\s|$)/);
   const rm = dm ? null : s.match(/(^|\s)(오늘|내일|모레)(?=\s|$)/);
   if (dm) due = pickYear(Number(dm[2]), Number(dm[3]), today);
   else if (rm) due = addDays(today, ["오늘", "내일", "모레"].indexOf(rm[2]));
+  else if (ship) due = ship;
   else return null;
   if (!due) return null;
-  s = s.replace((dm ?? rm)![0], " ");
+  if (dm || rm) s = s.replace((dm ?? rm)![0], " ");
 
   // 요일 (있으면 확인만)
   let weekday: string | null = null;
@@ -109,6 +140,10 @@ export function parseOrderLine(raw: string, today: string): ParsedOrder | null {
     method = /택배|배송|퀵/.test(mm[2]) ? "delivery" : "pickup";
     s = s.replace(mm[0], " ");
   }
+  if (ship) {
+    if (mm && method === "pickup") return null; // 픽업인데 출고일? 애매해요 → AI
+    method = "delivery";
+  }
 
   const p = takePrice(s);
   s = p.rest;
@@ -123,6 +158,11 @@ export function parseOrderLine(raw: string, today: string): ParsedOrder | null {
   if (/\d/.test(item.replace(/\d+(cm|mm|호|개|종|송이)/g, ""))) return null; // 숫자가 남으면 애매해요 → AI
 
   const real = WEEK[new Date(`${due}T00:00:00Z`).getUTCDay()];
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+  const notes = [
+    weekday && weekday !== real ? `${md(due)}은 ${real}요일이에요 (${weekday}요일이라고 쓰셨어요). 날짜 기준으로 넣었어요.` : "",
+    ship && ship > due ? `출고일(${md(ship)})이 받는 날(${md(due)})보다 늦어요. 맞는지 확인해 주세요.` : "",
+  ].filter(Boolean);
   return {
     due_date: due,
     due_time: t.time,
@@ -131,9 +171,8 @@ export function parseOrderLine(raw: string, today: string): ParsedOrder | null {
     item,
     price: p.price,
     memo: memos.length ? memos.join(", ") : null,
-    ...(weekday && weekday !== real
-      ? { note: `${Number(due.slice(5, 7))}/${Number(due.slice(8, 10))}은 ${real}요일이에요 (${weekday}요일이라고 쓰셨어요). 날짜 기준으로 넣었어요.` }
-      : {}),
+    ship_date: ship,
+    ...(notes.length ? { note: notes.join(" ") } : {}),
   };
 }
 
@@ -145,7 +184,7 @@ export function parseQuickAction(raw: string): { kind: "complete" | "cancel"; na
   const name = words[0].replace(/님$/, "");
   if (!/^[가-힣A-Za-z]{2,10}$/.test(name)) return null;
   const tail = words.slice(1).join(" ");
-  if (/(보냈어요?|보냈음|보냄|발송\s*완료|완료(?:했어요?|함|요)?|찾아\s*갔어요?|가져\s*갔어요?|픽업\s*(?:완료|했어요?))$/.test(tail)) {
+  if (/(보냈어요?|보냈음|보냄|(?:발송|출고)\s*(?:완료|했어요?)|완료(?:했어요?|함|요)?|찾아\s*갔어요?|가져\s*갔어요?|픽업\s*(?:완료|했어요?))$/.test(tail)) {
     return { kind: "complete", name };
   }
   if (/(?:주문\s*)?취소(?:해\s*줘|해주세요|할게요?|요|함)?$/.test(tail)) return { kind: "cancel", name };

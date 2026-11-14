@@ -11,7 +11,8 @@ export interface BotUser {
 /** 여러 번 주고받는 대화(거래처 등록, 가격 기록 …)의 진행 상태 */
 export interface BotSession {
   /** ai_job: 오래 걸리는 주문 비서 작업 (step: running / done / error) — ‘결과’로 받아 가요 */
-  flow: "sup_new" | "sup_edit" | "sup_del" | "price" | "search" | "ai_job";
+  /** order_ctx = 하던 일이 아니라 ‘방금 주문’ 대화 기억 (15분) */
+  flow: "sup_new" | "sup_edit" | "sup_del" | "price" | "search" | "ai_job" | "order_ctx";
   step: string;
   data: Record<string, string | number | boolean | null>;
   /** ISO — 오래된 대화(15분)는 버려요 */

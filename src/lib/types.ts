@@ -369,6 +369,8 @@ export interface Order {
   due_date: string;
   /** 픽업 시간 "HH:MM" (한국 시각, 없으면 null) */
   due_time: string | null;
+  /** 택배 출고일(보내는 날) YYYY-MM-DD — 택배만, 없으면 null (스키마 v7) */
+  ship_date: string | null;
   method: OrderMethod;
   status: OrderStatus;
   memo: string | null;
@@ -385,6 +387,8 @@ export type OrderInput = Pick<
   "customer" | "item" | "price" | "due_date" | "due_time" | "method" | "memo" | "contact" | "address"
 > & {
   status?: OrderStatus;
+  /** 넣지 않으면 그대로 둬요 (null = 지우기) — 예전 DB(v6)에서도 저장되게 */
+  ship_date?: string | null;
 };
 
 export type OrderChangeOp = "create" | "update" | "complete" | "reopen" | "cancel";
