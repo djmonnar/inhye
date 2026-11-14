@@ -33,8 +33,9 @@ import {
   ProductThumb,
   StockBadge,
 } from "@/components/ui";
-import { ensureUrl, margin, needsKioskSync, num, relTime, shortDate, won } from "@/lib/format";
-import { useMoves, useProduct, useRefresh, useSupplierMap } from "@/lib/queries";
+import { toInput } from "@/components/ProductForm";
+import { ensureUrl, isWebBarcode, margin, needsKioskSync, nextStoreBarcode, num, relTime, shortDate, won } from "@/lib/format";
+import { useMoves, useProduct, useProducts, useRefresh, useSupplierMap } from "@/lib/queries";
 import { store } from "@/lib/store";
 import type { MoveKind } from "@/lib/types";
 
@@ -54,6 +55,8 @@ export default function ProductDetailPage() {
   const [promoOpen, setPromoOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [quickBusy, setQuickBusy] = useState(false);
+  const { data: allProducts = [] } = useProducts();
+  const [fixingCode, setFixingCode] = useState(false);
 
   if (isLoading) return <Loading />;
   if (!product)
@@ -79,6 +82,21 @@ export default function ProductDetailPage() {
       toast(e instanceof Error ? e.message : "실패했어요", "sad");
     } finally {
       setQuickBusy(false);
+    }
+  }
+
+  /** 웹 주소(QR)가 바코드로 들어간 상품 → 매장용 바코드로 한 번에 바꿔요 */
+  async function fixWebBarcode() {
+    if (!product || fixingCode) return;
+    setFixingCode(true);
+    try {
+      await store().saveProduct({ ...toInput(product), barcode: nextStoreBarcode(allProducts) }, product.id);
+      await refresh("products");
+      toast("매장용 바코드로 바꿨어요! 라벨을 뽑아 붙이고 빅솔론에 반영해 주세요", "wow");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "바꾸지 못했어요", "sad");
+    } finally {
+      setFixingCode(false);
     }
   }
 
@@ -129,7 +147,18 @@ export default function ProductDetailPage() {
               ))}
             </div>
             <h2 className="font-cute text-2xl leading-snug">{product.name}</h2>
-            {product.barcode && (
+            {product.barcode && isWebBarcode(product.barcode) ? (
+              <div className="rounded-2xl bg-butter-100 p-3 text-sm text-butter-700" role="alert">
+                <p className="font-semibold">바코드에 웹 주소가 들어 있어요</p>
+                <p className="mt-0.5 break-all font-mono text-xs">{product.barcode}</p>
+                <p className="mt-1 text-xs">
+                  상품 태그의 QR코드를 찍으면 이렇게 돼요. 키오스크·스캐너에서 못 찍어요. 매장용 바코드로 바꾸고 라벨을 붙여 주세요.
+                </p>
+                <button type="button" className="btn-soft btn-sm mt-2 w-full" disabled={fixingCode} onClick={fixWebBarcode}>
+                  <Sparkles size={16} /> 매장용 바코드로 바꾸기
+                </button>
+              </div>
+            ) : product.barcode && (
               <button
                 type="button"
                 className="flex w-full items-center gap-3 rounded-2xl bg-cream p-3 text-left"

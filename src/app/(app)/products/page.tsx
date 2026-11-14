@@ -5,11 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { EmptyState, Loading, PageHeader, ProductThumb, StockBadge } from "@/components/ui";
-import { margin, needsKioskSync, searchText, stockLevel, won } from "@/lib/format";
+import { isWebBarcode, margin, needsKioskSync, searchText, stockLevel, won } from "@/lib/format";
 import { useCategories, useProducts, useSupplierMap } from "@/lib/queries";
 import type { Product } from "@/lib/types";
 
-type Status = "all" | "low" | "kiosk" | "inactive" | "nosupplier" | "nophoto";
+type Status = "all" | "low" | "kiosk" | "inactive" | "nosupplier" | "nophoto" | "webcode";
 type Sort = "new" | "name" | "stock" | "margin" | "price";
 
 const STATUS: { value: Status; label: string }[] = [
@@ -60,6 +60,8 @@ function ProductsList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
+  const webCount = useMemo(() => (products ?? []).filter((p) => isWebBarcode(p.barcode)).length, [products]);
+
   const filtered = useMemo(() => {
     const needle = searchText(q);
     let list = (products ?? []).filter((p) => {
@@ -70,6 +72,7 @@ function ProductsList() {
       if (status === "inactive" && p.is_active) return false;
       if (status === "nosupplier" && p.supplier_id) return false;
       if (status === "nophoto" && p.image_path) return false;
+      if (status === "webcode" && !isWebBarcode(p.barcode)) return false;
       if (!needle) return true;
       const sup = p.supplier_id ? suppliers.get(p.supplier_id)?.name : "";
       return searchText(
@@ -136,7 +139,8 @@ function ProductsList() {
           </div>
         </div>
         <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4">
-          {STATUS.map((s) => (
+          {/* 바코드에 웹 주소(QR)가 들어간 상품이 있을 때만 보여요 */}
+          {[...STATUS, ...(webCount ? [{ value: "webcode" as Status, label: `🔗 바코드 확인 ${webCount}` }] : [])].map((s) => (
             <button
               type="button"
               key={s.value}

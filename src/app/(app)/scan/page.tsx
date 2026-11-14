@@ -9,7 +9,7 @@ import { Mascot } from "@/components/Mascot";
 import { useToast } from "@/components/providers";
 import { KIND_LABEL } from "@/components/SupplierSheet";
 import { Loading, PageHeader, ProductThumb, Segmented, StockBadge } from "@/components/ui";
-import { ensureUrl, num, won } from "@/lib/format";
+import { ensureUrl, isWebBarcode, num, WEB_BARCODE_MSG, won } from "@/lib/format";
 import { useProducts, useRefresh, useSupplierMap } from "@/lib/queries";
 import { store } from "@/lib/store";
 import type { Product } from "@/lib/types";
@@ -203,11 +203,21 @@ function ScanInner() {
           ) : (
             <section className="card flex animate-pop-in flex-col items-center p-5 text-center">
               <Mascot mood="sad" size={72} />
-              <p className="mt-2 font-cute text-lg">등록 안 된 바코드예요</p>
-              <p className="font-mono text-sm text-ink-soft">{result.code}</p>
-              <Link href={`/products/new?barcode=${encodeURIComponent(result.code)}`} className="btn-primary mt-3">
-                <Plus size={18} /> 이 바코드로 새 상품 등록
-              </Link>
+              {isWebBarcode(result.code) ? (
+                <>
+                  <p className="mt-2 font-cute text-lg">QR코드를 찍었어요</p>
+                  <p className="break-all font-mono text-xs text-ink-soft">{result.code}</p>
+                  <p className="mt-2 text-sm text-ink-soft">{WEB_BARCODE_MSG}</p>
+                </>
+              ) : (
+                <>
+                  <p className="mt-2 font-cute text-lg">등록 안 된 바코드예요</p>
+                  <p className="font-mono text-sm text-ink-soft">{result.code}</p>
+                  <Link href={`/products/new?barcode=${encodeURIComponent(result.code)}`} className="btn-primary mt-3">
+                    <Plus size={18} /> 이 바코드로 새 상품 등록
+                  </Link>
+                </>
+              )}
             </section>
           ))}
 

@@ -8,12 +8,14 @@ import { compressImage } from "@/lib/image";
 import {
   ensureUrl,
   hostOf,
+  isWebBarcode,
   margin,
   nextStoreBarcode,
   normalizeBarcode,
   num,
   siteNameFromUrl,
   suggestPrices,
+  WEB_BARCODE_MSG,
   won,
 } from "@/lib/format";
 import { useCategories, useProducts, useRefresh, useSuppliers } from "@/lib/queries";
@@ -85,6 +87,7 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
   const [photoRemoved, setPhotoRemoved] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const [scanHint, setScanHint] = useState("");
   const [supplierSheet, setSupplierSheet] = useState<Partial<SupplierInput> | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -189,6 +192,10 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
     if (!f.name.trim()) {
       setError("상품명을 적어 주세요.");
       window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (isWebBarcode(f.barcode)) {
+      setError("바코드에 웹 주소(QR코드)가 들어 있어요. 숫자 바코드를 찍거나 ‘매장용 바코드로 바꾸기’를 눌러 주세요.");
       return;
     }
     if (duplicate) {
@@ -382,7 +389,9 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
           <Field
             label="바코드"
             hint={
-              duplicate ? (
+              isWebBarcode(f.barcode) ? (
+                <span className="text-danger">웹 주소(QR코드)는 바코드로 못 써요 — 키오스크에서 안 찍혀요</span>
+              ) : duplicate ? (
                 <span className="text-danger">
                   이미 등록된 바코드예요 →{" "}
                   <Link href={`/products/${duplicate.id}`} className="underline">
@@ -414,13 +423,13 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
                     <ScanBarcode size={20} />
                   </button>
                 </div>
-                {!f.barcode && (
+                {(!f.barcode || isWebBarcode(f.barcode)) && (
                   <button
                     type="button"
                     className="btn-ghost btn-sm text-berry-600"
                     onClick={() => set("barcode", nextStoreBarcode(products))}
                   >
-                    <Sparkles size={16} /> 매장용 바코드 자동 만들기
+                    <Sparkles size={16} /> {f.barcode ? "매장용 바코드로 바꾸기" : "매장용 바코드 자동 만들기"}
                   </button>
                 )}
               </div>
@@ -680,17 +689,36 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
         </button>
       </div>
 
-      <Sheet open={scanOpen} onClose={() => setScanOpen(false)} title="바코드 스캔">
+      <Sheet
+        open={scanOpen}
+        onClose={() => {
+          setScanOpen(false);
+          setScanHint("");
+        }}
+        title="바코드 스캔"
+      >
         {scanOpen && (
           <BarcodeScanner
             className="aspect-[4/3]"
             onDetected={(code) => {
+              // 태그의 QR코드(웹 주소)는 바코드가 아니에요 → 넣지 않고 숫자 바코드를 다시 찍게 해요
+              if (isWebBarcode(code)) {
+                setScanHint(WEB_BARCODE_MSG);
+                return;
+              }
               set("barcode", code);
+              setScanHint("");
               setScanOpen(false);
             }}
           />
         )}
-        <p className="mt-3 text-center text-sm text-ink-soft">바코드를 네모 칸 안에 맞춰 주세요</p>
+        {scanHint ? (
+          <p className="mt-3 rounded-2xl bg-butter-100 px-3 py-2 text-center text-sm text-butter-700" role="alert">
+            {scanHint}
+          </p>
+        ) : (
+          <p className="mt-3 text-center text-sm text-ink-soft">바코드를 네모 칸 안에 맞춰 주세요</p>
+        )}
       </Sheet>
 
       <AiFillSheet

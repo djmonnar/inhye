@@ -76,6 +76,18 @@ export function normalizeBarcode(v: string | null | undefined): string | null {
   return s ? s : null;
 }
 
+/**
+ * 웹 주소는 상품 바코드가 아니에요 — 상품 태그의 QR코드(예: 캐릭터 공식 사이트 주소)를 찍으면 이게 들어와요.
+ * 모든 상품이 같은 주소라 상품을 가릴 수 없고, 키오스크·라벨 스캐너에서도 못 찍어요.
+ */
+export function isWebBarcode(code: string | null | undefined): boolean {
+  const s = (code ?? "").trim();
+  return /^(https?:\/\/|www\.)/i.test(s) || s.includes("://");
+}
+
+export const WEB_BARCODE_MSG =
+  "QR코드(웹 주소)를 읽었어요. 상품에 붙은 숫자 바코드(세로 막대)를 찍어 주세요. 없으면 ‘매장용 바코드 자동 만들기’를 눌러요.";
+
 export function ean13CheckDigit(first12: string): number {
   let sum = 0;
   for (let i = 0; i < 12; i++) {

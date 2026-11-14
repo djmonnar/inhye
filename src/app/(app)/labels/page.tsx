@@ -9,7 +9,7 @@ import { useAuth, useToast } from "@/components/providers";
 import { toInput } from "@/components/ProductForm";
 import { Loading, PageHeader, ProductThumb, Segmented } from "@/components/ui";
 import { IS_DEMO } from "@/lib/config";
-import { nextStoreBarcode, searchText } from "@/lib/format";
+import { isWebBarcode, nextStoreBarcode, searchText } from "@/lib/format";
 import { renderLabelCanvas, renderTestCanvas, type LabelStyle } from "@/lib/labelCanvas";
 import { useProducts, useRefresh } from "@/lib/queries";
 import { store } from "@/lib/store";
@@ -61,7 +61,8 @@ function LabelsInner() {
 
   const size = { w: preset.w, h: preset.h };
   const selected = products.filter((p) => copies[p.id] > 0);
-  const missingBarcode = selected.filter((p) => !p.barcode);
+  // 바코드가 없거나 웹 주소(QR)인 상품 — 매장용 바코드를 만들어 줘요
+  const missingBarcode = selected.filter((p) => !p.barcode || isWebBarcode(p.barcode));
   const total = selected.reduce((n, p) => n + copies[p.id], 0);
   const results = useMemo(() => {
     const needle = searchText(q);
@@ -256,7 +257,7 @@ function LabelsInner() {
             </div>
             {missingBarcode.length > 0 && show.barcode && (
               <button type="button" className="btn-soft btn-sm mt-3 w-full" disabled={fixing} onClick={fixBarcodes}>
-                <Sparkles size={16} /> 바코드 없는 {missingBarcode.length}개에 매장용 바코드 만들기
+                <Sparkles size={16} /> 바코드 없는(웹 주소 포함) {missingBarcode.length}개에 매장용 바코드 만들기
               </button>
             )}
             {method === "usb" ? (
