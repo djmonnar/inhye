@@ -3,13 +3,14 @@
 import { Camera, CameraOff, Pencil, Plus, ShoppingBasket, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BarcodeScanner, beep } from "@/components/BarcodeScanner";
 import { Mascot } from "@/components/Mascot";
 import { useToast } from "@/components/providers";
 import { KIND_LABEL } from "@/components/SupplierSheet";
 import { Loading, PageHeader, ProductThumb, Segmented, StockBadge } from "@/components/ui";
-import { ensureUrl, isWebBarcode, num, WEB_BARCODE_MSG, won } from "@/lib/format";
+import { toInput } from "@/components/ProductForm";
+import { ensureUrl, isWebBarcode, needsKioskSync, num, searchText, WEB_BARCODE_MSG, won } from "@/lib/format";
 import { useProducts, useRefresh, useSupplierMap } from "@/lib/queries";
 import { store } from "@/lib/store";
 import type { Product } from "@/lib/types";
@@ -26,6 +27,65 @@ interface LogItem {
 }
 
 const sameCode = (a: string, b: string) => a.replace(/^0+/, "") === b.replace(/^0+/, "");
+
+/**
+ * 앱에 없는 바코드 → 이미 있는 상품(대개 빅솔론에서 자동 등록돼 바코드가 빈 상품)에 붙여요.
+ * 빅솔론에 같은 바코드로 등록된 상품이면 그대로 두고, 아니면 빅솔론에도 넣어야 리더기에서 찍혀요.
+ */
+function AttachBarcode({ code, products, onDone }: { code: string; products: Product[]; onDone: (p: Product) => void }) {
+  const toast = useToast();
+  const refresh = useRefresh();
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false);
+  const list = useMemo(() => {
+    const needle = searchText(q);
+    return products
+      .filter((p) => !p.barcode || isWebBarcode(p.barcode))
+      .filter((p) => !needle || searchText(p.name, p.category).includes(needle))
+      .slice(0, 6);
+  }, [products, q]);
+
+  async function attach(p: Product) {
+    setBusy(true);
+    try {
+      const wasClean = !needsKioskSync(p);
+      const saved = await store().saveProduct({ ...toInput(p), barcode: code }, p.id);
+      // 빅솔론에서 온 상품에 리더기 바코드를 붙인 거라 ‘반영 필요’로 바꾸지 않아요
+      if (wasClean) await store().markKioskSynced([p.id]);
+      await refresh("products");
+      toast(`‘${p.name}’에 바코드를 붙였어요`, "wow");
+      onDone(saved);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "붙이지 못했어요", "sad");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 w-full text-left">
+      <p className="font-cute">이미 있는 상품에 붙이기</p>
+      <p className="text-xs text-ink-soft">빅솔론에 등록된 상품이면 여기서 골라요. 바코드가 빈 상품만 보여요.</p>
+      <input className="input mt-2" placeholder="상품 이름으로 찾기" value={q} onChange={(e) => setQ(e.target.value)} aria-label="붙일 상품 찾기" />
+      <ul className="mt-2 space-y-1">
+        {list.map((p) => (
+          <li key={p.id}>
+            <button
+              type="button"
+              disabled={busy}
+              className="flex w-full items-center gap-2 rounded-2xl bg-cream px-3 py-2 text-left text-sm active:bg-cream-deep"
+              onClick={() => void attach(p)}
+            >
+              <span className="min-w-0 flex-1 truncate">{p.name}</span>
+              <span className="shrink-0 text-xs text-ink-soft">{p.category}</span>
+            </button>
+          </li>
+        ))}
+        {list.length === 0 && <li className="text-xs text-ink-faint">바코드가 빈 상품이 없어요</li>}
+      </ul>
+    </div>
+  );
+}
 
 function ScanInner() {
   const params = useSearchParams();
@@ -211,10 +271,15 @@ function ScanInner() {
                 </>
               ) : (
                 <>
-                  <p className="mt-2 font-cute text-lg">등록 안 된 바코드예요</p>
+                  <p className="mt-2 font-cute text-lg">앱에 없는 바코드예요</p>
                   <p className="font-mono text-sm text-ink-soft">{result.code}</p>
-                  <Link href={`/products/new?barcode=${encodeURIComponent(result.code)}`} className="btn-primary mt-3">
-                    <Plus size={18} /> 이 바코드로 새 상품 등록
+                  <AttachBarcode
+                    code={result.code}
+                    products={products ?? []}
+                    onDone={(p) => setResult({ code: result.code, product: p })}
+                  />
+                  <Link href={`/products/new?barcode=${encodeURIComponent(result.code)}`} className="btn-ghost btn-sm mt-3">
+                    <Plus size={16} /> 새 상품으로 등록 (빅솔론에도 올려야 해요)
                   </Link>
                 </>
               )}

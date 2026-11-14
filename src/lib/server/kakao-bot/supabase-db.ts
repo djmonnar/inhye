@@ -3,6 +3,7 @@ import { normTime } from "../../day";
 import type { Order, Product, ProductSource, Role, Supplier } from "../../types";
 import { adminClient } from "../admin";
 import { fetchBixolonDay, fetchBixolonGoods, PosNotReady } from "../bixolon";
+import { goodsInfoOf, registerUnknownGoods } from "../pos";
 import type { BotDb, BotSession, BotUser, TodaySales } from "./types";
 
 /** 챗봇 서버용 데이터 — 서비스 키로 읽고 쓰지만, 권한은 bot.ts가 연결된 앱 계정의 역할로 확인해요. */
@@ -134,6 +135,8 @@ export function supabaseBotDb(): BotDb {
       let notReady = false;
       try {
         const lines = await withTimeout(fetchBixolonDay(day), 2500);
+        // 앱에 없는 빅솔론 상품은 답을 늦추지 않게 뒤에서 자동 등록
+        void registerUnknownGoods(goodsInfoOf(lines)).catch(() => 0);
         return {
           day,
           source: "live",

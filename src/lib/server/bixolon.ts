@@ -44,6 +44,8 @@ interface GoodsRow {
   goodsCode?: string;
   goodsName?: string;
   categoryName?: string;
+  sellingPrice?: number;
+  unitCost?: number;
   salesQty?: number;
   salesAmount?: number;
   paymentAmount?: number;

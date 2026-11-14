@@ -1,4 +1,5 @@
 import { adminClient } from "./admin";
+import { AUTO_TAG } from "../format";
 import { fetchBixolonDay, PosNotReady, type PosSaleLine } from "./bixolon";
 
 export interface PosSyncResult {
@@ -9,6 +10,7 @@ export interface PosSyncResult {
   unmatched: number;
   days: string[];
   linked?: number;
+  created?: number;
 }
 
 /** DB 오류를 사장님이 할 일이 보이는 문장으로 바꿔요. */
@@ -137,10 +139,70 @@ export async function syncBixolon(from?: string): Promise<PosSyncResult> {
   return ingestWithLinks(await fetchDays(days), days);
 }
 
-/** 이름으로 코드를 먼저 이어 붙이고 저장해요 (붙이기가 실패해도 저장은 해요). */
+/**
+ * 이름으로 코드를 먼저 이어 붙이고, 그래도 앱에 없는 빅솔론 상품은 자동 등록한 뒤 저장해요
+ * (붙이기·등록이 실패해도 저장은 해요). 그래야 판매가 바로 그 상품 재고에 반영돼요.
+ */
 async function ingestWithLinks(lines: PosSaleLine[], days: string[]): Promise<PosSyncResult> {
   const linked = await linkCodesByName(lines.map((l) => ({ code: l.product_code, name: l.product_name }))).catch(() => 0);
-  return { ...(await ingestPosSales("bixolon", lines, days)), linked };
+  const created = await registerUnknownGoods(goodsInfoOf(lines)).catch(() => 0);
+  return { ...(await ingestPosSales("bixolon", lines, days)), linked, created };
+}
+
+/** 빅솔론 판매 한 줄에서 상품 정보(분류·판매가·단가)를 꺼내요 */
+export interface GoodsInfo {
+  code: string | null;
+  name: string;
+  category?: string | null;
+  price?: number | null;
+  cost?: number | null;
+}
+
+export function goodsInfoOf(lines: PosSaleLine[]): GoodsInfo[] {
+  return lines.map((l) => {
+    const raw = (l.raw ?? {}) as { categoryName?: unknown; sellingPrice?: unknown; unitCost?: unknown };
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+    return {
+      code: l.product_code,
+      name: l.product_name,
+      category: typeof raw.categoryName === "string" ? raw.categoryName : null,
+      price: num(raw.sellingPrice) ?? (l.qty > 0 ? Math.round(l.amount / l.qty) : null),
+      cost: num(raw.unitCost),
+    };
+  });
+}
+
+/**
+ * 상품 등록은 빅솔론에서만 해요(키오스크·리더기는 빅솔론 상품만 알아요).
+ * 빅솔론 판매에 나왔는데 앱에 없는 상품(코드로도, 이름으로도 못 찾음)은 앱에 자동으로 만들어요:
+ * 이름·분류·판매가·상품 코드는 빅솔론 그대로, ‘빅솔론 반영 필요’ 표시 없이. 구매처·원가·사진은 앱에서 더해요.
+ */
+export async function registerUnknownGoods(items: GoodsInfo[]): Promise<number> {
+  const byCode = new Map<string, GoodsInfo>();
+  for (const it of items) if (it.code && it.name.trim() && !byCode.has(it.code)) byCode.set(it.code, it);
+  if (!byCode.size) return 0;
+  const db = adminClient();
+  const { data: taken, error } = await db.from("products").select("kiosk_code").in("kiosk_code", [...byCode.keys()]);
+  if (error) throw dbError(error);
+  for (const t of taken ?? []) byCode.delete(t.kiosk_code as string);
+  if (!byCode.size) return 0;
+  // 빅솔론에서 온 그대로라 ‘반영 필요’가 아니에요 (바뀐 때 = 반영한 때)
+  const now = new Date().toISOString();
+  const rows = [...byCode.values()].map((g) => ({
+    name: g.name.trim().slice(0, 200),
+    category: (g.category ?? "").trim() || "기타",
+    sale_price: Math.max(0, Math.round(g.price ?? 0)),
+    cost_price: Math.max(0, Math.round(g.cost ?? 0)),
+    kiosk_code: g.code,
+    is_active: true,
+    tags: [AUTO_TAG],
+    memo: "빅솔론 판매에서 자동 등록 — 구매처·원가·바코드를 채워 주세요",
+    kiosk_changed_at: now,
+    kiosk_synced_at: now,
+  }));
+  const { data, error: e2 } = await db.from("products").insert(rows).select("id");
+  if (e2) throw dbError(e2);
+  return data?.length ?? 0;
 }
 
 /** 하루씩 차례로 받아요. 빅솔론 방화벽(WAF)에 걸리지 않게 사이에 조금 쉬어요. */

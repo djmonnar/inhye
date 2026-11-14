@@ -85,6 +85,9 @@ export function isWebBarcode(code: string | null | undefined): boolean {
   return /^(https?:\/\/|www\.)/i.test(s) || s.includes("://");
 }
 
+/** 빅솔론 판매에서 앱에 자동으로 만든 상품에 붙는 태그 (구매처·원가·바코드를 채울 상품) */
+export const AUTO_TAG = "빅솔론 자동 등록";
+
 export const WEB_BARCODE_MSG =
   "QR코드(웹 주소)를 읽었어요. 상품에 붙은 숫자 바코드(세로 막대)를 찍어 주세요. 없으면 ‘매장용 바코드 자동 만들기’를 눌러요.";
 

@@ -5,11 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { EmptyState, Loading, PageHeader, ProductThumb, StockBadge } from "@/components/ui";
-import { isWebBarcode, margin, needsKioskSync, searchText, stockLevel, won } from "@/lib/format";
+import { AUTO_TAG, isWebBarcode, margin, needsKioskSync, searchText, stockLevel, won } from "@/lib/format";
 import { useCategories, useProducts, useSupplierMap } from "@/lib/queries";
 import type { Product } from "@/lib/types";
 
-type Status = "all" | "low" | "kiosk" | "inactive" | "nosupplier" | "nophoto" | "webcode";
+type Status = "all" | "low" | "kiosk" | "inactive" | "nosupplier" | "nophoto" | "webcode" | "auto";
 type Sort = "new" | "name" | "stock" | "margin" | "price";
 
 const STATUS: { value: Status; label: string }[] = [
@@ -61,6 +61,7 @@ function ProductsList() {
   }, [q]);
 
   const webCount = useMemo(() => (products ?? []).filter((p) => isWebBarcode(p.barcode)).length, [products]);
+  const autoCount = useMemo(() => (products ?? []).filter((p) => p.tags.includes(AUTO_TAG)).length, [products]);
 
   const filtered = useMemo(() => {
     const needle = searchText(q);
@@ -73,6 +74,7 @@ function ProductsList() {
       if (status === "nosupplier" && p.supplier_id) return false;
       if (status === "nophoto" && p.image_path) return false;
       if (status === "webcode" && !isWebBarcode(p.barcode)) return false;
+      if (status === "auto" && !p.tags.includes(AUTO_TAG)) return false;
       if (!needle) return true;
       const sup = p.supplier_id ? suppliers.get(p.supplier_id)?.name : "";
       return searchText(
@@ -140,7 +142,11 @@ function ProductsList() {
         </div>
         <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4">
           {/* 바코드에 웹 주소(QR)가 들어간 상품이 있을 때만 보여요 */}
-          {[...STATUS, ...(webCount ? [{ value: "webcode" as Status, label: `🔗 바코드 확인 ${webCount}` }] : [])].map((s) => (
+          {[
+            ...STATUS,
+            ...(autoCount ? [{ value: "auto" as Status, label: `🆕 빅솔론에서 온 상품 ${autoCount}` }] : []),
+            ...(webCount ? [{ value: "webcode" as Status, label: `🔗 바코드 확인 ${webCount}` }] : []),
+          ].map((s) => (
             <button
               type="button"
               key={s.value}

@@ -303,6 +303,8 @@ export interface PosLive {
   sample?: boolean;
   /** 이번에 이름이 같아서 빅솔론 코드를 붙인 앱 상품 수 */
   linked?: number;
+  /** 앱에 없어서 자동 등록한 빅솔론 상품 수 */
+  created?: number;
 }
 
 /** 정산용 기간 판매 (빅솔론 상품별 합계 + 상품 분류명) */
@@ -372,6 +374,8 @@ export interface PosSyncResult {
   unmatched: number;
   days?: string[];
   linked?: number;
+  /** 빅솔론 판매에 나와서 앱에 자동 등록한 상품 수 */
+  created?: number;
 }
 
 /** 예약 주문 (꽃다발 등) */

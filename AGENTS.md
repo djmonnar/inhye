@@ -89,6 +89,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 5. ✅ 카카오톡 연결·테스트 발송 확인. 스키마 v5(알림 시간 설정 + 주문 픽업 시간) 적용은 `/setup` ‘앱에서 바로 실행’으로.
 6. **거래처별 가격 + 카카오 챗봇 (스키마 v6, 2026-11-13)**: `/setup`에서 v6 적용 → Vercel `KAKAO_SKILL_SECRET` → 오픈빌더 설정([suppliers-kakao-bot.md](docs/wiki/suppliers-kakao-bot.md) ‘처음 설정’). 다음 후보: 발주 화면에도 ‘더 싼 거래처’ 표시, 엑셀 백업에 거래처별 가격 포함.
 7. **택배 출고일 (스키마 v7, 2026-11-14)**: `orders.ship_date` — `/setup`에서 v7 적용(‘앱에서 바로 실행’). D-day·알림 기준은 `actDay()`(택배는 출고일, 없으면 받는 날).
+8. **빅솔론이 상품 원본 (2026-11-14)**: 상품 등록은 빅솔론에서만. 앱은 판매에 나온 새 상품을 자동 등록(`registerUnknownGoods`, 태그 `빅솔론 자동 등록`, 바코드 없음 → 스캔 화면 ‘이미 있는 상품에 붙이기’). 빅솔론에 상품 목록·등록 외부 API 문의 중 — 관리자 화면 API는 쓰지 않기.
 
 결정·발견 기록은 [`docs/wiki/decisions.md`](docs/wiki/decisions.md)에 날짜순으로 있어요.
 

@@ -53,10 +53,18 @@ function LiveSales({ products }: { products: Product[] }) {
     try {
       const live = await store().posLive(d);
       setData(live);
-      if (live.linked) {
-        // 이름이 같은 앱 상품에 빅솔론 코드를 붙였어요 → 상품 목록을 새로 받아 바로 연결돼 보이게
+      if (live.linked || live.created) {
+        // 코드를 붙였거나 빅솔론 상품을 자동 등록했어요 → 상품 목록을 새로 받아 바로 연결돼 보이게
         await refresh("products");
-        toast(`이름이 같은 상품 ${live.linked}개에 빅솔론 코드를 붙였어요`, "wow");
+        toast(
+          [
+            live.created ? `빅솔론 상품 ${live.created}개를 앱에 자동 등록했어요` : "",
+            live.linked ? `이름이 같은 상품 ${live.linked}개에 빅솔론 코드를 붙였어요` : "",
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          "wow",
+        );
       }
     } catch (e) {
       setData(null);
@@ -224,7 +232,7 @@ export default function SalesPage() {
       const r = await store().posSync(connected ? undefined : fromDay);
       await refresh("pos", "products", "moves");
       toast(
-        `${r.days?.length ?? 1}일치 ${r.fetched}개 상품 · 재고 반영 ${r.applied}건${r.linked ? ` · 이름으로 코드 연결 ${r.linked}개` : ""}`,
+        `${r.days?.length ?? 1}일치 ${r.fetched}개 상품 · 재고 반영 ${r.applied}건${r.linked ? ` · 이름으로 코드 연결 ${r.linked}개` : ""}${r.created ? ` · 앱에 자동 등록 ${r.created}개` : ""}`,
         "wow",
       );
     } catch (e) {

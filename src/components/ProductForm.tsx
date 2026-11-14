@@ -265,6 +265,18 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
       />
 
       <div className="space-y-4">
+        {!product && (
+          <div className="rounded-2xl bg-soda-100 px-4 py-3 text-sm text-soda-700">
+            <p className="font-semibold">💡 판매할 상품은 빅솔론에 먼저 등록해 주세요</p>
+            <p className="mt-0.5 text-xs">
+              키오스크·히엘페이 리더기는 빅솔론 상품만 알아요. 빅솔론에서 한 번이라도 팔리면 앱에 자동으로 들어와요(이름·분류·판매가).
+              구매처·원가·바코드는 그 상품을 열어서 채우면 돼요. 여기서는 빅솔론에 안 올릴 상품만 등록해요.
+            </p>
+            <Link href="/products?status=auto" className="mt-1 inline-block text-xs font-semibold underline">
+              빅솔론에서 온 상품 보기
+            </Link>
+          </div>
+        )}
         {error && (
           <p className="rounded-2xl bg-danger/10 px-4 py-3 text-sm text-danger" role="alert">
             {error}
