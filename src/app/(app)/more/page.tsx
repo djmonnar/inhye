@@ -4,6 +4,7 @@ import {
   BarChart3,
   BookOpen,
   Bot,
+  Calculator,
   ChevronRight,
   FileSpreadsheet,
   Flower2,
@@ -39,6 +40,7 @@ export default function MorePage() {
   const items = [
     { href: "/orders", icon: Flower2, label: "주문 · 주문 비서", desc: "꽃다발 예약 주문을 채팅으로 등록, 카톡 알림" },
     { href: "/sales", icon: BarChart3, label: "매출 · 빅솔론 연동", desc: "키오스크 판매를 받아 재고 자동 차감" },
+    { href: "/sales/settle", icon: Calculator, label: "A/B 정산", desc: "분류명 앞글자(A·B)로 기간 매출 나눠 보기 · 엑셀" },
     { href: "/report", icon: Sparkles, label: "AI 가게 리포트", desc: "기간 정리, 발주 추천, 이번 주 할 일, 신상 소개 글" },
     { href: "/excel", icon: FileSpreadsheet, label: "엑셀 · 빅솔론 대량등록", desc: "빅솔론 대량작업 엑셀 내보내기/가져오기, 백업" },
     { href: "/labels", icon: Printer, label: "바코드 라벨 · 가격표 인쇄", desc: "바코드 없는 상품에 붙일 라벨 만들기" },

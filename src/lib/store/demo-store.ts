@@ -525,6 +525,20 @@ export function createDemoStore(): DataStore {
       return { day, fetchedAt: new Date().toISOString(), items, sample: true };
     },
 
+    async posSettle(start, end) {
+      // 체험 모드: 분류명 앞글자(A/B)로 나뉘는 샘플 (빅솔론에 접속하지 않아요)
+      const products = (await store.listProducts()).filter((p) => p.is_active).slice(0, 8);
+      const items = products.map((p, i) => ({
+        code: p.kiosk_code,
+        name: p.name,
+        category: /^[A-Za-z](?![A-Za-z])/.test(p.category) ? p.category : `${i % 2 ? "B" : "A"} ${p.category}`,
+        qty: 8 - i,
+        amount: (8 - i) * p.sale_price,
+      }));
+      items.push({ code: "S009999", name: "분류 없는 샘플 상품", category: "EVENT", qty: 1, amount: 3000 });
+      return { start, end, fetchedAt: new Date().toISOString(), items, sample: true };
+    },
+
     async posReceipts(day) {
       // 체험 모드: 화면을 미리 볼 수 있게 샘플 영수증을 만들어요 (빅솔론에 접속하지 않아요)
       const products = (await store.listProducts()).filter((p) => p.is_active).slice(0, 5);

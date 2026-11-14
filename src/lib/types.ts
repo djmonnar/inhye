@@ -305,6 +305,24 @@ export interface PosLive {
   linked?: number;
 }
 
+/** 정산용 기간 판매 (빅솔론 상품별 합계 + 상품 분류명) */
+export interface PosSettleItem {
+  code: string | null;
+  name: string;
+  /** 빅솔론 상품 분류명 (예: "A 실크플라워", "B 인형") */
+  category: string;
+  qty: number;
+  amount: number;
+}
+
+export interface PosSettle {
+  start: string;
+  end: string;
+  fetchedAt: string;
+  items: PosSettleItem[];
+  sample?: boolean;
+}
+
 /** 빅솔론 영수증(건별 매출) — 보기 전용으로 정리한 모양 */
 export interface PosReceiptGoods {
   code: string | null;

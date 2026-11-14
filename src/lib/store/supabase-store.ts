@@ -15,6 +15,7 @@ import type {
   OrderChatResult,
   OrderInput,
   PosLive,
+  PosSettle,
   PosReceiptsDay,
   PosSale,
   PosStatus,
@@ -412,6 +413,10 @@ export function createSupabaseStore(): DataStore {
 
     async posLive(day) {
       return api<PosLive>(`/api/pos/live?day=${encodeURIComponent(day)}`, "GET");
+    },
+
+    async posSettle(start, end) {
+      return api<PosSettle>(`/api/pos/settle?${new URLSearchParams({ start, end }).toString()}`, "GET");
     },
 
     async posReceipts(day) {

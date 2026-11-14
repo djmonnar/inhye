@@ -28,9 +28,9 @@ npm run build
 
 ```
 src/app/(app)/        로그인 후 화면: 홈, products, scan, reorder, suppliers, excel, labels,
-                      print-station, sales(+receipts), orders, report, members, guide, history, more, kakao-bot(챗봇 연결)
+                      print-station, sales(+receipts, settle=A/B 정산), orders, report, members, guide, history, more, kakao-bot(챗봇 연결)
 src/app/login, setup  로그인(자동 로그인) / 처음 설정(SQL 안내, 관리자 계정)
-src/app/api/          setup/admin, setup/schema(DB에 schema.sql 바로 적용), members, pos/status, pos/sync, pos/live(빅솔론 하루치 바로 보기, 저장 없음), pos/receipts(영수증별, 저장 없음), orders/chat(주문 비서), kakao/{status,connect,callback,test}, kakao/skill(카카오 챗봇 스킬 서버), kakao/bot(챗봇 연결 코드·연결 관리), cron/orders(매일 알림), ai/{product,link,promo,report}
+src/app/api/          setup/admin, setup/schema(DB에 schema.sql 바로 적용), members, pos/status, pos/sync, pos/live(빅솔론 하루치 바로 보기, 저장 없음), pos/receipts(영수증별, 저장 없음), pos/settle(기간 상품별+분류명, A/B 정산, 최대 31일), orders/chat(주문 비서), kakao/{status,connect,callback,test}, kakao/skill(카카오 챗봇 스킬 서버), kakao/bot(챗봇 연결 코드·연결 관리), cron/orders(매일 알림), ai/{product,link,promo,report}
 src/components/       ui.tsx(공용 UI), OrderChat(주문 비서 — 주문 화면·홈 떠 있는 버튼 공용), WhenPicker(날짜·시간 버튼), DayNav, ProductForm, BarcodeScanner, StockSheet, SupplierSheet,
                       SourcePrices(상품 화면 ‘거래처별 가격’ + 가격 기록 시트), labels.tsx(라벨 공용), SendLabelSheet, AiFillSheet, PromoSheet, Mascot
 src/lib/store/        데이터 계층 인터페이스(types.ts) + supabase-store.ts + demo-store.ts
@@ -38,7 +38,7 @@ src/lib/server/       서버 전용: admin.ts(서비스 키, 권한), schema.ts(
                       kakao-bot/: bot.ts(챗봇 말 해석·대화 흐름·주문 — DB 없이 시험 가능), ai.ts(AI 해석기·주문 비서 연결), howto.ts(“발주 어떻게 해?” 사용법 답), kakao.ts(오픈빌더 응답·길이 제한·콜백), types.ts(BotDb·BotAi), supabase-db.ts
 src/lib/              excel.ts(빅솔론 양식), tspl.ts / labelCanvas.ts / usbPrinter.ts(라벨 직접 인쇄),
                       format.ts, queries.ts, report.ts, sources.ts(거래처별 가격 정렬·최저가 — 앱·챗봇 공용), josa.ts(을/를·이/가 조사),
-                      orderParse.ts(주문 한 줄을 AI 없이 바로 읽기 — 주문 비서 앞단)
+                      orderParse.ts(주문 한 줄을 AI 없이 바로 읽기 — 주문 비서 앞단), settle.ts(A/B 정산 묶기 — 분류명 앞글자)
 public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해도 안전해야 함)
 ```
 

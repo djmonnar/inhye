@@ -1,4 +1,5 @@
 import type { Cell, Workbook } from "exceljs";
+import type { Settlement } from "./settle";
 import { normalizeBarcode, parseNum } from "./format";
 import type { BulkProductRow, Product, Supplier } from "./types";
 
@@ -150,6 +151,48 @@ export async function buildBackupWorkbook(
     ss.addRow([s.name, kind[s.kind], s.website ?? "", s.contact ?? "", s.phone ?? "", s.order_note ?? "", s.memo ?? ""]);
   }
   styleHeader(ss.getRow(1));
+  return toBlob(wb);
+}
+
+/** A/B 정산 엑셀: 요약 + 묶음(A·B·기타)마다 시트 하나 (분류 · 상품 · 코드 · 수량 · 금액) */
+export async function buildSettleWorkbook(s: Settlement, start: string, end: string): Promise<Blob> {
+  const ExcelJS = await loadExcel();
+  const wb = new ExcelJS.Workbook();
+  const sum = wb.addWorksheet("요약");
+  sum.columns = [
+    { header: "묶음", width: 10 },
+    { header: "분류", width: 22 },
+    { header: "수량", width: 10 },
+    { header: "금액", width: 14 },
+  ];
+  for (const g of s.groups) {
+    for (const c of g.categories) sum.addRow([g.key, c.name, c.qty, c.amount]);
+    const r = sum.addRow([g.key, `${g.key} 합계`, g.qty, g.amount]);
+    r.font = { bold: true };
+  }
+  const total = sum.addRow(["", "전체 합계", s.qty, s.amount]);
+  total.font = { bold: true };
+  sum.addRow([]);
+  sum.addRow(["기간", `${start} ~ ${end}`]);
+  sum.addRow(["기준", "빅솔론 상품별 매출(결제 금액), 분류명 앞글자로 묶음"]);
+  sum.getColumn(4).numFmt = "#,##0";
+  styleHeader(sum.getRow(1));
+
+  for (const g of s.groups) {
+    const ws = wb.addWorksheet(g.key);
+    ws.columns = [
+      { header: "분류", width: 22 },
+      { header: "상품", width: 30 },
+      { header: "상품 코드", width: 12 },
+      { header: "수량", width: 10 },
+      { header: "금액", width: 14 },
+    ];
+    for (const c of g.categories) for (const it of c.items) ws.addRow([c.name, it.name, it.code ?? "", it.qty, it.amount]);
+    const r = ws.addRow(["합계", "", "", g.qty, g.amount]);
+    r.font = { bold: true };
+    ws.getColumn(5).numFmt = "#,##0";
+    styleHeader(ws.getRow(1));
+  }
   return toBlob(wb);
 }
 

@@ -13,6 +13,7 @@ import type {
   OrderChatTurn,
   OrderInput,
   PosLive,
+  PosSettle,
   PosReceiptsDay,
   PosSale,
   PosStatus,
@@ -101,6 +102,8 @@ export interface DataStore {
   posSync(from?: string): Promise<PosSyncResult>;
   /** 빅솔론 하루치 판매를 바로 보기만 해요 (저장·재고 차감 없음). day = 한국 날짜 YYYY-MM-DD */
   posLive(day: string): Promise<PosLive>;
+  /** 기간 판매를 빅솔론 분류명과 같이 (A/B 정산, 최대 31일) */
+  posSettle(start: string, end: string): Promise<PosSettle>;
   /** 빅솔론 하루치 영수증(건별)을 바로 보기만 해요. */
   posReceipts(day: string): Promise<PosReceiptsDay>;
 

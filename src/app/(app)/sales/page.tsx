@@ -242,7 +242,16 @@ export default function SalesPage() {
 
   return (
     <div>
-      <PageHeader back title="매출" sub="빅솔론 판매 → 재고 자동 반영" />
+      <PageHeader
+        back
+        title="매출"
+        sub="빅솔론 판매 → 재고 자동 반영"
+        right={
+          <Link href="/sales/settle" className="btn-soft btn-sm">
+            A/B 정산
+          </Link>
+        }
+      />
       <div className="space-y-4">
         <section className="card p-4">
           <p className="mb-3 font-cute text-lg">빅솔론 연동 준비</p>

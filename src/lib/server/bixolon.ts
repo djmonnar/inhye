@@ -13,7 +13,7 @@
  *   BIXOLON_API_BASE  (선택) 기본 https://api.bixolon-pos.com
  */
 
-import type { PosReceipt } from "../types";
+import type { PosReceipt, PosSettleItem } from "../types";
 
 export interface PosSaleLine {
   /** 원본에서 유일한 값. 같은 값이 다시 오면 수량·금액만 갱신돼요. */
@@ -43,19 +43,20 @@ interface GoodsRow {
   goodsId?: number;
   goodsCode?: string;
   goodsName?: string;
+  categoryName?: string;
   salesQty?: number;
   salesAmount?: number;
   paymentAmount?: number;
 }
 
-/** 하루치 상품별 판매 합계 (day = 한국 날짜 YYYY-MM-DD). */
-export async function fetchBixolonDay(day: string): Promise<PosSaleLine[]> {
+/** 기간(한국 날짜 start~end) 상품별 판매 합계 — 빅솔론 응답 그대로 */
+async function requestGoods(start: string, end: string): Promise<GoodsRow[]> {
   const key = env("BIXOLON_API_KEY");
   if (!key) {
     throw new PosNotReady("Vercel 환경변수에 BIXOLON_API_KEY(빅솔론 매장키)를 먼저 넣어 주세요.");
   }
   const base = (env("BIXOLON_API_BASE") || "https://api.bixolon-pos.com").replace(/\/$/, "");
-  const url = `${base}/api/external/v2/sales/analysis/goods?startDate=${day}&endDate=${day}`;
+  const url = `${base}/api/external/v2/sales/analysis/goods?startDate=${start}&endDate=${end}`;
   const res = await fetch(url, { headers: { accept: "application/json", authorization: key }, cache: "no-store" });
   if (res.status === 401) {
     throw new Error(
@@ -69,8 +70,25 @@ export async function fetchBixolonDay(day: string): Promise<PosSaleLine[]> {
   const data = (await res.json().catch(() => null)) as GoodsRow[] | { data?: GoodsRow[] } | null;
   const rows = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : null;
   if (!rows) throw new Error("빅솔론 응답 형식이 예상과 달라요.");
+  return rows.filter((r) => (r.goodsCode || r.goodsId) && typeof r.salesQty === "number");
+}
+
+/** 기간 상품별 판매 합계 + 빅솔론 상품 분류명 (정산용, 저장 없음) */
+export async function fetchBixolonGoods(start: string, end: string): Promise<PosSettleItem[]> {
+  const rows = await requestGoods(start, end);
+  return rows.map((r) => ({
+    code: r.goodsCode ?? null,
+    name: r.goodsName ?? "",
+    category: (r.categoryName ?? "").trim(),
+    qty: Math.round(r.salesQty ?? 0),
+    amount: Math.round(r.paymentAmount ?? r.salesAmount ?? 0),
+  }));
+}
+
+/** 하루치 상품별 판매 합계 (day = 한국 날짜 YYYY-MM-DD). */
+export async function fetchBixolonDay(day: string): Promise<PosSaleLine[]> {
+  const rows = await requestGoods(day, day);
   return rows
-    .filter((r) => (r.goodsCode || r.goodsId) && typeof r.salesQty === "number")
     .map((r) => ({
       external_id: `goods:${day}:${r.goodsId ?? r.goodsCode}`,
       sold_at: `${day}T00:00:00+09:00`,
