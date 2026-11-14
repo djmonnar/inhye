@@ -5,10 +5,8 @@ import { cheaperThanMain, isStale, sortSources, suggestQty } from "../../sources
 import type { Order, OrderChangeOp, OrderChatResult, OrderChatTurn, Product, ProductSource, Supplier, SupplierInput, SupplierKind } from "../../types";
 import {
   call,
-  callbackAck,
   card,
   carousel,
-  isCallbackAck,
   link,
   list,
   quick,
@@ -16,7 +14,6 @@ import {
   say,
   text,
   type Button,
-  type CallbackAck,
   type ListItem,
   type SkillRequest,
   type SkillResponse,
@@ -35,15 +32,16 @@ export interface BotContext {
   now?: Date;
   /** AI (서버에 OpenAI 키가 있을 때만) — 정해진 말이 아닐 때 뜻 알아내기 + 주문 비서 */
   ai?: BotAi;
-  /** 이 시각(ms)까지 답해야 해요 (카카오 5초 규칙). 늦어지는 주문 정리는 ‘결과 보기’로 받아 가요 */
+  /**
+   * 이 시각(ms)까지 답해야 해요. 보통은 카카오 5초 규칙 때문에 요청 + 3.8초,
+   * 블록에서 콜백을 켰으면 route가 먼저 ‘잠깐만요’로 답해 두니 넉넉하게(40초). 늦어지는 주문 정리는 ‘결과 보기’로 받아 가요
+   */
   deadline?: number;
   /** 답을 보낸 뒤에도 끝까지 마무리할 일 (Next.js after) */
   defer?: (work: Promise<unknown>) => void;
-  /** 블록에서 콜백을 켰을 때만: 늦은 답을 카카오에 나중에 보내요 */
-  callback?: (work: Promise<SkillResponse>) => void;
 }
 
-export type BotReply = SkillResponse | CallbackAck;
+export type BotReply = SkillResponse;
 
 const KIND_LABEL: Record<SupplierKind, string> = { online: "온라인", wholesale: "도매", offline: "오프라인", etc: "기타" };
 const ROLE_LABEL = { admin: "관리자", staff: "직원", pending: "승인 대기" } as const;
@@ -924,41 +922,26 @@ class Bot {
 
   private async aiRoute(said: string): Promise<BotReply | null> {
     const ai = this.ctx.ai;
-    // DB를 읽고 답을 만들 시간(약 1초)은 남겨 둬요
+    // DB를 읽고 답을 만들 시간(약 1초)은 남겨 둬요. 콜백이면 마감이 넉넉해서 9초까지 기다려요
     const budget = this.timeLeft() - 1000;
-    // 콜백을 켰으면 늦어도 괜찮아요: ‘알아보고 있어요’라고 먼저 답하고 결과는 나중에 보내요
-    const callback = this.ctx.callback;
-    if (!ai || (budget < 800 && !callback)) return null;
+    if (!ai || budget < 800) return null;
     const suppliers = (await this.suppliers()).map((x) => x.name).slice(0, 80);
     const t0 = Date.now();
-    const routing = ai.route(said, { suppliers }, { timeoutMs: callback ? 9000 : 2600 }).catch(() => null);
-    const r = await Promise.race([routing, sleep(Math.max(budget, 0)).then((): typeof SLOW => SLOW)]);
+    const routing = ai.route(said, { suppliers }, { timeoutMs: Math.min(9000, budget) }).catch(() => null);
+    const r = await Promise.race([routing, sleep(budget).then((): typeof SLOW => SLOW)]);
     if (r === SLOW) {
-      console.warn(`[kakao ai] route: no answer in ${Date.now() - t0}ms${callback ? " → callback" : " → fallback"}`);
-      if (!callback) return null;
-      callback(
-        routing.then(async (late) => {
-          const out = late ? await this.dispatch(late, said, true) : null;
-          return out && !isCallbackAck(out) ? out : (await this.keywordRoute(said)) ?? (await this.anything(said));
-        }),
-      );
-      return callbackAck("무슨 말인지 알아보고 있어요 ⏳");
+      console.warn(`[kakao ai] route: no answer in ${Date.now() - t0}ms → fallback`);
+      return null;
     }
     console.info(`[kakao ai] route: ${r ? r.intent : "failed"} in ${Date.now() - t0}ms`);
-    return r ? this.dispatch(r, said, false) : null;
+    return r ? this.dispatch(r, said) : null;
   }
 
-  /** AI가 고른 뜻 → 챗봇의 정해진 명령. late = 콜백으로 나중에 보내는 중(주문 정리를 끝까지 기다려요) */
-  private async dispatch(r: AiRoute, said: string, late: boolean): Promise<BotReply | null> {
+  /** AI가 고른 뜻 → 챗봇의 정해진 명령 */
+  private async dispatch(r: AiRoute, said: string): Promise<BotReply | null> {
     const q = clean(r.query ?? "");
     switch (r.intent) {
       case "orders":
-        if (late && this.ctx.ai) {
-          return this.ctx.ai.orderChat(said, [], this.user.profileId).then(
-            (res) => this.orderResult(res),
-            (e) => reply([text(`주문을 정리하지 못했어요 😢 ${errMsg(e)}\n다시 보내 주세요.`)], quick("주문 목록", "메뉴")),
-          );
-        }
         return this.orderFlow(said);
       case "order_list":
         return this.orderList(1);
@@ -995,7 +978,7 @@ class Bot {
 
   /**
    * 주문 비서(앱과 같은 두뇌)에게 맡겨요. 정해진 모양은 AI 없이 바로, 아니면 AI.
-   * 5초 안에 못 끝나면: 콜백을 켰으면 자동으로 이어서 보내고, 아니면 ‘결과 보기’로 받아 가게 해서 두 번 등록되지 않아요.
+   * 마감 안에 못 끝나면 ‘결과 보기’로 받아 가게 해서 두 번 등록되지 않아요 (콜백을 켰으면 마감이 40초라 거의 안 생겨요).
    */
   async orderFlow(said: string, history: OrderChatTurn[] = []): Promise<BotReply> {
     const ai = this.ctx.ai;
@@ -1008,7 +991,7 @@ class Bot {
     const work = ai.orderChat(said, history, this.user.profileId).then((r) => this.orderResult(r));
     const failed = (e: unknown) => reply([text(`주문을 정리하지 못했어요 😢 ${errMsg(e)}\n다시 보내 주세요.`)], quick("주문 목록", "메뉴"));
 
-    // 정해진 모양의 주문은 AI 없이 바로 끝나요 → 기다릴 수 있는 만큼 기다렸다가 바로 답해요
+    // 정해진 모양의 주문은 AI 없이 바로 끝나요 → 기다릴 수 있는 만큼(콜백이면 넉넉히) 기다렸다가 바로 답해요
     let first: SkillResponse | typeof SLOW;
     try {
       first = await Promise.race([work, sleep(this.timeLeft() - 300).then((): typeof SLOW => SLOW)]);
@@ -1016,12 +999,6 @@ class Bot {
       return failed(e);
     }
     if (first !== SLOW) return first;
-
-    // 블록에서 콜백을 켰으면: ‘정리 중’이라고 먼저 답하고, 다 되면 카카오가 알아서 보여줘요 (누를 것 없음)
-    if (this.ctx.callback) {
-      this.ctx.callback(work.catch(failed));
-      return callbackAck("주문을 정리하고 있어요 ⏳ 잠시만요!");
-    }
 
     // 늦어요: ‘정리 중’을 저장해 두고, 끝나면 결과를 저장 → ‘결과 보기’ 또는 같은 말을 다시 보내면 그걸 보여줘요
     await this.setSession({ flow: "ai_job", step: "running", data: { said } });
