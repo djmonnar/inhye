@@ -18,7 +18,7 @@ export const maxDuration = 60;
  * - 콜백을 안 켠 블록: 카카오는 5초 안에 답을 못 받으면 오류를 보여주니, 4.3초가 넘으면 ‘다시 보내 달라’고 먼저 답해요.
  *   주문 비서는 정해진 모양이면 AI 없이 바로, AI가 3.8초 안에 못 끝나면 ‘결과 보기’(bot.ts).
  * - 콜백을 켠 블록(요청에 userRequest.callbackUrl): 카카오는 **매번** useCallback:true 답을 기대해요
- *   (일반 답을 주면 ‘스킬 서버 연결 오류’ — 2026-11-14 확인). 그래서 바로 ‘잠깐만요’로 답하고,
+ *   (일반 답을 주면 ‘스킬 서버 연결 오류’ — 2026-11-14 확인). 그래서 바로 {useCallback:true}만(대기 문구 없이) 답하고,
  *   진짜 답은 넉넉한 마감(40초)으로 만든 뒤 콜백 주소로 보내요(주소는 1분 안에 한 번만 쓸 수 있어요).
  */
 const HEADER = "x-popo-key";
@@ -111,7 +111,8 @@ export async function POST(req: Request) {
       }
       await sendCallback(callbackUrl, res);
     });
-    return Response.json(callbackAck("잠깐만요 ⏳"));
+    // 대기 문구(data)는 안 줘요 → ‘잠깐만요’ 말풍선 없이 답 하나만 와요
+    return Response.json(callbackAck());
   }
 
   const work = handleSkill(body, ctx);

@@ -56,15 +56,18 @@ export interface SkillResponse {
   template: { outputs: Output[]; quickReplies?: QuickReply[] };
 }
 
-/** 콜백 모드의 첫 답: ‘기다려 주세요’ — 진짜 답은 나중에 callbackUrl로 보내요 (template 없이) */
+/**
+ * 콜백 모드의 첫 답 — 진짜 답은 나중에 callbackUrl로 보내요 (template 없이).
+ * data.text를 주면 ‘기다려 주세요’ 말풍선이 하나 더 생겨요. 빼면 대기 문구 없이 답만 와요(공식 가이드: data는 쓸 때만).
+ */
 export interface CallbackAck {
   version: "2.0";
   useCallback: true;
-  data: { text: string };
+  data?: { text: string };
 }
 
-export const callbackAck = (t: string): CallbackAck => ({ version: "2.0", useCallback: true, data: { text: cut(t, 400) } });
-export const isCallbackAck = (r: SkillResponse | CallbackAck): r is CallbackAck => "useCallback" in r;
+export const callbackAck = (t?: string): CallbackAck =>
+  t ? { version: "2.0", useCallback: true, data: { text: cut(t, 400) } } : { version: "2.0", useCallback: true };
 
 export const cut = (s: string, n: number) => {
   const chars = [...(s ?? "")];

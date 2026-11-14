@@ -78,7 +78,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 | Xprinter 라벨 | ✅ PC 드라이버 인쇄 · 안드로이드 USB 직접(TSPL) · 노트북 인쇄 스테이션 | [printing.md](docs/wiki/printing.md) |
 | OpenAI | ✅ 사진→상품정보, 링크→상품정보, 홍보글, 가게 리포트, 주문 비서 (`OPENAI_API_KEY`) | [features.md](docs/wiki/features.md) |
 | 카카오톡 ‘나에게 보내기’ | ✅ 연결·테스트 발송 확인(2026-11-10). 보내는 시간은 주문 화면에서 선택(스키마 v4 `app_settings`) | [orders-kakao.md](docs/wiki/orders-kakao.md) |
-| 카카오 챗봇 (오픈빌더 스킬) | ✅ 카톡에서 주문 등록 동작 확인(2026-11-13) + **AI 해석·주문 비서**(정해진 모양 주문은 AI 없이 바로 `orderParse.ts`, AI가 5초 넘으면 ‘결과 보기’). **폴백 블록 콜백 켬(2026-11-14)** → 콜백 블록은 매번 `useCallback:true`가 먼저여야 해서 route가 ‘잠깐만요 ⏳’ 후 콜백으로 답 |  [suppliers-kakao-bot.md](docs/wiki/suppliers-kakao-bot.md) |
+| 카카오 챗봇 (오픈빌더 스킬) | ✅ 카톡에서 주문 등록 동작 확인(2026-11-13) + **AI 해석·주문 비서**(정해진 모양 주문은 AI 없이 바로 `orderParse.ts`, AI가 5초 넘으면 ‘결과 보기’). **폴백 블록 콜백 켬(2026-11-14)** → 콜백 블록은 매번 `useCallback:true`가 먼저여야 해서 route가 대기 문구 없이 `{useCallback:true}` 후 콜백으로 답 |  [suppliers-kakao-bot.md](docs/wiki/suppliers-kakao-bot.md) |
 
 ## 7. 다음에 할 일 (열린 문제)
 
