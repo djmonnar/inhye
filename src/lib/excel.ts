@@ -1,6 +1,6 @@
 import type { Cell, Workbook } from "exceljs";
 import { groupLabel, type Settlement } from "./settle";
-import { normalizeBarcode, parseNum } from "./format";
+import { isWebBarcode, normalizeBarcode, parseNum } from "./format";
 import type { BulkProductRow, Product, Supplier } from "./types";
 
 /**
@@ -44,7 +44,8 @@ function kioskRow(p: Product, unitPrice: UnitPriceMode): string[] {
     yn(p.is_active),
     yn(p.kiosk_track_stock),
     String(p.kiosk_track_stock ? Math.max(p.stock_qty, 0) : 0),
-    p.barcode ?? "",
+    // 웹 주소(태그 QR)는 바코드가 아니라 빈칸으로 (리더기에서 못 찍어요)
+    isWebBarcode(p.barcode) ? "" : (p.barcode ?? ""),
     unitPrice === "cost" ? String(p.cost_price) : unitPrice === "price" ? String(p.sale_price) : "",
     p.name_en ?? "",
     p.name_zh ?? "",

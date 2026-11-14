@@ -1,6 +1,7 @@
 "use client";
 
 import { Download, FileSpreadsheet, FileUp, Send, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useToast } from "@/components/providers";
 import { ConfirmSheet, PageHeader, Segmented, Toggle } from "@/components/ui";
@@ -15,7 +16,7 @@ import {
   type ParsedSheet,
   type UnitPriceMode,
 } from "@/lib/excel";
-import { needsKioskSync } from "@/lib/format";
+import { isWebBarcode, needsKioskSync } from "@/lib/format";
 import { useProducts, useRefresh, useSuppliers } from "@/lib/queries";
 import { store } from "@/lib/store";
 import { emptySupplier } from "@/components/SupplierSheet";
@@ -41,6 +42,7 @@ export default function ExcelPage() {
 
   const dirty = useMemo(() => products.filter(needsKioskSync), [products]);
   const targets = scope === "dirty" ? dirty : scope === "active" ? products.filter((p) => p.is_active) : products;
+  const webCodes = targets.filter((p) => isWebBarcode(p.barcode)).length;
   const plan = useMemo(() => (sheet ? planImport(sheet, products, opts) : []), [sheet, products, opts]);
   const counts = useMemo(
     () => ({
@@ -173,6 +175,15 @@ export default function ExcelPage() {
               양식의 선택 칸이에요. 빅솔론 화면에서 ‘상품단가’가 어디에 쓰이는지 한 번 확인해 보세요.
             </p>
           </div>
+          {webCodes > 0 && (
+            <p className="rounded-2xl bg-butter-100 p-3 text-xs text-butter-700" role="alert">
+              바코드에 웹 주소(태그 QR)가 들어간 상품 {webCodes}개는 바코드 칸을 비워서 넣어요. 리더기로 찍으려면 먼저{" "}
+              <Link href="/products?status=webcode" className="font-semibold underline">
+                상품 목록 ‘🔗 바코드 확인’
+              </Link>
+              에서 매장용 바코드로 바꿔 주세요.
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <button type="button" className="btn-primary" disabled={busy} onClick={() => exportKiosk(false)}>
               <Download size={18} /> 다운로드
