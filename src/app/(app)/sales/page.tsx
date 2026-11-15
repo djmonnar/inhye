@@ -262,7 +262,7 @@ export default function SalesPage() {
         sub="빅솔론 판매 → 재고 자동 반영"
         right={
           <Link href="/sales/settle" className="btn-soft btn-sm">
-            A/B 정산
+            정산
           </Link>
         }
       />

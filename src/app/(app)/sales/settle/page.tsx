@@ -5,9 +5,10 @@ import { ChevronDown, Copy, Download, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useToast } from "@/components/providers";
 import { EmptyState, Loading, PageHeader, Segmented } from "@/components/ui";
-import { kstToday, shiftDay } from "@/lib/day";
+import { actDay, kstToday, shiftDay } from "@/lib/day";
 import { num, relTime, won } from "@/lib/format";
-import { groupLabel, OTHER, settle, settleText, type SettleGroup } from "@/lib/settle";
+import { FLOWER_LABEL, groupLabel, OTHER, settle, settleOrders, settleText, type OrderBucket, type OrderSettle, type SettleGroup } from "@/lib/settle";
+import type { Order } from "@/lib/types";
 import { store } from "@/lib/store";
 
 /**
@@ -95,6 +96,92 @@ function GroupDetail({ g }: { g: SettleGroup }) {
   );
 }
 
+/** 💐 꽃다발 주문 칸 (픽업 · 택배) */
+function FlowerTile({ f, total }: { f: OrderSettle; total: number }) {
+  const share = total > 0 ? Math.round((f.amount / total) * 100) : 0;
+  return (
+    <div className="col-span-2 rounded-3xl border-2 border-line bg-white p-3">
+      <p className="flex items-baseline justify-between gap-2">
+        <span className="font-cute text-lg">{FLOWER_LABEL}</span>
+        <span className="text-xs text-ink-soft">{share}%</span>
+      </p>
+      <p className="mt-1 font-cute text-2xl text-ink">{won(f.amount)}</p>
+      <p className="text-xs text-ink-soft">
+        완료 {num(f.count)}건 · 픽업 {won(f.pickup.amount)} ({num(f.pickup.count)}건) · 택배 {won(f.delivery.amount)} ({num(f.delivery.count)}건)
+      </p>
+    </div>
+  );
+}
+
+function OrderRows({ list }: { list: Order[] }) {
+  return (
+    <ul className="space-y-1">
+      {list.map((o) => (
+        <li key={o.id} className="flex items-center gap-2 text-xs">
+          <span className="w-16 shrink-0 text-ink-soft">{md(actDay(o))}</span>
+          <span className="min-w-0 flex-1 truncate">
+            {o.customer || "-"} · {o.item}
+          </span>
+          <span className="w-20 shrink-0 text-right">{won(o.price)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function FlowerDetail({ f }: { f: OrderSettle }) {
+  const [open, setOpen] = useState<"pickup" | "delivery" | "pending" | null>(null);
+  const rows: [typeof open, string, OrderBucket][] = [
+    ["pickup", "🛍 픽업", f.pickup],
+    ["delivery", "📦 택배 (출고일 기준)", f.delivery],
+  ];
+  return (
+    <section className="card p-4">
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <p className="font-cute text-lg">{FLOWER_LABEL}</p>
+        <p className="text-sm font-semibold">{won(f.amount)}</p>
+      </div>
+      <ul className="divide-y-2 divide-dashed divide-line">
+        {rows.map(([key, label, b]) => (
+          <li key={key}>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 py-2.5 text-left"
+              aria-expanded={open === key}
+              onClick={() => setOpen(open === key ? null : key)}
+            >
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">{label}</span>
+              <span className="shrink-0 text-xs text-ink-soft">{num(b.count)}건</span>
+              <span className="w-24 shrink-0 text-right text-sm">{won(b.amount)}</span>
+              <ChevronDown size={16} className={`shrink-0 text-ink-faint transition ${open === key ? "rotate-180" : ""}`} />
+            </button>
+            {open === key && (
+              <div className="mb-2 rounded-2xl bg-cream px-3 py-2">
+                {b.count ? <OrderRows list={b.orders} /> : <p className="text-xs text-ink-faint">이 기간에 완료한 주문이 없어요</p>}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+      {f.pending.count > 0 && (
+        <div className="mt-2 rounded-2xl bg-butter-100 px-3 py-2 text-xs text-butter-700">
+          <button type="button" className="flex w-full items-center gap-2 text-left" onClick={() => setOpen(open === "pending" ? null : "pending")}>
+            <span className="flex-1">
+              ⏳ 완료 안 한 주문 {num(f.pending.count)}건 ({won(f.pending.amount)})은 정산에 안 들어가요. 주문 화면에서 ‘완료’를 누르면 들어가요.
+            </span>
+            <ChevronDown size={16} className={`shrink-0 transition ${open === "pending" ? "rotate-180" : ""}`} />
+          </button>
+          {open === "pending" && (
+            <div className="mt-2 text-ink">
+              <OrderRows list={f.pending.orders} />
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function SettlePage() {
   const toast = useToast();
   const [today] = useState(kstToday);
@@ -111,12 +198,22 @@ export default function SettlePage() {
     staleTime: 60_000,
     retry: false,
   });
+  const oq = useQuery({
+    queryKey: ["orders", "settle", start, end],
+    queryFn: () => store().settleOrders(start, end),
+    enabled: !invalid,
+    retry: false,
+  });
   const result = useMemo(() => (q.data ? settle(q.data.items) : null), [q.data]);
+  const flowers = useMemo(() => (oq.data ? settleOrders(oq.data, start, end) : null), [oq.data, start, end]);
+  const kioskAmount = result?.amount ?? 0;
+  const flowerAmount = flowers?.amount ?? 0;
+  const total = kioskAmount + flowerAmount;
+  const hasAny = Boolean(result?.groups.length || flowers?.count || flowers?.pending.count);
 
   async function copyText() {
-    if (!result) return;
     try {
-      await navigator.clipboard.writeText(settleText(result, start, end, won, num));
+      await navigator.clipboard.writeText(settleText(result, flowers, start, end, won, num));
       toast("정산 요약을 복사했어요. 카톡에 붙여 넣으세요!", "wink");
     } catch {
       toast("복사하지 못했어요", "sad");
@@ -124,10 +221,9 @@ export default function SettlePage() {
   }
 
   async function downloadExcel() {
-    if (!result) return;
     try {
       const { buildSettleWorkbook, download } = await import("@/lib/excel");
-      download(await buildSettleWorkbook(result, start, end), `포포하우스_정산_${start}_${end}.xlsx`);
+      download(await buildSettleWorkbook(result, flowers, start, end), `포포하우스_정산_${start}_${end}.xlsx`);
     } catch {
       toast("엑셀을 만들지 못했어요", "sad");
     }
@@ -135,7 +231,7 @@ export default function SettlePage() {
 
   return (
     <div>
-      <PageHeader back title="A/B 정산" sub="A = 인혜 · B = 경령 (빅솔론 분류명의 A·B)" />
+      <PageHeader back title="정산" sub="A = 인혜 · B = 경령 · 💐 꽃다발 주문(픽업·택배)" />
       <div className="space-y-4">
         <section className="card space-y-3 p-4">
           <Segmented<Period>
@@ -175,8 +271,16 @@ export default function SettlePage() {
             <span>
               {md(start)} ~ {md(end)} · {num(days)}일{q.data ? ` · ${relTime(q.data.fetchedAt)} 받음` : ""}
             </span>
-            <button type="button" className="btn-ghost btn-sm" disabled={!!invalid || q.isFetching} onClick={() => q.refetch()}>
-              <RefreshCw size={14} className={q.isFetching ? "animate-spin" : ""} /> 새로 받기
+            <button
+              type="button"
+              className="btn-ghost btn-sm"
+              disabled={!!invalid || q.isFetching || oq.isFetching}
+              onClick={() => {
+                void q.refetch();
+                void oq.refetch();
+              }}
+            >
+              <RefreshCw size={14} className={q.isFetching || oq.isFetching ? "animate-spin" : ""} /> 새로 받기
             </button>
           </div>
           {invalid && (
@@ -187,46 +291,57 @@ export default function SettlePage() {
         </section>
 
         {q.data?.sample && (
-          <p className="rounded-2xl bg-butter-100 px-3 py-2 text-xs text-butter-700">체험 모드라 샘플 숫자예요. 빅솔론을 연결하면 실제 매출로 나눠요.</p>
+          <p className="rounded-2xl bg-butter-100 px-3 py-2 text-xs text-butter-700">체험 모드라 키오스크 숫자는 샘플이에요. 빅솔론을 연결하면 실제 매출로 나눠요.</p>
         )}
 
-        {invalid ? null : q.isLoading ? (
-          <Loading text="빅솔론에서 받는 중..." />
-        ) : q.error ? (
-          <p className="rounded-2xl bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
-            {q.error instanceof Error ? q.error.message : "빅솔론에서 받아오지 못했어요."}
-          </p>
-        ) : !result || result.groups.length === 0 ? (
-          <EmptyState mood="sleep" title="이 기간엔 판매가 없어요" desc="다른 기간을 골라 보세요." />
+        {invalid ? null : (q.isLoading || oq.isLoading) && !hasAny ? (
+          <Loading text="정산 계산하는 중..." />
         ) : (
           <>
-            <section className="card p-4">
-              <div className="mb-3 flex items-baseline justify-between gap-2">
-                <p className="font-cute text-lg">합계</p>
-                <p className="text-sm">
-                  <b className="font-cute text-xl">{won(result.amount)}</b> <span className="text-ink-soft">· {num(result.qty)}개</span>
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {result.groups.map((g) => (
-                  <GroupTile key={g.key} g={g} total={result.amount} />
-                ))}
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button type="button" className="btn-soft btn-sm" onClick={copyText}>
-                  <Copy size={16} /> 카톡용 복사
-                </button>
-                <button type="button" className="btn-soft btn-sm" onClick={downloadExcel}>
-                  <Download size={16} /> 엑셀로 받기
-                </button>
-              </div>
-              <p className="mt-2 text-[11px] text-ink-faint">
-                금액은 빅솔론 상품별 결제 금액(할인 반영) 기준이에요. 오늘 판매는 10분쯤 늦게 반영돼요.
+            {(q.error || oq.error) && (
+              <p className="rounded-2xl bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
+                {q.error ? `키오스크(빅솔론): ${q.error instanceof Error ? q.error.message : "받아오지 못했어요."}` : ""}
+                {q.error && oq.error ? " / " : ""}
+                {oq.error ? `꽃다발 주문: ${oq.error instanceof Error ? oq.error.message : "불러오지 못했어요."}` : ""}
               </p>
-            </section>
-            {result.groups.map((g) => (
-              <GroupDetail key={g.key} g={g} />
-            ))}
+            )}
+            {!hasAny && !q.error && !oq.error ? (
+              <EmptyState mood="sleep" title="이 기간엔 판매가 없어요" desc="다른 기간을 골라 보세요." />
+            ) : (
+              <>
+                <section className="card p-4">
+                  <div className="mb-1 flex items-baseline justify-between gap-2">
+                    <p className="font-cute text-lg">총합계</p>
+                    <p className="font-cute text-2xl">{won(total)}</p>
+                  </div>
+                  <p className="mb-3 text-right text-xs text-ink-soft">
+                    키오스크 {won(kioskAmount)}
+                    {result ? ` (${num(result.qty)}개)` : ""} + 꽃다발 주문 {won(flowerAmount)}
+                    {flowers ? ` (${num(flowers.count)}건)` : ""}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {result?.groups.map((g) => <GroupTile key={g.key} g={g} total={total} />)}
+                    {flowers && <FlowerTile f={flowers} total={total} />}
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button type="button" className="btn-soft btn-sm" onClick={copyText}>
+                      <Copy size={16} /> 카톡용 복사
+                    </button>
+                    <button type="button" className="btn-soft btn-sm" onClick={downloadExcel}>
+                      <Download size={16} /> 엑셀로 받기
+                    </button>
+                  </div>
+                  <p className="mt-2 text-[11px] text-ink-faint">
+                    키오스크는 빅솔론 결제 금액(할인 반영), 오늘 판매는 10분쯤 늦게 반영돼요. 꽃다발 주문은 ‘완료’한 주문의 가격이에요(픽업은 픽업일, 택배는
+                    출고일 기준).
+                  </p>
+                </section>
+                {result?.groups.map((g) => (
+                  <GroupDetail key={g.key} g={g} />
+                ))}
+                {flowers && <FlowerDetail f={flowers} />}
+              </>
+            )}
           </>
         )}
       </div>

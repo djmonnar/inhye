@@ -1,7 +1,8 @@
 import type { Cell, Workbook } from "exceljs";
-import { groupLabel, type Settlement } from "./settle";
+import { actDay } from "./day";
+import { FLOWER_LABEL, groupLabel, type OrderSettle, type Settlement } from "./settle";
 import { isWebBarcode, normalizeBarcode, parseNum } from "./format";
-import type { BulkProductRow, Product, Supplier } from "./types";
+import type { BulkProductRow, Order, Product, Supplier } from "./types";
 
 /**
  * 빅솔론 상품 대량작업(엑셀 업로드) 양식 — 업로드해 주신 엑셀과 같은 열 순서/색/서식.
@@ -155,31 +156,38 @@ export async function buildBackupWorkbook(
   return toBlob(wb);
 }
 
-/** A/B 정산 엑셀: 요약 + 묶음(A·B·기타)마다 시트 하나 (분류 · 상품 · 코드 · 수량 · 금액) */
-export async function buildSettleWorkbook(s: Settlement, start: string, end: string): Promise<Blob> {
+/** 정산 엑셀: 요약 + 묶음(A·B·기타)마다 시트 + 꽃다발 주문 시트 */
+export async function buildSettleWorkbook(s: Settlement | null, f: OrderSettle | null, start: string, end: string): Promise<Blob> {
   const ExcelJS = await loadExcel();
   const wb = new ExcelJS.Workbook();
   const sum = wb.addWorksheet("요약");
   sum.columns = [
-    { header: "묶음", width: 10 },
-    { header: "분류", width: 22 },
-    { header: "수량", width: 10 },
+    { header: "묶음", width: 16 },
+    { header: "분류", width: 24 },
+    { header: "수량·건수", width: 12 },
     { header: "금액", width: 14 },
   ];
-  for (const g of s.groups) {
+  for (const g of s?.groups ?? []) {
     for (const c of g.categories) sum.addRow([groupLabel(g.key), c.name, c.qty, c.amount]);
     const r = sum.addRow([groupLabel(g.key), `${groupLabel(g.key)} 합계`, g.qty, g.amount]);
     r.font = { bold: true };
   }
-  const total = sum.addRow(["", "전체 합계", s.qty, s.amount]);
+  if (f) {
+    sum.addRow([FLOWER_LABEL, "픽업", f.pickup.count, f.pickup.amount]);
+    sum.addRow([FLOWER_LABEL, "택배", f.delivery.count, f.delivery.amount]);
+    const r = sum.addRow([FLOWER_LABEL, `꽃다발 주문 합계`, f.count, f.amount]);
+    r.font = { bold: true };
+  }
+  const total = sum.addRow(["", "총합계", "", (s?.amount ?? 0) + (f?.amount ?? 0)]);
   total.font = { bold: true };
   sum.addRow([]);
   sum.addRow(["기간", `${start} ~ ${end}`]);
-  sum.addRow(["기준", "빅솔론 상품별 매출(결제 금액), 분류명 앞글자로 묶음"]);
+  sum.addRow(["기준", "키오스크: 빅솔론 상품별 결제 금액(분류명의 A·B로 묶음) / 꽃다발 주문: 완료한 주문 가격(픽업일·출고일 기준)"]);
+  if (f?.pending.count) sum.addRow(["참고", `완료 안 한 꽃다발 주문 ${f.pending.count}건 ${f.pending.amount}원은 빠져 있어요`]);
   sum.getColumn(4).numFmt = "#,##0";
   styleHeader(sum.getRow(1));
 
-  for (const g of s.groups) {
+  for (const g of s?.groups ?? []) {
     const ws = wb.addWorksheet(groupLabel(g.key).replace(/[\\/?*[\]:]/g, " "));
     ws.columns = [
       { header: "분류", width: 22 },
@@ -191,6 +199,30 @@ export async function buildSettleWorkbook(s: Settlement, start: string, end: str
     for (const c of g.categories) for (const it of c.items) ws.addRow([c.name, it.name, it.code ?? "", it.qty, it.amount]);
     const r = ws.addRow(["합계", "", "", g.qty, g.amount]);
     r.font = { bold: true };
+    ws.getColumn(5).numFmt = "#,##0";
+    styleHeader(ws.getRow(1));
+  }
+
+  if (f) {
+    const ws = wb.addWorksheet("꽃다발 주문");
+    ws.columns = [
+      { header: "날짜", width: 12 },
+      { header: "방법", width: 8 },
+      { header: "주문한 분", width: 14 },
+      { header: "상품", width: 30 },
+      { header: "금액", width: 12 },
+      { header: "상태", width: 10 },
+    ];
+    const row = (o: Order, state: string) =>
+      ws.addRow([actDay(o), o.method === "delivery" ? "택배" : "픽업", o.customer, o.item, o.price, state]);
+    for (const o of [...f.pickup.orders, ...f.delivery.orders]) row(o, "완료");
+    const r = ws.addRow(["합계", "", "", "", f.amount, ""]);
+    r.font = { bold: true };
+    if (f.pending.count) {
+      ws.addRow([]);
+      ws.addRow(["완료 안 한 주문 (정산에서 빠짐)"]).font = { bold: true };
+      for (const o of f.pending.orders) row(o, "진행 중");
+    }
     ws.getColumn(5).numFmt = "#,##0";
     styleHeader(ws.getRow(1));
   }

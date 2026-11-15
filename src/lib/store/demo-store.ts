@@ -574,6 +574,13 @@ export function createDemoStore(): DataStore {
         .sort((a, b) => `${a.due_date} ${a.due_time ?? "99"}`.localeCompare(`${b.due_date} ${b.due_time ?? "99"}`));
     },
 
+    async settleOrders(start) {
+      const list = await load<Order[]>("orders", []);
+      return list
+        .filter((o) => o.status !== "canceled" && o.due_date >= start)
+        .map((o) => ({ ...o, due_time: o.due_time ?? null, ship_date: o.ship_date ?? null }));
+    },
+
     async saveOrder(input, id) {
       const list = await load<Order[]>("orders", []);
       const now = new Date().toISOString();

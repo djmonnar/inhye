@@ -1,6 +1,6 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { IMAGE_BUCKET, SUPABASE_URL } from "../config";
-import { normTime } from "../day";
+import { normTime, shiftDay } from "../day";
 import { blobToDataUrl } from "../image";
 import { loginEmail, setRemember, supabase } from "../supabase";
 import type {
@@ -432,6 +432,20 @@ export function createSupabaseStore(): DataStore {
         .or(`status.eq.open,updated_at.gte.${since}`)
         .order("due_date")
         .limit(500);
+      if (error) fail(error);
+      return (data as Order[]).map((o) => ({ ...o, due_time: normTime(o.due_time), ship_date: o.ship_date ?? null }));
+    },
+
+    async settleOrders(start, end) {
+      // 택배는 출고일(받는 날보다 앞)로 세니, 받는 날은 끝날 뒤 60일까지 받아 와서 거르기
+      const { data, error } = await sb
+        .from("orders")
+        .select("*")
+        .neq("status", "canceled")
+        .gte("due_date", start)
+        .lte("due_date", shiftDay(end, 60))
+        .order("due_date")
+        .limit(3000);
       if (error) fail(error);
       return (data as Order[]).map((o) => ({ ...o, due_time: normTime(o.due_time), ship_date: o.ship_date ?? null }));
     },

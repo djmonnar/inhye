@@ -181,6 +181,19 @@ export function supabaseBotDb(): BotDb {
       }
     },
 
+    async settleOrders(start, end) {
+      const until = new Date(Date.parse(`${end}T00:00:00Z`) + 60 * 86400000).toISOString().slice(0, 10);
+      const { data, error } = await sb
+        .from("orders")
+        .select("*")
+        .neq("status", "canceled")
+        .gte("due_date", start)
+        .lte("due_date", until)
+        .limit(3000);
+      if (error) dbFail(error, "주문");
+      return ((data ?? []) as Order[]).map((o) => ({ ...o, due_time: normTime(o.due_time), ship_date: o.ship_date ?? null }));
+    },
+
     async listOrders() {
       const { data, error } = await sb.from("orders").select("*").eq("status", "open").order("due_date").limit(200);
       if (error) dbFail(error, "주문 불러오기");

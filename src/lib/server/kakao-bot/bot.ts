@@ -1,7 +1,22 @@
 import { actDay, normTime, timeLabel } from "../../day";
 import { margin, num, relTime, won } from "../../format";
 import { j } from "../../josa";
-import { groupLabel, GROUP_OWNER, isSalesAsk, isSettleAsk, OTHER, salesWhen, settle, settlePeriod, settleWho } from "../../settle";
+import {
+  FLOWER,
+  FLOWER_LABEL,
+  groupLabel,
+  GROUP_OWNER,
+  isSalesAsk,
+  isSettleAsk,
+  OTHER,
+  salesWhen,
+  settle,
+  settleMethod,
+  settleOrders,
+  settlePeriod,
+  settleWho,
+  type OrderSettle,
+} from "../../settle";
 import { cheaperThanMain, isStale, sortSources, suggestQty } from "../../sources";
 import type { Order, OrderChangeOp, OrderChatResult, OrderChatTurn, Product, ProductSource, Supplier, SupplierInput, SupplierKind } from "../../types";
 import {
@@ -924,14 +939,25 @@ class Bot {
     return reply(outputs, MENU);
   }
 
-  /** A/B 정산 (A = 인혜, B = 경령) — 빅솔론 기간 합계를 분류명 A·B로 나눠요 */
+  /**
+   * 정산 — A(인혜) · B(경령)는 빅솔론 기간 합계를 분류명 A·B로, 💐 꽃다발 주문은 완료한 주문(픽업·택배).
+   * 한 묶음만 물으면 그 묶음 자세히 + 나머지 한 줄, 아니면 전부 + 총합계.
+   */
   async settleReply(said: string): Promise<SkillResponse> {
     const today = kstDay(this.now);
     const p = settlePeriod(said, today);
     const who = settleWho(said);
-    let items;
+    const how = who === FLOWER || who === null ? settleMethod(said) : null;
+    const flowerOnly = who === FLOWER;
+    let items: Awaited<ReturnType<BotDb["settleItems"]>> = [];
+    let f: OrderSettle;
     try {
-      items = await this.db.settleItems(p.start, p.end);
+      const [goods, orders] = await Promise.all([
+        flowerOnly ? Promise.resolve([]) : this.db.settleItems(p.start, p.end),
+        this.db.settleOrders(p.start, p.end),
+      ]);
+      items = goods;
+      f = settleOrders(orders, p.start, p.end);
     } catch (e) {
       return reply([text(`정산을 불러오지 못했어요 😢 ${errMsg(e)}`)], MENU);
     }
@@ -941,36 +967,63 @@ class Bot {
       const g = s.groups.find((x) => x.key === key);
       return `${groupLabel(key)}  ${won(g?.amount ?? 0)} (${num(g?.qty ?? 0)}개)`;
     };
+    const flowerLine = `${FLOWER_LABEL}  ${won(f.amount)} (${num(f.count)}건 · 픽업 ${won(f.pickup.amount)} · 택배 ${won(f.delivery.amount)})`;
     const keys = [...new Set([...Object.keys(GROUP_OWNER), ...s.groups.map((g) => g.key)])].filter(
       (k) => k !== OTHER || s.groups.some((g) => g.key === OTHER),
     );
-    const late = p.end === today ? "\n(오늘 판매는 10분쯤 늦게 반영돼요)" : "";
-    const again = (k: string) => [p.word, GROUP_OWNER[k] ?? k, "정산"].filter(Boolean).join(" ");
+    const late = !flowerOnly && p.end === today ? "\n(오늘 판매는 10분쯤 늦게 반영돼요)" : "";
+    const pendingNote = f.pending.count
+      ? `⏳ 완료 안 한 꽃다발 주문 ${num(f.pending.count)}건 ${won(f.pending.amount)}은 빠져 있어요 (완료하면 들어가요)`
+      : "";
+    const nameOf = (k: string) => (k === FLOWER ? "꽃다발" : (GROUP_OWNER[k] ?? k));
+    const again = (k: string) => [p.word, nameOf(k), "정산"].filter(Boolean).join(" ");
     const otherPeriod = p.word === "지난달" ? "이번 달" : "지난달";
+    const orderLine = (o: Order) => `• ${md(actDay(o))} ${o.method === "delivery" ? "📦" : "🛍"} ${o.customer || "-"} ${o.item} ${won(o.price)}`;
 
     let body: string;
     let qr: (string | [string, string])[];
-    if (who) {
+    if (flowerOnly) {
+      const b = how ? f[how] : null;
+      const shown = b ? b.orders : [...f.pickup.orders, ...f.delivery.orders];
+      body = [
+        `🧾 ${FLOWER_LABEL}${how ? (how === "pickup" ? " 픽업" : " 택배") : ""} ${p.label} 정산 · ${range}`,
+        b ? `${won(b.amount)} · 완료 ${num(b.count)}건` : `${won(f.amount)} · 완료 ${num(f.count)}건`,
+        ...(b ? [] : [`• 픽업 ${won(f.pickup.amount)} (${num(f.pickup.count)}건)`, `• 택배 ${won(f.delivery.amount)} (${num(f.delivery.count)}건, 출고일 기준)`]),
+        ...(shown.length ? ["", "주문", ...shown.slice(-6).map(orderLine), ...(shown.length > 6 ? [`외 ${num(shown.length - 6)}건`] : [])] : []),
+        ...(pendingNote ? ["", pendingNote] : []),
+      ].join("\n");
+      qr = [
+        how !== "pickup" && [p.word, "픽업 정산"].filter(Boolean).join(" "),
+        how !== "delivery" && [p.word, "택배 정산"].filter(Boolean).join(" "),
+        [p.word, "정산"].filter(Boolean).join(" ") || "이번 달 정산",
+        `${otherPeriod} 꽃다발 정산`,
+        "메뉴",
+      ].filter((x): x is string => Boolean(x));
+    } else if (who) {
       const g = s.groups.find((x) => x.key === who);
       const others = keys.filter((k) => k !== who && k !== OTHER);
       body = [
         `🧾 ${GROUP_OWNER[who] ?? who}(${who}) ${p.label} 정산 · ${range}`,
         `${won(g?.amount ?? 0)} · ${num(g?.qty ?? 0)}개`,
         ...(g?.categories.length ? ["", "분류별", ...g.categories.slice(0, 5).map((c) => `• ${c.name} ${won(c.amount)} (${num(c.qty)}개)`)] : []),
-        ...(others.length ? ["", ...others.map((k) => `(${line(k)})`)] : []),
+        "",
+        ...others.map((k) => `(${line(k)})`),
+        `(${flowerLine})`,
       ].join("\n");
-      qr = [...others.map((k) => again(k)), `${otherPeriod} ${GROUP_OWNER[who] ?? who} 정산`, "메뉴"];
+      qr = [...others.map((k) => again(k)), again(FLOWER), `${otherPeriod} ${nameOf(who)} 정산`, "메뉴"];
     } else {
       body = [
         `🧾 ${p.label} 정산 · ${range}`,
         ...keys.map((k) => line(k)),
-        `합계  ${won(s.amount)} (${num(s.qty)}개)`,
+        flowerLine,
+        `총합계  ${won(s.amount + f.amount)}`,
         ...(s.groups.some((g) => g.key === OTHER) ? ["", "기타 = 분류명에 A·B가 없는 상품 (빅솔론에서 고치면 들어가요)"] : []),
+        ...(pendingNote ? ["", pendingNote] : []),
       ].join("\n");
-      qr = [...Object.keys(GROUP_OWNER).map((k) => again(k)), `${otherPeriod} 정산`, "메뉴"];
+      qr = [...Object.keys(GROUP_OWNER).map((k) => again(k)), again(FLOWER), `${otherPeriod} 정산`, "메뉴"];
     }
     return reply(
-      [text(body + late), card("자세히 보기", "분류별 · 상품별, 엑셀로 받기", [link("앱 A/B 정산", this.app("/sales/settle"))])],
+      [text(body + late), card("자세히 보기", "묶음별 · 분류별 · 주문별, 엑셀로 받기", [link("앱 정산 화면", this.app("/sales/settle"))])],
       quick(...qr),
     );
   }

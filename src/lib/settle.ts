@@ -1,4 +1,5 @@
-import type { PosSettleItem } from "./types";
+import { actDay } from "./day";
+import type { Order, PosSettleItem } from "./types";
 
 /**
  * A/B 정산: 빅솔론 상품 분류명의 앞이나 뒤에 붙은 영문 한 글자로 묶어요.
@@ -12,9 +13,14 @@ export const OTHER = "기타";
 /** 묶음 주인 — A는 인혜 매출, B는 경령 매출 (사장님이 정한 것, 2026-11-14) */
 export const GROUP_OWNER: Record<string, string> = { A: "인혜", B: "경령" };
 
-/** "A · 인혜" / "B · 경령" / "기타" / "C 묶음" */
+/** 꽃다발 주문(픽업·택배) 묶음 — 키오스크가 아니라 앱 주문에서 와요 */
+export const FLOWER = "F";
+export const FLOWER_LABEL = "💐 꽃다발 주문";
+
+/** "A · 인혜" / "B · 경령" / "기타" / "💐 꽃다발 주문" / "C 묶음" */
 export function groupLabel(key: string): string {
   if (key === OTHER) return "기타";
+  if (key === FLOWER) return FLOWER_LABEL;
   return GROUP_OWNER[key] ? `${key} · ${GROUP_OWNER[key]}` : `${key} 묶음`;
 }
 
@@ -75,12 +81,63 @@ export function settle(items: PosSettleItem[]): Settlement {
   return { groups: out, ...sum(out) };
 }
 
-/** 카톡에 붙여 넣을 정산 요약 */
-export function settleText(s: Settlement, start: string, end: string, won: (n: number) => string, num: (n: number) => string) {
+// ---------------------------------------------------------------------------
+// 꽃다발 주문 정산: 기간 안에 ‘완료’한 주문 (픽업은 픽업일, 택배는 출고일·없으면 받는 날 기준).
+// 완료를 안 누른 주문은 따로(pending) — 정산 금액엔 안 넣어요. 취소는 빼요.
+// ---------------------------------------------------------------------------
+
+export interface OrderBucket {
+  count: number;
+  amount: number;
+  orders: Order[];
+}
+
+export interface OrderSettle {
+  pickup: OrderBucket;
+  delivery: OrderBucket;
+  count: number;
+  amount: number;
+  /** 기간 안인데 아직 완료 안 한 주문 */
+  pending: OrderBucket;
+}
+
+const bucket = (list: Order[]): OrderBucket => ({
+  count: list.length,
+  amount: list.reduce((n, o) => n + (o.price || 0), 0),
+  orders: [...list].sort((a, b) => actDay(a).localeCompare(actDay(b)) || a.customer.localeCompare(b.customer, "ko")),
+});
+
+export function settleOrders(orders: Order[], start: string, end: string): OrderSettle {
+  const inRange = orders.filter((o) => o.status !== "canceled" && actDay(o) >= start && actDay(o) <= end);
+  const done = inRange.filter((o) => o.status === "done");
+  const pickup = bucket(done.filter((o) => o.method === "pickup"));
+  const delivery = bucket(done.filter((o) => o.method === "delivery"));
+  return {
+    pickup,
+    delivery,
+    count: pickup.count + delivery.count,
+    amount: pickup.amount + delivery.amount,
+    pending: bucket(inRange.filter((o) => o.status === "open")),
+  };
+}
+
+/** 카톡에 붙여 넣을 정산 요약 (A·B·기타 + 꽃다발 주문 + 총합계) */
+export function settleText(
+  s: Settlement | null,
+  f: OrderSettle | null,
+  start: string,
+  end: string,
+  won: (n: number) => string,
+  num: (n: number) => string,
+) {
   const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
   const lines = [`🌸 포포하우스 정산 ${md(start)}~${md(end)}`];
-  for (const g of s.groups) lines.push(`${groupLabel(g.key)}: ${won(g.amount)} (${num(g.qty)}개)`);
-  lines.push(`합계: ${won(s.amount)} (${num(s.qty)}개)`);
+  for (const g of s?.groups ?? []) lines.push(`${groupLabel(g.key)}: ${won(g.amount)} (${num(g.qty)}개)`);
+  if (f) {
+    lines.push(`${FLOWER_LABEL}: ${won(f.amount)} (${num(f.count)}건 · 픽업 ${won(f.pickup.amount)} · 택배 ${won(f.delivery.amount)})`);
+  }
+  lines.push(`총합계: ${won((s?.amount ?? 0) + (f?.amount ?? 0))}`);
+  if (f?.pending.count) lines.push(`(완료 안 한 꽃다발 주문 ${num(f.pending.count)}건 ${won(f.pending.amount)}은 빠져 있어요)`);
   return lines.join("\n");
 }
 
@@ -134,19 +191,33 @@ export function settlePeriod(said: string, today: string): SettlePeriod {
   return month(y, m, "", `${m}월`);
 }
 
-/** 누구 정산인지: A(인혜) / B(경령) / 둘 다(null) */
+const FLOWER_WORDS = /꽃다발|꽃\s*주문|예약\s*주문|픽업|택배|배송/;
+
+/** 누구 정산인지: A(인혜) / B(경령) / F(꽃다발 주문) / 여럿·없음(null = 전체) */
 export function settleWho(said: string): string | null {
   const owners = Object.entries(GROUP_OWNER);
   const hit = new Set<string>();
   for (const [key, name] of owners) if (said.includes(name)) hit.add(key);
   for (const m of said.matchAll(/(?<![A-Za-z])([ABab])(?![A-Za-z])/g)) hit.add(m[1].toUpperCase());
+  if (FLOWER_WORDS.test(said)) hit.add(FLOWER);
+  if (/총|전체|모두|다\s*합/.test(said)) return null;
   return hit.size === 1 ? [...hit][0] : null;
+}
+
+/** 꽃다발 주문 중 픽업만 / 택배만 */
+export function settleMethod(said: string): "pickup" | "delivery" | null {
+  const pick = /픽업/.test(said);
+  const ship = /택배|배송/.test(said);
+  return pick && !ship ? "pickup" : ship && !pick ? "delivery" : null;
 }
 
 /** 정산을 묻는 말인지 (주문 줄·숫자 날짜는 아니에요) */
 export function isSettleAsk(said: string): boolean {
-  if (/\d{1,2}\s*[/.]\s*\d{1,2}|픽업|택배|꽃다발|출고/.test(said)) return false;
-  if (/정산/.test(said)) return true;
+  if (/\d{1,2}\s*[/.]\s*\d{1,2}/.test(said)) return false;
+  if (/정산/.test(said)) return !/출고|보냈|완료|취소|바꿔|변경/.test(said);
+  // “이번 달 꽃다발 매출”, “픽업 주문 총액” — 주문 등록·수정 말은 아니에요
+  if (FLOWER_WORDS.test(said) && /매출|총액|합계|얼마\s*(?:벌|팔)|수입/.test(said) && !/출고|보냈|완료|취소|바꿔|변경|등록/.test(said)) return true;
+  if (/픽업|택배|꽃다발|출고/.test(said)) return false;
   const names = Object.values(GROUP_OWNER).join("|");
   if (new RegExp(`(?:${names})`).test(said) && /매출|판매|얼마|금액|팔|벌/.test(said)) return true;
   return /(?<![A-Za-z])[ABab](?![A-Za-z])\s*(?:분류|묶음|쪽)?\s*(?:매출|판매|금액|얼마)|(?:분류|묶음)\s*[ABab](?![A-Za-z])/.test(said);

@@ -109,6 +109,8 @@ export interface DataStore {
 
   /** 예약 주문: 진행 중 전부 + 최근 60일 안에 끝난/취소한 것 */
   listOrders(): Promise<Order[]>;
+  /** 정산용: 기간(픽업일·출고일 기준) 근처의 취소 안 된 주문 — 거르기는 settleOrders()가 해요 */
+  settleOrders(start: string, end: string): Promise<Order[]>;
   saveOrder(input: OrderInput, id?: string): Promise<Order>;
   /** 관리자만. 보통은 status 'canceled'로 취소해요(되살릴 수 있게). */
   deleteOrder(id: string): Promise<void>;

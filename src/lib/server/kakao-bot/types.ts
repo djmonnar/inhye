@@ -48,6 +48,8 @@ export interface BotDb {
   todaySales(day: string): Promise<TodaySales>;
   /** 기간 상품별 판매 + 빅솔론 분류명 (A/B 정산, 최대 31일) */
   settleItems(start: string, end: string): Promise<PosSettleItem[]>;
+  /** 정산용 주문 (취소 빼고, 기간 근처) — 거르기는 settleOrders() */
+  settleOrders(start: string, end: string): Promise<Order[]>;
   /** 진행 중인 주문 (날짜·시간순) */
   listOrders(): Promise<Order[]>;
 }
