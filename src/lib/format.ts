@@ -85,6 +85,12 @@ export function isWebBarcode(code: string | null | undefined): boolean {
   return /^(https?:\/\/|www\.)/i.test(s) || s.includes("://");
 }
 
+/** 전화 걸기 링크용 숫자만 ("010-1234-5678" → "01012345678"), 번호가 아니면 null */
+export function telOf(v: string | null | undefined): string | null {
+  const digits = (v ?? "").replace(/[^\d+]/g, "");
+  return digits.replace(/\D/g, "").length >= 7 ? digits : null;
+}
+
 /** 빅솔론 판매에서 앱에 자동으로 만든 상품에 붙는 태그 (구매처·원가·바코드를 채울 상품) */
 export const AUTO_TAG = "빅솔론 자동 등록";
 

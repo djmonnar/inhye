@@ -1246,7 +1246,9 @@ class Bot {
     const d = o.status === "open" ? dLabel(daysUntil(actDay(o), today)) : "";
     return {
       title: `${md(o.due_date)}${t ? ` ${t}` : ""} ${o.method === "delivery" ? "📦" : "🛍"} ${o.customer || "-"}`,
-      description: [o.item, o.price ? won(o.price) : "", ship ? `출고 ${md(ship)}${d ? ` ${d}` : ""}` : d].filter(Boolean).join(" · "),
+      description: [o.item, o.contact ?? "", o.price ? won(o.price) : "", ship ? `출고 ${md(ship)}${d ? ` ${d}` : ""}` : d]
+        .filter(Boolean)
+        .join(" · "),
     };
   }
 

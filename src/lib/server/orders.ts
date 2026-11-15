@@ -293,6 +293,7 @@ async function quickPath(message: string, orders: Order[], today: string, caller
     method: x.method,
     ...(anyShip ? { ship_date: x.ship_date } : {}),
     memo: x.memo?.slice(0, 300) ?? null,
+    contact: x.contact,
     source_text: lines[i].slice(0, 1000),
     created_by: callerId,
   }));

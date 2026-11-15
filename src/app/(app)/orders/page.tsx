@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Check, Plus, RotateCcw, X } from "lucide-react";
+import { Bell, Check, Phone, Plus, RotateCcw, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { md, MethodChip, OrderChat } from "@/components/OrderChat";
@@ -9,7 +9,7 @@ import { useAuth, useToast } from "@/components/providers";
 import { EmptyState, Field, Loading, MoneyInput, PageHeader, Segmented, Sheet } from "@/components/ui";
 import { IS_DEMO } from "@/lib/config";
 import { actDay, kstToday, timeLabel } from "@/lib/day";
-import { num, won } from "@/lib/format";
+import { num, telOf, won } from "@/lib/format";
 import { useKakaoStatus, useOrders, useRefresh } from "@/lib/queries";
 import { store } from "@/lib/store";
 import type { Order, OrderInput, OrderMethod } from "@/lib/types";
@@ -130,15 +130,24 @@ function OrderSheet({ order, onClose, today }: { order: Order | "new" | null; on
           {(id) => <input id={id} className="input" value={f.item} onChange={(e) => set("item", e.target.value)} placeholder="예: 하치와레 꽃다발" />}
         </Field>
         <Field label="가격">{(id) => <MoneyInput id={id} value={f.price} onChange={(n) => set("price", n)} />}</Field>
+        <Field label="연락처 (선택)">
+          {(id) => (
+            <input
+              id={id}
+              className="input"
+              type="tel"
+              inputMode="tel"
+              autoComplete="off"
+              value={f.contact ?? ""}
+              onChange={(e) => set("contact", e.target.value || null)}
+              placeholder="예: 010-1234-5678"
+            />
+          )}
+        </Field>
         {f.method === "delivery" && (
-          <>
-            <Field label="연락처 (선택)">
-              {(id) => <input id={id} className="input" value={f.contact ?? ""} onChange={(e) => set("contact", e.target.value || null)} />}
-            </Field>
-            <Field label="주소 (선택)">
-              {(id) => <input id={id} className="input" value={f.address ?? ""} onChange={(e) => set("address", e.target.value || null)} />}
-            </Field>
-          </>
+          <Field label="주소 (선택)">
+            {(id) => <input id={id} className="input" value={f.address ?? ""} onChange={(e) => set("address", e.target.value || null)} />}
+          </Field>
         )}
         <Field label="메모 (선택)">
           {(id) => (
@@ -406,9 +415,15 @@ function Orders() {
                       </span>
                       <span className="block truncate text-xs text-ink-soft">
                         {won(o.price)}
+                        {o.contact ? ` · ${o.contact}` : ""}
                         {o.memo ? ` · ${o.memo}` : ""}
                       </span>
                     </button>
+                    {telOf(o.contact) && (
+                      <a href={`tel:${telOf(o.contact)}`} className="btn-ghost btn-sm shrink-0 px-2.5" aria-label={`${o.customer || "손님"}에게 전화`}>
+                        <Phone size={16} />
+                      </a>
+                    )}
                     {o.status !== "canceled" && (
                       <button
                         type="button"

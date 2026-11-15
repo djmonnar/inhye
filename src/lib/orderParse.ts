@@ -21,6 +21,8 @@ export interface ParsedOrder {
   item: string;
   price: number;
   memo: string | null;
+  /** 휴대폰·전화번호 (있으면) */
+  contact: string | null;
   /** 택배 출고일(보내는 날), 없으면 null */
   ship_date: string | null;
   /** 요일이 날짜와 다를 때 등 알려줄 말 */
@@ -102,6 +104,14 @@ export function parseOrderLine(raw: string, today: string): ParsedOrder | null {
     return " ";
   });
 
+  // 휴대폰·전화번호 → 연락처 (날짜·가격으로 잘못 읽지 않게 먼저 떼어 내요)
+  let contact: string | null = null;
+  s = s.replace(/(^|\s)(?:연락처|전화|폰|번호)?\s*[:：]?\s*(0\d{1,2}[-.\s]?\d{3,4}[-.\s]?\d{4})(?=\s|$)/, (_, sp: string, num: string) => {
+    const d = num.replace(/\D/g, "");
+    contact = d.length === 11 ? `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}` : d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : num;
+    return " ";
+  });
+
   // 택배 출고일 (있으면 먼저 떼어 내요)
   let ship: string | null = null;
   const sm = s.match(SHIP_RE);
@@ -171,6 +181,7 @@ export function parseOrderLine(raw: string, today: string): ParsedOrder | null {
     item,
     price: p.price,
     memo: memos.length ? memos.join(", ") : null,
+    contact,
     ship_date: ship,
     ...(notes.length ? { note: notes.join(" ") } : {}),
   };
