@@ -17,6 +17,7 @@ import {
   settleWho,
   type OrderSettle,
 } from "../../settle";
+import { isPriceListAsk, PRICE_FOOTER, PRICE_LIST, priceAnswer } from "../../priceList";
 import { cheaperThanMain, isStale, sortSources, suggestQty } from "../../sources";
 import type { Order, OrderChangeOp, OrderChatResult, OrderChatTurn, Product, ProductSource, Supplier, SupplierInput, SupplierKind } from "../../types";
 import {
@@ -243,6 +244,9 @@ class Bot {
     if (/^(도움말|도움|help|\?|사용법|뭐\s*할\s*수\s*있어)/i.test(said)) return this.help();
     if (/^연결\s*(해제|끊기|끊어)/.test(said)) return this.unlink();
     if (/^연결/.test(said)) return reply([text(`이미 ${this.user.name}님 계정과 연결돼 있어요.`)], MENU);
+
+    // 가게 주문 가격표 (“꽃다발 M 얼마야?”, “가격표”) — 사용법 질문보다 먼저 (“꽃다발 가격 어떻게 돼?”)
+    if (isPriceListAsk(said)) return this.priceReply(said);
 
     // 방법을 묻는 말 (“발주 어떻게 넣어?”) → 그 주제 사용법. 거래처·상품 이름이 들어 있으면 그걸 묻는 거라 건너뛰어요
     if (HOWTO_RE.test(said) && !/어떻게\s*(?:됐|되었|돼\s*가|되고)/.test(said)) {
@@ -1028,6 +1032,17 @@ class Bot {
     );
   }
 
+  /** 포포하우스 주문 가격표 — 물은 칸(꽃다발·꽃바구니·부케…)과 크기, 아니면 전체 */
+  priceReply(said: string): SkillResponse {
+    const a = priceAnswer(said);
+    const short = (s: (typeof PRICE_LIST)[number]) => (s.key === "doll" ? "인형 꽃다발" : s.title.split(" ")[0]);
+    const others = PRICE_LIST.filter((s) => s.key !== a.section?.key && s.key !== "options")
+      .slice(0, 3)
+      .map((s): [string, string] => [short(s), `${s.title} 가격`]);
+    const outputs = [text(a.section ? `${a.text}\n\n${PRICE_FOOTER}` : a.text)];
+    return reply(outputs, quick(...(a.section ? ["가격표", ...others] : ["꽃다발 가격", "꽃바구니 가격", "부케 가격"]), "메뉴"));
+  }
+
   /** 말에서 날짜를 읽어 그날 매출로 (기간이면 정산 합계로, 아직 안 온 날이면 알려줘요) */
   async salesAsk(said: string): Promise<SkillResponse> {
     const w = salesWhen(said, kstDay(this.now));
@@ -1145,6 +1160,8 @@ class Bot {
         return this.salesAsk(said);
       case "settle":
         return this.settleReply(said);
+      case "price_list":
+        return this.priceReply(said);
       case "howto": {
         const topic = topicFromQuery(r.query, said);
         return topic ? this.howtoReply(topic) : this.help();

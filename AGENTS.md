@@ -38,7 +38,7 @@ src/lib/server/       서버 전용: admin.ts(서비스 키, 권한), schema.ts(
                       kakao-bot/: bot.ts(챗봇 말 해석·대화 흐름·주문 — DB 없이 시험 가능), ai.ts(AI 해석기·주문 비서 연결), howto.ts(“발주 어떻게 해?” 사용법 답), kakao.ts(오픈빌더 응답·길이 제한·콜백), types.ts(BotDb·BotAi), supabase-db.ts
 src/lib/              excel.ts(빅솔론 양식), tspl.ts / labelCanvas.ts / usbPrinter.ts(라벨 직접 인쇄),
                       format.ts, queries.ts, report.ts, sources.ts(거래처별 가격 정렬·최저가 — 앱·챗봇 공용), josa.ts(을/를·이/가 조사),
-                      orderParse.ts(주문 한 줄을 AI 없이 바로 읽기 — 주문 비서 앞단), settle.ts(정산 묶기 — A·B 분류명 + 💐 꽃다발 주문 settleOrders, 챗봇 기간·사람·날짜 읽기)
+                      orderParse.ts(주문 한 줄을 AI 없이 바로 읽기 — 주문 비서 앞단), settle.ts(정산 묶기 — A·B 분류명 + 💐 꽃다발 주문 settleOrders, 챗봇 기간·사람·날짜 읽기), priceList.ts(주문 가격표 — 챗봇·주문 비서·주문 화면, 가격 바뀌면 여기만)
 public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해도 안전해야 함)
 ```
 

@@ -22,6 +22,7 @@ const INTENTS: AiIntent[] = [
   "reorder",
   "sales",
   "settle",
+  "price_list",
   "howto",
   "help",
   "unknown",
@@ -47,6 +48,7 @@ function instructions(suppliers: string[]) {
 - reorder: 발주할 것 보여 줘, 품절·채워야 할 것, 뭐 주문해야 해 (목록을 달라는 말)
 - sales: 하루 매출·판매 (오늘·어제·그저께·11/13·금요일 등, 전체 합계만 물을 때)
 - settle: 정산, A·B 분류(묶음)별 매출, “인혜 매출”(A), “경령 매출”(B), 꽃다발 주문(픽업·택배) 정산·매출, 이번 달·지난달·N월 매출 합계·총정산. query = 원문 그대로
+- price_list: 가게가 받는 주문 상품 가격(꽃다발·인형 꽃다발·꽃바구니·화병꽂이·달항아리·아크릴백·클리어백·부케·부토니에·코사지·추가 옵션·쇼핑백), 가격표·메뉴판. 키오스크 소품 가격은 product
 - howto: 어떤 일을 ‘어떻게 하는지’ 방법을 묻는 말. query = 주제 하나(reorder 발주·입고 / orders 예약 주문 / supplier 거래처 / price 가격 기록 / product 상품·재고 / sales 매출 / label 라벨 인쇄). 예) "발주 어떻게 넣어?" → howto, reorder
 - help: 챗봇 전체 사용법, 뭐 할 수 있어
 - unknown: 위에 없음 (인사·잡담 포함)

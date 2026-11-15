@@ -10,6 +10,7 @@ import { EmptyState, Field, Loading, MoneyInput, PageHeader, Segmented, Sheet } 
 import { IS_DEMO } from "@/lib/config";
 import { actDay, kstToday, timeLabel } from "@/lib/day";
 import { num, telOf, won } from "@/lib/format";
+import { PRICE_FOOTER, PRICE_LIST } from "@/lib/priceList";
 import { useKakaoStatus, useOrders, useRefresh } from "@/lib/queries";
 import { store } from "@/lib/store";
 import type { Order, OrderInput, OrderMethod } from "@/lib/types";
@@ -440,6 +441,34 @@ function Orders() {
             </ul>
           )}
         </section>
+
+        <details className="card p-4">
+          <summary className="cursor-pointer font-cute text-lg">📋 주문 가격표</summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {PRICE_LIST.map((s) => (
+              <div key={s.key} className="rounded-2xl bg-cream p-3">
+                <p className="font-cute">
+                  {s.emoji} {s.title}
+                  {s.sub && <span className="ml-1 text-xs text-ink-soft">{s.sub}</span>}
+                </p>
+                <ul className="mt-1 space-y-0.5 text-sm">
+                  {s.items.map((it) => (
+                    <li key={it.name} className="flex justify-between gap-2">
+                      <span className="text-ink-soft">{it.name}</span>
+                      <span className="text-right font-medium">{it.price}</span>
+                    </li>
+                  ))}
+                </ul>
+                {s.notes.map((n) => (
+                  <p key={n} className="mt-1 text-xs text-ink-faint">
+                    {n}
+                  </p>
+                ))}
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-ink-soft">{PRICE_FOOTER}</p>
+        </details>
 
         {user?.role === "admin" && <KakaoCard />}
       </div>

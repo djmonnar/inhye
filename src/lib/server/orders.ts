@@ -2,6 +2,7 @@ import { actDay, normTime, timeLabel } from "../day";
 import { parseOrderLine, parseQuickAction } from "../orderParse";
 import { adminClient } from "./admin";
 import { askJson, objectSchema, STRING } from "./openai";
+import { priceListText } from "../priceList";
 import type { Order, OrderChangeOp, OrderChatResult, OrderChatTurn, OrderMethod } from "../types";
 
 /**
@@ -82,6 +83,9 @@ function instructions(today: string) {
 - 목록에 없는 주문을 바꾸라고 하면 reply로 못 찾았다고 말해.
 
 [정리·질문] "이번 주 주문 정리해줘", "택배 뭐 남았어?" 같은 건 actions 없이 목록을 보고 reply로 짧게 정리해(날짜순, 날짜·요일·방법·이름·상품·가격).
+
+[가게 가격표] 가격을 물으면 아래 표로만 답해(없는 건 ‘별도 문의’, 지어내지 말 것). 주문 줄에 가격이 없으면 price는 null로 두고, 상품이 표에 딱 맞으면 reply에 “가격표로는 ○원이에요”라고만 알려줘(마음대로 넣지 않기).
+${priceListText()}
 
 [답(reply)] 한국어 해요체, 짧고 다정하게. 무엇을 했는지 한두 줄. 지어내지 말 것.
 create일 때는 ref null, 모르는 칸은 null.`;

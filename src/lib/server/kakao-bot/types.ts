@@ -68,6 +68,7 @@ export type AiIntent =
   | "reorder"
   | "sales"
   | "settle"
+  | "price_list"
   | "howto"
   | "help"
   | "unknown";
