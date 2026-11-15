@@ -9,6 +9,8 @@ export interface PriceItem {
   name: string;
   /** 보여줄 가격 ("30,000원", "2만~3만원대", "별도 문의") */
   price: string;
+  /** 다르게 부르는 말 (가나디 = 강아지) */
+  aliases?: string[];
 }
 
 export interface PriceSection {
@@ -29,10 +31,11 @@ export const PRICE_LIST: PriceSection[] = [
     title: "인형 꽃다발",
     items: [
       { name: "치이카와", price: "30,000원" },
-      { name: "가나디", price: "35,000원" },
+      { name: "가나디", price: "35,000원", aliases: ["강아지"] },
     ],
     notes: ["가나디 꽃 추가금은 구성에 따라 달라져요"],
-    words: /인형\s*꽃다발|치이카와\s*꽃다발|가나디/,
+    // “강아지”는 가나디 — 다만 “강아지 키링 얼마”처럼 다른 상품이면 아니에요(꽃다발이거나 바로 가격을 물을 때만)
+    words: /인형\s*꽃다발|치이카와\s*꽃다발|가나디|강아지\s*(?:인형\s*)?꽃다발|강아지\s*(?:는|은)?\s*(?:얼마|가격|금액|몇\s*원)/,
   },
   {
     key: "bouquet",
@@ -146,7 +149,9 @@ export function findPriceSection(said: string): PriceSection | null {
 export function findPriceItem(section: PriceSection, said: string): PriceItem | null {
   const flat = (x: string) => x.replace(/\s+/g, "");
   // 이름 전체가 있으면 그것 (“꽃 추가”, “달력 레터링”)
-  const full = section.items.find((it) => it.name.length > 1 && flat(said).includes(flat(it.name)));
+  const full = section.items.find(
+    (it) => (it.name.length > 1 && flat(said).includes(flat(it.name))) || it.aliases?.some((a) => flat(said).includes(flat(a))),
+  );
   if (full) return full;
   // 아니면 이름 속 낱말이 가장 많이 맞는 것 (“코사지” → 혼주 / 사회자 코사지)
   let best: PriceItem | null = null;
@@ -173,10 +178,13 @@ export function isPriceListAsk(said: string): boolean {
   return Boolean(findPriceSection(said)) && /얼마|가격|금액|비용|몇\s*원|추가금/.test(said);
 }
 
+/** "가나디 (강아지)" — 다른 이름이 있으면 같이 */
+export const itemLabel = (it: PriceItem) => (it.aliases?.length ? `${it.name} (${it.aliases.join("·")})` : it.name);
+
 export function sectionText(s: PriceSection): string {
   return [
     `${s.emoji} ${s.title}${s.sub ? ` (${s.sub})` : ""}`,
-    ...s.items.map((it) => `• ${it.name} ${it.price}`),
+    ...s.items.map((it) => `• ${itemLabel(it)} ${it.price}`),
     ...s.notes.map((n) => `  ${n}`),
   ].join("\n");
 }

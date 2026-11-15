@@ -10,7 +10,7 @@ import { EmptyState, Field, Loading, MoneyInput, PageHeader, Segmented, Sheet } 
 import { IS_DEMO } from "@/lib/config";
 import { actDay, kstToday, timeLabel } from "@/lib/day";
 import { num, telOf, won } from "@/lib/format";
-import { PRICE_FOOTER, PRICE_LIST } from "@/lib/priceList";
+import { itemLabel, PRICE_FOOTER, PRICE_LIST } from "@/lib/priceList";
 import { useKakaoStatus, useOrders, useRefresh } from "@/lib/queries";
 import { store } from "@/lib/store";
 import type { Order, OrderInput, OrderMethod } from "@/lib/types";
@@ -454,7 +454,7 @@ function Orders() {
                 <ul className="mt-1 space-y-0.5 text-sm">
                   {s.items.map((it) => (
                     <li key={it.name} className="flex justify-between gap-2">
-                      <span className="text-ink-soft">{it.name}</span>
+                      <span className="text-ink-soft">{itemLabel(it)}</span>
                       <span className="text-right font-medium">{it.price}</span>
                     </li>
                   ))}
