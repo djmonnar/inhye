@@ -159,6 +159,10 @@ export default function GuidePage() {
           <button type="button" className="btn-soft btn-sm w-full" onClick={() => copy(HIEL_ASK)}>
             <Copy size={16} /> 히엘페이 문의 문구 복사
           </button>
+          <p className="text-xs text-ink-soft">
+            보낼 곳: <a href="mailto:info@hielpay.com" className="font-semibold underline">info@hielpay.com</a> (대표, 참조 mkt@hielpay.com 제휴) ·
+            고객센터 <a href="tel:15771984" className="underline">1577-1984</a> · 신규·가맹 상담 1577-5526
+          </p>
         </section>
       </div>
     </div>
