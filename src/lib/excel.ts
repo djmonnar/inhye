@@ -174,7 +174,7 @@ export async function buildSettleWorkbook(s: Settlement | null, f: OrderSettle |
   }
   if (f) {
     sum.addRow([FLOWER_LABEL, "픽업", f.pickup.count, f.pickup.amount]);
-    sum.addRow([FLOWER_LABEL, "택배", f.delivery.count, f.delivery.amount]);
+    sum.addRow([FLOWER_LABEL, "배달·택배", f.delivery.count, f.delivery.amount]);
     const r = sum.addRow([FLOWER_LABEL, `꽃다발 주문 합계`, f.count, f.amount]);
     r.font = { bold: true };
   }
@@ -214,7 +214,7 @@ export async function buildSettleWorkbook(s: Settlement | null, f: OrderSettle |
       { header: "상태", width: 10 },
     ];
     const row = (o: Order, state: string) =>
-      ws.addRow([actDay(o), o.method === "delivery" ? "택배" : "픽업", o.customer, o.item, o.price, state]);
+      ws.addRow([actDay(o), o.method === "delivery" ? "배달·택배" : "픽업", o.customer, o.item, o.price, state]);
     for (const o of [...f.pickup.orders, ...f.delivery.orders]) row(o, "완료");
     const r = ws.addRow(["합계", "", "", "", f.amount, ""]);
     r.font = { bold: true };

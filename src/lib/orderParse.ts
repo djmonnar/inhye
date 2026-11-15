@@ -145,9 +145,9 @@ export function parseOrderLine(raw: string, today: string): ParsedOrder | null {
 
   // 받는 방법
   let method: "pickup" | "delivery" = "pickup";
-  const mm = s.match(/(^|\s)(택배|배송|퀵|픽업|방문|수령)(?=\s|$)/);
+  const mm = s.match(/(^|\s)(택배|배송|배달|퀵|픽업|방문|수령)(?=\s|$)/);
   if (mm) {
-    method = /택배|배송|퀵/.test(mm[2]) ? "delivery" : "pickup";
+    method = /택배|배송|배달|퀵/.test(mm[2]) ? "delivery" : "pickup";
     s = s.replace(mm[0], " ");
   }
   if (ship) {

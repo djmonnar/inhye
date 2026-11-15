@@ -44,7 +44,7 @@ function saveChat(list: ChatMsg[]) {
 export function MethodChip({ method }: { method: OrderMethod }) {
   return method === "delivery" ? (
     <span className="inline-flex items-center gap-1 rounded-full bg-soda-100 px-2 py-0.5 text-[11px] text-soda-700">
-      <Truck size={12} /> 택배
+      <Truck size={12} /> 배달·택배
     </span>
   ) : (
     <span className="inline-flex items-center gap-1 rounded-full bg-berry-100 px-2 py-0.5 text-[11px] text-berry-700">

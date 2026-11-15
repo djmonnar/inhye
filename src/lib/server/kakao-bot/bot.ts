@@ -85,7 +85,7 @@ const SLOW: unique symbol = Symbol("slow");
 const JOB_STALE_MS = 90_000;
 
 /** 주문(예약) 이야기 같으면 바로 주문 비서로 — 날짜, 픽업·택배, 꽃다발, 보냈어·완료 … */
-const ORDER_RE = /(\d{1,2}\s*[\/.월]\s*\d{1,2}|픽업|택배|꽃다발|예약|주문\s*(?:등록|추가|넣|받|들어)|보냈|찾아\s*갔|가져\s*갔|완료|출고|발송)/;
+const ORDER_RE = /(\d{1,2}\s*[\/.월]\s*\d{1,2}|픽업|택배|배달|꽃다발|예약|주문\s*(?:등록|추가|넣|받|들어)|보냈|찾아\s*갔|가져\s*갔|완료|출고|발송)/;
 /** 방금 주문 얘기를 이어서 할 때 나오는 말 (“가격은 3만원이야”, “4시로 바꿔줘”, “주소는 ~야”) */
 const ORDER_FOLLOW_RE =
   /가격|\d+(?:\.\d+)?\s*만\s*(?:\d\s*천\s*)?원?|\d{1,3}(?:,\d{3})+\s*원?|\d{4,}\s*원|바꿔|바꾸|변경|수정|고쳐|시간|주소|연락처|번호|메모|추가|빼\s*줘|날짜|출고|발송|도착|요청|그거|그\s*주문/;
@@ -979,7 +979,7 @@ class Bot {
       const g = s.groups.find((x) => x.key === key);
       return `${groupLabel(key)}  ${won(g?.amount ?? 0)} (${num(g?.qty ?? 0)}개)`;
     };
-    const flowerLine = `${FLOWER_LABEL}  ${won(f.amount)} (${num(f.count)}건 · 픽업 ${won(f.pickup.amount)} · 택배 ${won(f.delivery.amount)})`;
+    const flowerLine = `${FLOWER_LABEL}  ${won(f.amount)} (${num(f.count)}건 · 픽업 ${won(f.pickup.amount)} · 배달·택배 ${won(f.delivery.amount)})`;
     const keys = [...new Set([...Object.keys(GROUP_OWNER), ...s.groups.map((g) => g.key)])].filter(
       (k) => k !== OTHER || s.groups.some((g) => g.key === OTHER),
     );
@@ -998,15 +998,15 @@ class Bot {
       const b = how ? f[how] : null;
       const shown = b ? b.orders : [...f.pickup.orders, ...f.delivery.orders];
       body = [
-        `🧾 ${FLOWER_LABEL}${how ? (how === "pickup" ? " 픽업" : " 택배") : ""} ${p.label} 정산 · ${range}`,
+        `🧾 ${FLOWER_LABEL}${how ? (how === "pickup" ? " 픽업" : " 배달·택배") : ""} ${p.label} 정산 · ${range}`,
         b ? `${won(b.amount)} · 완료 ${num(b.count)}건` : `${won(f.amount)} · 완료 ${num(f.count)}건`,
-        ...(b ? [] : [`• 픽업 ${won(f.pickup.amount)} (${num(f.pickup.count)}건)`, `• 택배 ${won(f.delivery.amount)} (${num(f.delivery.count)}건, 출고일 기준)`]),
+        ...(b ? [] : [`• 픽업 ${won(f.pickup.amount)} (${num(f.pickup.count)}건)`, `• 배달·택배 ${won(f.delivery.amount)} (${num(f.delivery.count)}건, 출고일 기준)`]),
         ...(shown.length ? ["", "주문", ...shown.slice(-6).map(orderLine), ...(shown.length > 6 ? [`외 ${num(shown.length - 6)}건`] : [])] : []),
         ...(pendingNote ? ["", pendingNote] : []),
       ].join("\n");
       qr = [
         how !== "pickup" && [p.word, "픽업 정산"].filter(Boolean).join(" "),
-        how !== "delivery" && [p.word, "택배 정산"].filter(Boolean).join(" "),
+        how !== "delivery" && [p.word, "배달 정산"].filter(Boolean).join(" "),
         [p.word, "정산"].filter(Boolean).join(" ") || "이번 달 정산",
         `${otherPeriod} 꽃다발 정산`,
         "메뉴",

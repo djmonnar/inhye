@@ -134,7 +134,7 @@ export function settleText(
   const lines = [`🌸 포포하우스 정산 ${md(start)}~${md(end)}`];
   for (const g of s?.groups ?? []) lines.push(`${groupLabel(g.key)}: ${won(g.amount)} (${num(g.qty)}개)`);
   if (f) {
-    lines.push(`${FLOWER_LABEL}: ${won(f.amount)} (${num(f.count)}건 · 픽업 ${won(f.pickup.amount)} · 택배 ${won(f.delivery.amount)})`);
+    lines.push(`${FLOWER_LABEL}: ${won(f.amount)} (${num(f.count)}건 · 픽업 ${won(f.pickup.amount)} · 배달·택배 ${won(f.delivery.amount)})`);
   }
   lines.push(`총합계: ${won((s?.amount ?? 0) + (f?.amount ?? 0))}`);
   if (f?.pending.count) lines.push(`(완료 안 한 꽃다발 주문 ${num(f.pending.count)}건 ${won(f.pending.amount)}은 빠져 있어요)`);
@@ -191,7 +191,7 @@ export function settlePeriod(said: string, today: string): SettlePeriod {
   return month(y, m, "", `${m}월`);
 }
 
-const FLOWER_WORDS = /꽃다발|꽃\s*주문|예약\s*주문|픽업|택배|배송/;
+const FLOWER_WORDS = /꽃다발|꽃\s*주문|예약\s*주문|픽업|택배|배송|배달/;
 
 /** 누구 정산인지: A(인혜) / B(경령) / F(꽃다발 주문) / 여럿·없음(null = 전체) */
 export function settleWho(said: string): string | null {
@@ -207,7 +207,7 @@ export function settleWho(said: string): string | null {
 /** 꽃다발 주문 중 픽업만 / 택배만 */
 export function settleMethod(said: string): "pickup" | "delivery" | null {
   const pick = /픽업/.test(said);
-  const ship = /택배|배송/.test(said);
+  const ship = /택배|배송|배달/.test(said);
   return pick && !ship ? "pickup" : ship && !pick ? "delivery" : null;
 }
 

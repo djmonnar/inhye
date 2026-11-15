@@ -95,7 +95,7 @@ function OrderSheet({ order, onClose, today }: { order: Order | "new" | null; on
         <Segmented<OrderMethod>
           options={[
             { value: "pickup", label: "🛍 픽업" },
-            { value: "delivery", label: "📦 택배" },
+            { value: "delivery", label: "📦 배달·택배" },
           ]}
           value={f.method}
           onChange={(v) => set("method", v)}

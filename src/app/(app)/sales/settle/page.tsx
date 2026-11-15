@@ -107,7 +107,7 @@ function FlowerTile({ f, total }: { f: OrderSettle; total: number }) {
       </p>
       <p className="mt-1 font-cute text-2xl text-ink">{won(f.amount)}</p>
       <p className="text-xs text-ink-soft">
-        완료 {num(f.count)}건 · 픽업 {won(f.pickup.amount)} ({num(f.pickup.count)}건) · 택배 {won(f.delivery.amount)} ({num(f.delivery.count)}건)
+        완료 {num(f.count)}건 · 픽업 {won(f.pickup.amount)} ({num(f.pickup.count)}건) · 배달·택배 {won(f.delivery.amount)} ({num(f.delivery.count)}건)
       </p>
     </div>
   );
@@ -133,7 +133,7 @@ function FlowerDetail({ f }: { f: OrderSettle }) {
   const [open, setOpen] = useState<"pickup" | "delivery" | "pending" | null>(null);
   const rows: [typeof open, string, OrderBucket][] = [
     ["pickup", "🛍 픽업", f.pickup],
-    ["delivery", "📦 택배 (출고일 기준)", f.delivery],
+    ["delivery", "📦 배달·택배 (출고일 기준)", f.delivery],
   ];
   return (
     <section className="card p-4">
@@ -231,7 +231,7 @@ export default function SettlePage() {
 
   return (
     <div>
-      <PageHeader back title="정산" sub="A = 인혜 · B = 경령 · 💐 꽃다발 주문(픽업·택배)" />
+      <PageHeader back title="정산" sub="A = 인혜 · B = 경령 · 💐 꽃다발 주문(픽업·배달·택배)" />
       <div className="space-y-4">
         <section className="card space-y-3 p-4">
           <Segmented<Period>
@@ -332,7 +332,7 @@ export default function SettlePage() {
                     </button>
                   </div>
                   <p className="mt-2 text-[11px] text-ink-faint">
-                    키오스크는 빅솔론 결제 금액(할인 반영), 오늘 판매는 10분쯤 늦게 반영돼요. 꽃다발 주문은 ‘완료’한 주문의 가격이에요(픽업은 픽업일, 택배는
+                    키오스크는 빅솔론 결제 금액(할인 반영), 오늘 판매는 10분쯤 늦게 반영돼요. 꽃다발 주문은 ‘완료’한 주문의 가격이에요(픽업은 픽업일, 배달·택배는
                     출고일 기준).
                   </p>
                 </section>
