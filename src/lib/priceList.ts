@@ -172,7 +172,7 @@ export function findPriceItem(section: PriceSection, said: string): PriceItem | 
 
 /** 가게 가격표를 묻는 말인지 — 정산·매출·주문 수정(“꽃다발 3만원으로 바꿔줘”)은 아니에요 */
 export function isPriceListAsk(said: string): boolean {
-  if (/정산|매출|팔렸|팔린|벌었|가격\s*기록|\d{1,2}\s*[/.]\s*\d{1,2}/.test(said)) return false;
+  if (/정산|매출|팔렸|팔린|벌었|가격\s*기록|원가|매입가|입고가|\d{1,2}\s*[/.]\s*\d{1,2}/.test(said)) return false;
   if (/바꿔|바꾸|변경|수정|고쳐|등록|추가해|빼\s*줘|\d+(?:\.\d+)?\s*만\s*원?|\d{1,3}(?:,\d{3})+|\d{4,}\s*원/.test(said)) return false;
   if (/가격표|메뉴판|주문\s*가격|가격\s*알려/.test(said)) return true;
   return Boolean(findPriceSection(said)) && /얼마|가격|금액|비용|몇\s*원|추가금/.test(said);

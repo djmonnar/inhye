@@ -109,6 +109,16 @@ export function supabaseBotDb(): BotDb {
       return (data ?? []).map((p) => ({ ...p, tags: p.tags ?? [] }) as unknown as Product);
     },
 
+    async setProductCost(id, cost) {
+      const { data: before, error: e1 } = await sb.from("products").select("kiosk_changed_at, kiosk_synced_at").eq("id", id).single();
+      if (e1) dbFail(e1, "원가");
+      const wasClean = Boolean(before?.kiosk_synced_at && before.kiosk_changed_at <= before.kiosk_synced_at);
+      const { data, error } = await sb.from("products").update({ cost_price: Math.max(0, Math.round(cost)) }).eq("id", id).select(`${PRODUCT_COLS}, kiosk_changed_at`).single();
+      if (error || !data) dbFail(error, "원가");
+      if (wasClean) await sb.from("products").update({ kiosk_synced_at: (data as { kiosk_changed_at: string }).kiosk_changed_at }).eq("id", id);
+      return { ...data, tags: data.tags ?? [] } as unknown as Product;
+    },
+
     async listSources() {
       const { data, error } = await sb.from("product_sources").select("*").limit(20000);
       if (error) dbFail(error, "거래처별 가격 불러오기");

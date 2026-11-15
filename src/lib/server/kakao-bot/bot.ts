@@ -1,5 +1,5 @@
 import { actDay, normTime, timeLabel } from "../../day";
-import { margin, num, relTime, won } from "../../format";
+import { margin, num, parseKoreanWon, relTime, won } from "../../format";
 import { j } from "../../josa";
 import {
   FLOWER,
@@ -89,6 +89,8 @@ const ORDER_RE = /(\d{1,2}\s*[\/.월]\s*\d{1,2}|픽업|택배|꽃다발|예약|�
 /** 방금 주문 얘기를 이어서 할 때 나오는 말 (“가격은 3만원이야”, “4시로 바꿔줘”, “주소는 ~야”) */
 const ORDER_FOLLOW_RE =
   /가격|\d+(?:\.\d+)?\s*만\s*(?:\d\s*천\s*)?원?|\d{1,3}(?:,\d{3})+\s*원?|\d{4,}\s*원|바꿔|바꾸|변경|수정|고쳐|시간|주소|연락처|번호|메모|추가|빼\s*줘|날짜|출고|발송|도착|요청|그거|그\s*주문/;
+const COST_RE = /원가|매입가|입고가/;
+
 /** 방금 주문 기억 — 이만큼 지나면 잊어요 */
 const ORDER_CTX_MS = 15 * 60 * 1000;
 
@@ -247,6 +249,11 @@ class Bot {
 
     // 가게 주문 가격표 (“꽃다발 M 얼마야?”, “가격표”) — 사용법 질문보다 먼저 (“꽃다발 가격 어떻게 돼?”)
     if (isPriceListAsk(said)) return this.priceReply(said);
+    // 상품 원가 — “곰돌이 털 키링 원가 3500원”(적기), “곰돌이 원가 얼마야?”(보기)
+    if (COST_RE.test(said) && !HOWTO_RE.test(said) && !/정산|매출|가격\s*기록/.test(said)) {
+      const r = await this.costReply(said);
+      if (r) return r;
+    }
 
     // 방법을 묻는 말 (“발주 어떻게 넣어?”) → 그 주제 사용법. 거래처·상품 이름이 들어 있으면 그걸 묻는 거라 건너뛰어요
     if (HOWTO_RE.test(said) && !/어떻게\s*(?:됐|되었|돼\s*가|되고)/.test(said)) {
@@ -348,6 +355,7 @@ class Bot {
             "• 거래처 상품 도매꾹 — 거기서 사는 상품·가격",
             "• 상품 곰돌이 / 바코드 숫자 — 재고·거래처별 가격",
             "• 가격 기록 곰돌이 — 거래처마다 값 적기",
+            "• 곰돌이 원가 3500원 — 원가 바로 적기 · 곰돌이 원가 얼마야?",
             "• 발주 목록 — 품절·품절 임박을 거래처별로",
             "• 오늘 매출",
             "• 이번 달 정산 · 지난달 정산 — A(인혜) · B(경령) 나눠서",
@@ -1029,6 +1037,72 @@ class Bot {
     return reply(
       [text(body + late), card("자세히 보기", "묶음별 · 분류별 · 주문별, 엑셀로 받기", [link("앱 정산 화면", this.app("/sales/settle"))])],
       quick(...qr),
+    );
+  }
+
+  /**
+   * 상품 원가: “곰돌이 털 키링 원가 3500원” → 적기(전 원가·마진 같이), 금액이 없으면 지금 원가 보여주기.
+   * 이름이 여러 상품에 맞으면 골라 달라고 해요(누르면 정확한 이름으로 다시 보내져요).
+   */
+  async costReply(said: string): Promise<SkillResponse | null> {
+    let name = "";
+    let rest = "";
+    const after = said.match(/^(.*?)\s*(?:의\s*)?(?:원가|매입가|입고가)\s*(?:는|은|를|을|가|이)?\s*(.*)$/);
+    if (after && clean(after[1])) {
+      name = clean(after[1]);
+      rest = after[2];
+    } else {
+      // “원가 곰돌이 3500” · “원가 등록 곰돌이 3천원”
+      const before = said.match(/^(?:원가|매입가|입고가)\s*(?:등록|기록|입력)?\s*(.+?)\s*((?:\d[\d,.]*\s*(?:만|천|백)?\s*)+원?.*)?$/);
+      if (!before) return null;
+      name = clean(before[1]);
+      rest = before[2] ?? "";
+    }
+    name = name.replace(/\s*(?:상품|물건)$/, "");
+    if (!name) {
+      return reply([text("어떤 상품 원가인지 같이 보내 주세요.\n예) 곰돌이 털 키링 원가 3500원")], quick("상품 찾기", "메뉴"));
+    }
+    const amount = parseKoreanWon(rest);
+    const prods = await this.findProducts(name);
+    if (!prods.length) {
+      return reply([text(`${j(`‘${name}’`, "을")} 상품에서 못 찾았어요. 이름 일부로 다시 보내 주세요.\n예) 곰돌이 원가 3500원`)], quick("상품 찾기", "메뉴"));
+    }
+    if (prods.length > 1) {
+      const items: ListItem[] = prods.slice(0, PAGE).map((p) => ({
+        title: p.name,
+        description: `원가 ${won(p.cost_price)} · 판매가 ${won(p.sale_price)}`,
+        messageText: `${p.name} 원가${amount !== null ? ` ${amount}원` : " 얼마야"}`,
+      }));
+      return reply([list(`‘${name}’ 상품이 ${num(prods.length)}개예요 · 골라 주세요`, items)], quick("메뉴"));
+    }
+    const p = prods[0];
+    const m = (cost: number) => {
+      const mg = margin(cost, p.sale_price);
+      return p.sale_price && cost ? ` · 마진 ${won(mg.amount)} (${Math.round(mg.rate)}%)` : "";
+    };
+    if (amount === null) {
+      return reply(
+        [
+          text(
+            p.cost_price
+              ? `📦 ${p.name}\n원가 ${won(p.cost_price)} · 판매가 ${won(p.sale_price)}${m(p.cost_price)}`
+              : `📦 ${p.name}\n원가가 아직 없어요 (판매가 ${won(p.sale_price)}).\n‘${p.name} 원가 3500원’처럼 보내면 적어요.`,
+          ),
+        ],
+        quick(`상품 ${p.name}`.slice(0, 50), "메뉴"),
+      );
+    }
+    if (amount > 100_000_000) return reply([text("금액이 너무 커요. 원 단위로 다시 보내 주세요. 예) 3500원 · 3천5백원")], quick("메뉴"));
+    const old = p.cost_price;
+    const saved = await this.db.setProductCost(p.id, amount);
+    this.refreshData();
+    return reply(
+      [
+        text(
+          `✅ ${saved.name} 원가를 ${won(amount)}으로 적었어요${old && old !== amount ? ` (전: ${won(old)})` : ""}\n판매가 ${won(saved.sale_price)}${m(amount)}`,
+        ),
+      ],
+      quick(old && old !== amount ? ["되돌리기", `${saved.name} 원가 ${old}원`] : null, `상품 ${saved.name}`.slice(0, 50), "메뉴"),
     );
   }
 

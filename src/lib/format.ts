@@ -19,6 +19,29 @@ export function parseNum(v: unknown): number {
   return Number.isFinite(n) ? Math.round(n) : 0;
 }
 
+/**
+ * 말로 쓴 금액 → 원: "3500원" "3,500" "3천5백원" "1만2천" "1.5만원으로" → 숫자, 금액이 없으면 null.
+ * 첫 숫자부터 이어지는 만·천·백 묶음만 읽어요.
+ */
+export function parseKoreanWon(s: string): number | null {
+  const t = s.replace(/[\s,]/g, "");
+  const start = t.search(/\d/);
+  if (start < 0) return null;
+  const unit = { 만: 10000, 천: 1000, 백: 100 } as const;
+  let i = start;
+  let total = 0;
+  let any = false;
+  while (i < t.length) {
+    const m = /^(\d+(?:\.\d+)?)(만|천|백)?/.exec(t.slice(i));
+    if (!m) break;
+    total += parseFloat(m[1]) * (m[2] ? unit[m[2] as keyof typeof unit] : 1);
+    any = true;
+    i += m[0].length;
+    if (!m[2]) break;
+  }
+  return any ? Math.round(total) : null;
+}
+
 export interface Margin {
   amount: number;
   /** Margin as a share of the sale price (0–100). */

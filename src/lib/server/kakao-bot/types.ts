@@ -45,6 +45,8 @@ export interface BotDb {
   listProducts(): Promise<Product[]>;
   listSources(): Promise<ProductSource[]>;
   recordPrice(input: PriceInput, byName: string): Promise<void>;
+  /** 상품 원가 바꾸기 — 원래 ‘빅솔론 반영 필요’가 아니었으면 그대로 둬요 (원가는 빅솔론에 꼭 안 올려도 돼서) */
+  setProductCost(id: string, cost: number): Promise<Product>;
   todaySales(day: string): Promise<TodaySales>;
   /** 기간 상품별 판매 + 빅솔론 분류명 (A/B 정산, 최대 31일) */
   settleItems(start: string, end: string): Promise<PosSettleItem[]>;
