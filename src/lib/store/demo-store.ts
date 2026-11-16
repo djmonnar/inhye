@@ -13,7 +13,7 @@ import type {
   Supplier,
   SupplierInput,
 } from "../types";
-import { kstToday } from "../day";
+import { kstToday, tidyOrder } from "../day";
 import { buildShipNotice, isShipNoticeAsk, shipNoticeNote } from "../shipNotice";
 import { StoreError, type DataStore } from "./types";
 
@@ -572,7 +572,7 @@ export function createDemoStore(): DataStore {
     async listOrders() {
       const list = await load<Order[]>("orders", []);
       return [...list]
-        .map((o) => ({ ...o, due_time: o.due_time ?? null, ship_date: o.ship_date ?? null }))
+        .map((o) => tidyOrder({ ...o, due_time: o.due_time ?? null }))
         .sort((a, b) => `${a.due_date} ${a.due_time ?? "99"}`.localeCompare(`${b.due_date} ${b.due_time ?? "99"}`));
     },
 
@@ -580,7 +580,7 @@ export function createDemoStore(): DataStore {
       const list = await load<Order[]>("orders", []);
       return list
         .filter((o) => o.status !== "canceled" && o.due_date >= start)
-        .map((o) => ({ ...o, due_time: o.due_time ?? null, ship_date: o.ship_date ?? null }));
+        .map((o) => tidyOrder({ ...o, due_time: o.due_time ?? null }));
     },
 
     async saveOrder(input, id) {
@@ -598,6 +598,12 @@ export function createDemoStore(): DataStore {
           id: crypto.randomUUID(),
           status: "open",
           ship_date: null,
+          carrier: null,
+          tracking_no: null,
+          logen_take_no: null,
+          logen_status: null,
+          logen_at: null,
+          logen_msg: null,
           source_text: null,
           done_at: null,
           created_at: now,
@@ -624,6 +630,22 @@ export function createDemoStore(): DataStore {
         return { reply: `${n.text}${note ? `\n\n— — —\n${note}` : ""}`, changes: [], skipped: [], copy: n.text };
       }
       throw new StoreError("체험 모드에서는 주문 비서(AI)를 쓸 수 없어요. ‘직접 추가’로 넣어 보세요.");
+    },
+
+    async logenStatus() {
+      return { configured: false, missing: [], env: "test" as const, relay: false, dryRun: false };
+    },
+
+    async logenRegister() {
+      throw new StoreError("체험 모드에서는 로젠 접수를 할 수 없어요. 송장번호는 주문 고치기에서 직접 넣을 수 있어요.");
+    },
+
+    async logenSlips() {
+      throw new StoreError("체험 모드에서는 로젠 송장번호를 가져올 수 없어요.");
+    },
+
+    async logenCheck() {
+      throw new StoreError("체험 모드에서는 로젠에 연결할 수 없어요.");
     },
 
     async kakaoStatus() {

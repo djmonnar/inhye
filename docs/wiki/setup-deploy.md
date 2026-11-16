@@ -24,6 +24,7 @@
 | `KAKAO_SKILL_SECRET` | **비밀** | 카카오 챗봇 스킬 요청 확인 — 오픈빌더 스킬 헤더 `X-Popo-Key`와 같은 값 ([suppliers-kakao-bot.md](suppliers-kakao-bot.md)) |
 | `OPENAI_MODEL` | | (선택) 모델 바꾸기 |
 | `BIXOLON_API_KEY` | **비밀** | 빅솔론 매장키 (ASP 외부 연결 관리 → 연동 키 발급) |
+| `LOGEN_*` | 일부 **비밀** | 로젠택배 API — `LOGEN_SECRET_KEY`·`LOGEN_RELAY_TOKEN`은 비밀. 전체 목록: [logen.md](logen.md) |
 | `BIXOLON_API_BASE` | | (선택) API 주소, 기본 `https://api.bixolon-pos.com` |
 | `NEXT_PUBLIC_SHOP_NAME` | 공개 | (선택) 가게 이름, 기본 포포하우스 |
 | `NEXT_PUBLIC_LOGIN_EMAIL_DOMAIN` | 공개 | (선택) 아이디 로그인용 내부 도메인, 기본 `inhye.local` |

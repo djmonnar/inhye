@@ -4,6 +4,7 @@
  * “송장안내문 김포포 로젠 12345678901”처럼 이름·택배사·송장번호를 같이 주면 채우고,
  * 이름으로 주문을 찾으면 상품명도 채워요. 문구를 바꾸려면 이 파일만 고치면 돼요.
  */
+import { carrierOf, CARRIER_WORDS, findTracking } from "./carriers";
 import { actDay } from "./day";
 import type { Order } from "./types";
 
@@ -40,24 +41,17 @@ export function shipNoticeText(f: ShipNoticeFill = {}): string {
   ].join("\n");
 }
 
+/** 주문 하나로 바로 만든 안내문 (앱 주문 화면 ‘송장 안내문 복사’) */
+export function shipNoticeForOrder(o: Pick<Order, "customer" | "item" | "carrier" | "tracking_no">): string {
+  return shipNoticeText({ customer: o.customer, item: o.item, carrier: o.carrier, tracking: o.tracking_no });
+}
+
 /** 송장 안내문을 달라는 말 (“송장안내문”, “송장 안내 줘”, “택배 안내 문자”) */
 const ASK_RE = /송장\s*(?:번호\s*)?안내|송장\s*(?:문자|문구)|(?:택배|배송|발송)\s*안내\s*(?:문자|문구|메시지|문|글)/;
 
 export function isShipNoticeAsk(said: string): boolean {
   return ASK_RE.test(said);
 }
-
-const CARRIERS: [RegExp, string][] = [
-  [/우체국/, "우체국"],
-  [/로젠/, "로젠"],
-  [/CJ|씨제이|대한\s*통운/i, "CJ대한통운"],
-  [/한진/, "한진"],
-  [/롯데/, "롯데"],
-  [/경동/, "경동"],
-];
-
-/** 숫자 10~14자리(사이에 - 나 띄어쓰기 가능) = 송장번호 */
-const TRACK_RE = /(?<!\d)\d[\d\s-]{8,22}\d(?!\d)/g;
 
 export interface ShipNoticeAsk {
   name: string | null;
@@ -70,25 +64,13 @@ export interface ShipNoticeAsk {
 /** “송장안내문 김포포 로젠 123-4567-8901” → 이름·택배사·송장번호 */
 export function parseShipNoticeAsk(said: string): ShipNoticeAsk {
   let rest = ` ${said} `;
-  let tracking: string | null = null;
-  for (const m of said.matchAll(TRACK_RE)) {
-    const digits = m[0].replace(/\D/g, "");
-    if (digits.length >= 10 && digits.length <= 14) {
-      tracking = m[0].trim().replace(/\s+/g, "-");
-      rest = rest.replace(m[0], " ");
-      break;
-    }
-  }
-  let carrier: string | null = null;
-  for (const [re, label] of CARRIERS) {
-    if (re.test(rest)) {
-      carrier = label;
-      break;
-    }
-  }
+  const t = findTracking(said);
+  if (t) rest = rest.replace(t.raw, " ");
+  const tracking = t?.value ?? null;
+  const carrier = carrierOf(rest);
   rest = rest
     .replace(/송장\s*(?:번호\s*)?안내\s*(?:문자|문구|메시지|문|글)?|송장\s*(?:문자|문구)|(?:택배|배송|발송)\s*안내\s*(?:문자|문구|메시지|문|글)/g, " ")
-    .replace(/우체국|로젠|CJ|씨제이|대한\s*통운|한진|롯데|경동/gi, " ")
+    .replace(CARRIER_WORDS, " ")
     .replace(/택배(?:사)?|송장\s*번호|송장|주문자|고객|손님/g, " ")
     .replace(/양식|틀|예시|템플릿|좀|부탁해요?|(?:보내|써|만들어|알려|뽑아)?\s*(?:줘요|줘|주세요|줄래)|[.,!?~:]/g, " ")
     .replace(/\s+/g, " ")
@@ -133,8 +115,8 @@ export function buildShipNotice(said: string, orders: Order[], today: string): S
   const fill: ShipNoticeFill = {
     customer: order?.customer ?? ask.name,
     item: ask.item ?? order?.item ?? null,
-    carrier: ask.carrier,
-    tracking: ask.tracking,
+    carrier: ask.carrier ?? order?.carrier ?? null,
+    tracking: ask.tracking ?? order?.tracking_no ?? null,
   };
   const missing = [
     !fill.customer && "주문자",

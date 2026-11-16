@@ -9,7 +9,9 @@
  *   "11/23 월 택배 박고양 꽃다발 3만원 11/21 출고" → 받는 날 11/23, 출고일 11/21 (출고일만 있으면 그날로)
  *
  *   "김포포 꽃다발 보냈어" / "김포포 완료" → 완료,  "김포포 주문 취소" → 취소
+ *   "김포포 로젠 12345678901" / "김포포 송장번호 123-4567-8901" → 그 주문에 택배사·송장번호 적기
  */
+import { carrierOf, findTracking } from "./carriers";
 
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -200,4 +202,24 @@ export function parseQuickAction(raw: string): { kind: "complete" | "cancel"; na
   }
   if (/(?:주문\s*)?취소(?:해\s*줘|해주세요|할게요?|요|함)?$/.test(tail)) return { kind: "cancel", name };
   return null;
+}
+
+const TRACK_LINE_RE =
+  /^([가-힣A-Za-z]{2,10}?)(?:님)?\s+(?:(로젠|우체국|CJ\s*대한통운|CJ|씨제이|대한\s*통운|한진|롯데|경동)\s*(?:택배)?\s*)?(?:운?송장\s*(?:번호)?\s*(?:은|는|:)?\s*)?(\d[\d\s-]{8,22}\d)\s*(?:이야|입니다|이에요|예요|요|으로|로)?\s*(?:적어\s*줘|넣어\s*줘|저장(?:해\s*줘)?|등록(?:해\s*줘)?)?$/;
+
+/**
+ * “김포포 로젠 12345678901” · “김포포 송장번호 123-4567-8901” → 그 이름 주문에 송장번호 적기.
+ * 택배사나 ‘송장’이라는 말이 꼭 있어야 해요 (“김포포 01012345678”은 전화번호일 수 있어서).
+ */
+export function parseTrackingAction(raw: string): { name: string; carrier: string | null; tracking: string } | null {
+  const s = raw.trim().replace(/[.!~?]+$/, "").replace(/\s+/g, " ");
+  const m = TRACK_LINE_RE.exec(s);
+  if (!m) return null;
+  const name = m[1];
+  if (/송장|안내|주문|택배|배송/.test(name)) return null;
+  const carrier = m[2] ? carrierOf(m[2]) : null;
+  if (!carrier && !/송장/.test(s)) return null;
+  const t = findTracking(m[3]);
+  if (!t) return null;
+  return { name, carrier, tracking: t.value };
 }

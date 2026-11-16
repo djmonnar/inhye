@@ -8,6 +8,9 @@ import type {
   MoveInput,
   KakaoBotStatus,
   KakaoStatus,
+  LogenCheck,
+  LogenInfo,
+  LogenRun,
   Order,
   OrderChatResult,
   OrderChatTurn,
@@ -116,6 +119,15 @@ export interface DataStore {
   deleteOrder(id: string): Promise<void>;
   /** 주문 비서: 말로 등록·수정·완료·취소. history = 최근 대화 몇 줄 */
   orderChat(message: string, history: OrderChatTurn[]): Promise<OrderChatResult>;
+
+  /** 로젠택배 API: 준비 상태 (빠진 환경변수 이름) */
+  logenStatus(): Promise<LogenInfo>;
+  /** 고른 택배 주문을 로젠에 접수 (송장은 로젠 쪽에서 출력) */
+  logenRegister(ids: string[]): Promise<LogenRun>;
+  /** 로젠 송장번호 받아 오기 (ids 없으면 ‘접수됨’ 전부) */
+  logenSlips(ids?: string[]): Promise<LogenRun>;
+  /** 관리자: 로젠 연결 확인 (계약 운임 조회) */
+  logenCheck(): Promise<LogenCheck>;
 
   /** 카카오톡 ‘나에게 보내기’ 알림 */
   kakaoStatus(): Promise<KakaoStatus>;

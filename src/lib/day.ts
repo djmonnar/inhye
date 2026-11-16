@@ -1,3 +1,4 @@
+import type { Order } from "./types";
 /** 한국 날짜(YYYY-MM-DD)·시각 도우미. 빅솔론은 한국 영업일 기준이라 기기 시간대와 상관없이 KST로 계산해요. */
 
 const KST = "Asia/Seoul";
@@ -57,3 +58,24 @@ export function timeLabel(t: string | null | undefined): string {
 export function actDay(o: { method: string; due_date: string; ship_date?: string | null }): string {
   return o.method === "delivery" && o.ship_date ? o.ship_date : o.due_date;
 }
+
+/**
+ * DB에서 읽은 주문을 고르게 — 시간은 "HH:MM", 예전 DB에 없던 칸(출고일 v7, 택배사·송장·로젠 v8)은 null.
+ * 앱·서버·챗봇이 주문을 읽을 때 다 이걸 거쳐요.
+ */
+export function tidyOrder<T extends { due_time: string | null }>(o: T): T & OrderExtra {
+  const x = o as T & Partial<OrderExtra>;
+  return {
+    ...o,
+    due_time: normTime(o.due_time),
+    ship_date: x.ship_date ?? null,
+    carrier: x.carrier ?? null,
+    tracking_no: x.tracking_no ?? null,
+    logen_take_no: x.logen_take_no ?? null,
+    logen_status: x.logen_status ?? null,
+    logen_at: x.logen_at ?? null,
+    logen_msg: x.logen_msg ?? null,
+  };
+}
+
+type OrderExtra = Pick<Order, "ship_date" | "carrier" | "tracking_no" | "logen_take_no" | "logen_status" | "logen_at" | "logen_msg">;

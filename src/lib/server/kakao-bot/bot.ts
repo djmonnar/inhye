@@ -18,6 +18,7 @@ import {
   type OrderSettle,
 } from "../../settle";
 import { isPriceListAsk, PRICE_FOOTER, PRICE_LIST, priceAnswer } from "../../priceList";
+import { parseTrackingAction } from "../../orderParse";
 import { buildShipNotice, isShipNoticeAsk, shipNoticeNote } from "../../shipNotice";
 import { cheaperThanMain, isStale, sortSources, suggestQty } from "../../sources";
 import type { Order, OrderChangeOp, OrderChatResult, OrderChatTurn, Product, ProductSource, Supplier, SupplierInput, SupplierKind } from "../../types";
@@ -310,6 +311,8 @@ class Bot {
       return reply([text(`이미 ${this.user.name}님 계정과 연결돼 있어요.`)], MENU);
     }
 
+    // ‘김포포 로젠 12345678901’ — 주문에 송장번호 적기 (주문 비서 빠른 길, AI 없이)
+    if (parseTrackingAction(said)) return this.orderFlow(said);
     if (!viaAi && ORDER_RE.test(said)) return this.orderFlow(said);
     return this.understand(said, viaAi);
   }
@@ -354,6 +357,7 @@ class Bot {
             "• 주문 목록 / 오늘 픽업 / 내일 픽업",
             "• 주문은 그대로 보내면 등록돼요 — 11/20 금 오후 3시 픽업 김포포 꽃다발 2.5만원",
             "• 김포포 꽃다발 보냈어(완료) · 김포포 4시로 바꿔줘 · 김포포 주문 취소",
+            "• 김포포 로젠 12345678901 — 주문에 송장번호 저장 + 송장 안내문",
             "• 송장안내문 김포포 로젠 12345678901 — 손님께 보낼 송장 안내 글",
             "• 거래처 목록 / 거래처 도매꾹",
             "• 거래처 등록 / 거래처 수정 도매꾹",
@@ -1353,7 +1357,13 @@ class Bot {
     const d = o.status === "open" ? dLabel(daysUntil(actDay(o), today)) : "";
     return {
       title: `${md(o.due_date)}${t ? ` ${t}` : ""} ${o.method === "delivery" ? "📦" : "🛍"} ${o.customer || "-"}`,
-      description: [o.item, o.contact ?? "", o.price ? won(o.price) : "", ship ? `출고 ${md(ship)}${d ? ` ${d}` : ""}` : d]
+      description: [
+        o.item,
+        o.contact ?? "",
+        o.price ? won(o.price) : "",
+        ship ? `출고 ${md(ship)}${d ? ` ${d}` : ""}` : d,
+        o.tracking_no ? `📮 ${o.carrier ? `${o.carrier} ` : ""}${o.tracking_no}` : o.logen_status === "registered" ? "📮 로젠 접수(송장 대기)" : "",
+      ]
         .filter(Boolean)
         .join(" · "),
     };
@@ -1370,7 +1380,8 @@ class Bot {
   }
 
   private orderResult(r: OrderChatResult): SkillResponse {
-    return reply([text(this.orderBody(r))], quick("주문 목록", "오늘 픽업", "메뉴"));
+    // 손님께 보낼 글(송장 안내문)이 있으면 따로 한 말풍선 — 길게 눌러 그대로 복사
+    return reply([text(this.orderBody(r)), ...(r.copy ? [text(r.copy)] : [])], quick("주문 목록", "오늘 픽업", "메뉴"));
   }
 
   private async openOrders(): Promise<Order[]> {

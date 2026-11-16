@@ -88,10 +88,16 @@ export function useRefresh() {
         | "kakao"
         | "sources"
         | "kakao-bot"
+        | "logen"
       )[]
     ) => Promise.all(keys.map((k) => qc.invalidateQueries({ queryKey: [k] }))),
     [qc],
   );
+}
+
+/** 로젠 연동 준비 상태 — 체험 모드나 실패면 ‘준비 안 됨’으로 */
+export function useLogenStatus(enabled = true) {
+  return useQuery({ queryKey: ["logen"], queryFn: () => store().logenStatus(), enabled, retry: false, staleTime: 5 * 60_000 });
 }
 
 export function useKakaoBot() {

@@ -30,15 +30,15 @@ npm run build
 src/app/(app)/        로그인 후 화면: 홈, products, scan, reorder, suppliers, excel, labels,
                       print-station, sales(+receipts, settle=A/B 정산), orders, report, members, guide, history, more, kakao-bot(챗봇 연결)
 src/app/login, setup  로그인(자동 로그인) / 처음 설정(SQL 안내, 관리자 계정)
-src/app/api/          setup/admin, setup/schema(DB에 schema.sql 바로 적용), members, pos/status, pos/sync, pos/live(빅솔론 하루치 바로 보기, 저장 없음), pos/receipts(영수증별, 저장 없음), pos/settle(기간 상품별+분류명, 정산의 A/B 쪽, 최대 31일 — 꽃다발 주문은 store.settleOrders), orders/chat(주문 비서), kakao/{status,connect,callback,test}, kakao/skill(카카오 챗봇 스킬 서버), kakao/bot(챗봇 연결 코드·연결 관리), cron/orders(매일 알림), ai/{product,link,promo,report}
+src/app/api/          setup/admin, setup/schema(DB에 schema.sql 바로 적용), members, pos/status, pos/sync, pos/live(빅솔론 하루치 바로 보기, 저장 없음), pos/receipts(영수증별, 저장 없음), pos/settle(기간 상품별+분류명, 정산의 A/B 쪽, 최대 31일 — 꽃다발 주문은 store.settleOrders), orders/chat(주문 비서), logen/{status,register,slips,check}(로젠택배 — 궁중수라간 서버 logenRelay 경유), kakao/{status,connect,callback,test}, kakao/skill(카카오 챗봇 스킬 서버), kakao/bot(챗봇 연결 코드·연결 관리), cron/orders(매일 알림), ai/{product,link,promo,report}
 src/components/       ui.tsx(공용 UI), OrderChat(주문 비서 — 주문 화면·홈 떠 있는 버튼 공용), WhenPicker(날짜·시간 버튼), DayNav, ProductForm, BarcodeScanner, StockSheet, SupplierSheet,
                       SourcePrices(상품 화면 ‘거래처별 가격’ + 가격 기록 시트), labels.tsx(라벨 공용), SendLabelSheet, AiFillSheet, PromoSheet, Mascot
 src/lib/store/        데이터 계층 인터페이스(types.ts) + supabase-store.ts + demo-store.ts
-src/lib/server/       서버 전용: admin.ts(서비스 키, 권한), schema.ts(pg로 schema.sql 적용), orders.ts(주문 비서·알림 글), kakao.ts(나에게 보내기), pos.ts, bixolon.ts, openai.ts, ai-*.ts, fetch-page.ts
+src/lib/server/       서버 전용: admin.ts(서비스 키, 권한), schema.ts(pg로 schema.sql 적용), orders.ts(주문 비서·알림 글), kakao.ts(나에게 보내기), logen.ts(로젠 Open API — 주문등록·송장번호, 중계/직접·시험 모드), pos.ts, bixolon.ts, openai.ts, ai-*.ts, fetch-page.ts
                       kakao-bot/: bot.ts(챗봇 말 해석·대화 흐름·주문 — DB 없이 시험 가능), ai.ts(AI 해석기·주문 비서 연결), howto.ts(“발주 어떻게 해?” 사용법 답), kakao.ts(오픈빌더 응답·길이 제한·콜백), types.ts(BotDb·BotAi), supabase-db.ts
 src/lib/              excel.ts(빅솔론 양식), tspl.ts / labelCanvas.ts / usbPrinter.ts(라벨 직접 인쇄),
                       format.ts, queries.ts, report.ts, sources.ts(거래처별 가격 정렬·최저가 — 앱·챗봇 공용), josa.ts(을/를·이/가 조사),
-                      orderParse.ts(주문 한 줄을 AI 없이 바로 읽기 — 주문 비서 앞단), settle.ts(정산 묶기 — A·B 분류명 + 💐 꽃다발 주문 settleOrders, 챗봇 기간·사람·날짜 읽기), priceList.ts(주문 가격표 — 챗봇·주문 비서·주문 화면, 가격 바뀌면 여기만), shipNotice.ts(손님께 보낼 송장 안내문 — 챗봇·주문 비서, 문구 바뀌면 여기만)
+                      orderParse.ts(주문 한 줄을 AI 없이 바로 읽기 — 주문 비서 앞단), settle.ts(정산 묶기 — A·B 분류명 + 💐 꽃다발 주문 settleOrders, 챗봇 기간·사람·날짜 읽기), priceList.ts(주문 가격표 — 챗봇·주문 비서·주문 화면, 가격 바뀌면 여기만), shipNotice.ts(손님께 보낼 송장 안내문 — 챗봇·주문 비서, 문구 바뀌면 여기만), carriers.ts(택배사 이름·송장번호 읽기·배송 조회 링크)
 public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해도 안전해야 함)
 ```
 
@@ -78,6 +78,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 | Xprinter 라벨 | ✅ PC 드라이버 인쇄 · 안드로이드 USB 직접(TSPL) · 노트북 인쇄 스테이션 | [printing.md](docs/wiki/printing.md) |
 | OpenAI | ✅ 사진→상품정보, 링크→상품정보, 홍보글, 가게 리포트, 주문 비서 (`OPENAI_API_KEY`) | [features.md](docs/wiki/features.md) |
 | 카카오톡 ‘나에게 보내기’ | ✅ 연결·테스트 발송 확인(2026-11-10). 보내는 시간은 주문 화면에서 선택(스키마 v4 `app_settings`) | [orders-kakao.md](docs/wiki/orders-kakao.md) |
+| 로젠택배 API | 🟡 미리 만들어 둠(2026-11-16): 계약 코드·키 대기. 궁중수라간 Firebase 고정 IP(34.50.34.252)의 별도 함수 `logenRelay`를 거쳐요 — 그 저장소에 올리기·배포는 사용자 확인 후 | [logen.md](docs/wiki/logen.md) |
 | 카카오 챗봇 (오픈빌더 스킬) | ✅ 카톡에서 주문 등록 동작 확인(2026-11-13) + **AI 해석·주문 비서**(정해진 모양 주문은 AI 없이 바로 `orderParse.ts`, AI가 5초 넘으면 ‘결과 보기’). **폴백 블록 콜백 켬(2026-11-14)** → 콜백 블록은 매번 `useCallback:true`가 먼저여야 해서 route가 대기 문구 없이 `{useCallback:true}` 후 콜백으로 답 |  [suppliers-kakao-bot.md](docs/wiki/suppliers-kakao-bot.md) |
 
 ## 7. 다음에 할 일 (열린 문제)
@@ -92,6 +93,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 8. **빅솔론이 상품 원본 (2026-11-14)**: 상품 등록은 빅솔론에서만. 앱은 판매에 나온 새 상품을 자동 등록(`registerUnknownGoods`, 태그 `빅솔론 자동 등록`, 바코드 없음 → 스캔 화면 ‘이미 있는 상품에 붙이기’). 빅솔론에 상품 목록·등록 외부 API 문의 중 — 관리자 화면 API는 쓰지 않기.
 9. **(열림) 택배 ‘받는 날 미정’ 표시 (2026-11-14 발견)**: 출고일만 적힌 택배 주문은 `due_date`(받는 날)에도 출고일이 그대로 들어가요 — `src/lib/orderParse.ts`(`else if (ship) due = ship`)와 `src/lib/server/orders.ts` AI 지시(“출고일만 있으면 due_date도 같게”). 확인한 도착일처럼 보일 수 있음. 운영에 배포돼 있음(커밋 18d1786부터). 고칠 때: 받는 날을 모른다는 표시(예: `orders.due_unknown boolean`, 스키마 v8)를 두고 목록·챗봇·알림에서 ‘받는 날 미정’으로, AI 지시와 빠른 읽기도 그 표시를 쓰게. 출고 알림·D-day는 이미 출고일(`actDay`) 기준이라 그대로.
 10. **(문의 중) 히엘페이 결제 연동 모듈 (2026-11-15)**: 빅솔론 없이 앱이 키오스크 판매 화면을 맡을 수 있는지 — 히엘페이가 외부 프로그램용 결제 연동(SDK/에이전트)을 주는지가 관건. 문의 문구는 앱 ‘연동 안내’ 화면, 자세히는 [hielpay.md](docs/wiki/hielpay.md).
+12. **택배사·송장번호 + 로젠 API (스키마 v8, 2026-11-16)**: `/setup`에서 v8 적용. 로젠은 궁중수라간 저장소의 `functions/logenRelay.js`(별도 함수, `api`와 무관)를 거쳐요 — 배포는 Deploy Functions → `functions:logenRelay`만(전체·`api` 배포 금지), Secret Manager `LOGEN_RELAY_TOKEN` 먼저. 로젠에 IP 34.50.34.252 등록 요청. 처음 설정·환경변수: [logen.md](docs/wiki/logen.md).
 11. **(준비 중) 로젠택배 · 네이버 스마트스토어 (2026-11-16)**: 사용자가 로젠 계약 코드 발급을 기다리는 중. 송장은 스마트스토어 굿스플로(윈도우 노트북)로 시작. 앱 연동(커머스API 주문 가져오기·발송처리)은 사용자가 원할 때 — 호출 IP 등록 요건부터 확인. 정산 귀속(A·B·따로)과 재고 겹침은 사용자 결정 필요.
 
 결정·발견 기록은 [`docs/wiki/decisions.md`](docs/wiki/decisions.md)에 날짜순으로 있어요.

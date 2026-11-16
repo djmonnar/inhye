@@ -54,7 +54,7 @@ create trigger on_auth_user_created
 create or replace function public.app_status() returns json
 language sql stable security definer set search_path = public as $$
   select json_build_object(
-    'version', 7,
+    'version', 8,
     'has_admin', exists (select 1 from public.profiles where role = 'admin')
   );
 $$;
@@ -462,6 +462,17 @@ create index if not exists orders_status_due_idx on public.orders (status, due_d
 alter table public.orders add column if not exists due_time time;
 -- 택배 출고일 (선택, 보내는 날). due_date는 픽업일 / 택배 받는 날 (v7)
 alter table public.orders add column if not exists ship_date date;
+-- 택배사 · 송장번호 (선택, v8). 로젠 API로 접수하면 logen_* 칸도 채워요
+alter table public.orders add column if not exists carrier text;
+alter table public.orders add column if not exists tracking_no text;
+-- 로젠에 보낸 주문번호(fixTakeNo) — 송장번호를 다시 물어볼 때 써요
+alter table public.orders add column if not exists logen_take_no text;
+-- registered 접수됨(송장 출력 전) · slip_ready 송장번호 받음 · failed 실패
+alter table public.orders add column if not exists logen_status text
+  check (logen_status is null or logen_status in ('registered', 'slip_ready', 'failed'));
+alter table public.orders add column if not exists logen_at timestamptz;
+alter table public.orders add column if not exists logen_msg text;
+create unique index if not exists orders_logen_take_no_idx on public.orders (logen_take_no) where logen_take_no is not null;
 
 drop trigger if exists orders_touch on public.orders;
 create trigger orders_touch before update on public.orders

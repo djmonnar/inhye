@@ -381,6 +381,7 @@ export interface PosSyncResult {
 /** 예약 주문 (꽃다발 등) */
 export type OrderMethod = "pickup" | "delivery";
 export type OrderStatus = "open" | "done" | "canceled";
+export type LogenStatus = "registered" | "slip_ready" | "failed";
 
 export interface Order {
   id: string;
@@ -393,6 +394,17 @@ export interface Order {
   due_time: string | null;
   /** 택배 출고일(보내는 날) YYYY-MM-DD — 택배만, 없으면 null (스키마 v7) */
   ship_date: string | null;
+  /** 택배사 (로젠 · 우체국 · CJ대한통운 …) — 스키마 v8 */
+  carrier: string | null;
+  /** 송장번호 — 스키마 v8 */
+  tracking_no: string | null;
+  /** 로젠 API로 접수한 주문번호(fixTakeNo) */
+  logen_take_no: string | null;
+  /** 로젠 접수 상태: registered(송장 출력 전) · slip_ready(송장번호 받음) · failed */
+  logen_status: LogenStatus | null;
+  logen_at: string | null;
+  /** 로젠 마지막 안내·오류 */
+  logen_msg: string | null;
   method: OrderMethod;
   status: OrderStatus;
   memo: string | null;
@@ -411,6 +423,9 @@ export type OrderInput = Pick<
   status?: OrderStatus;
   /** 넣지 않으면 그대로 둬요 (null = 지우기) — 예전 DB(v6)에서도 저장되게 */
   ship_date?: string | null;
+  /** 택배사·송장번호 — 넣지 않으면 그대로 (v8 전 DB에서도 저장되게) */
+  carrier?: string | null;
+  tracking_no?: string | null;
 };
 
 export type OrderChangeOp = "create" | "update" | "complete" | "reopen" | "cancel";
@@ -426,6 +441,36 @@ export interface OrderChatResult {
   skipped: string[];
   /** 손님께 그대로 보낼 글 (송장 안내문) — 있으면 ‘복사’ 버튼 */
   copy?: string;
+}
+
+/** 로젠택배 API 준비 상태 (값은 안 보내고 있음/없음만) */
+export interface LogenInfo {
+  /** 접수에 필요한 값이 다 있는지 */
+  configured: boolean;
+  /** 아직 없는 Vercel 환경변수 이름 */
+  missing: string[];
+  env: "test" | "prod";
+  /** 궁중수라간 서버(고정 IP)를 거쳐 부르는지 */
+  relay: boolean;
+  /** 시험 모드 — 로젠에 보내지 않고 가짜 결과 */
+  dryRun: boolean;
+}
+
+/** 로젠 접수 · 송장번호 가져오기 결과 */
+export interface LogenRun {
+  /** 접수했거나 송장번호를 받은 주문 */
+  done: { id: string; customer: string; tracking_no: string | null }[];
+  /** 접수는 됐는데 아직 송장 출력 전 (송장번호 없음) */
+  waiting: { id: string; customer: string }[];
+  failed: { id: string; customer: string; message: string }[];
+}
+
+/** 로젠 연결 확인 (계약 운임 조회) */
+export interface LogenCheck {
+  ok: boolean;
+  env: "test" | "prod";
+  message: string;
+  fares: { box: string; fare: number }[];
 }
 
 export interface KakaoStatus {

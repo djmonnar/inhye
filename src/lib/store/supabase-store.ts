@@ -1,6 +1,6 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { IMAGE_BUCKET, SUPABASE_URL } from "../config";
-import { normTime, shiftDay } from "../day";
+import { shiftDay, tidyOrder } from "../day";
 import { blobToDataUrl } from "../image";
 import { loginEmail, setRemember, supabase } from "../supabase";
 import type {
@@ -11,6 +11,9 @@ import type {
   Member,
   KakaoBotStatus,
   KakaoStatus,
+  LogenCheck,
+  LogenInfo,
+  LogenRun,
   Order,
   OrderChatResult,
   OrderInput,
@@ -433,7 +436,7 @@ export function createSupabaseStore(): DataStore {
         .order("due_date")
         .limit(500);
       if (error) fail(error);
-      return (data as Order[]).map((o) => ({ ...o, due_time: normTime(o.due_time), ship_date: o.ship_date ?? null }));
+      return (data as Order[]).map(tidyOrder);
     },
 
     async settleOrders(start, end) {
@@ -447,7 +450,7 @@ export function createSupabaseStore(): DataStore {
         .order("due_date")
         .limit(3000);
       if (error) fail(error);
-      return (data as Order[]).map((o) => ({ ...o, due_time: normTime(o.due_time), ship_date: o.ship_date ?? null }));
+      return (data as Order[]).map(tidyOrder);
     },
 
     async saveOrder(input: OrderInput, id?: string) {
@@ -459,7 +462,7 @@ export function createSupabaseStore(): DataStore {
       const { data, error } = await q.select("*").single();
       if (error) fail(error);
       const o = data as Order;
-      return { ...o, due_time: normTime(o.due_time), ship_date: o.ship_date ?? null };
+      return tidyOrder(o);
     },
 
     async deleteOrder(id) {
@@ -469,6 +472,22 @@ export function createSupabaseStore(): DataStore {
 
     async orderChat(message, history) {
       return api<OrderChatResult>("/api/orders/chat", "POST", { message, history });
+    },
+
+    async logenStatus() {
+      return api<LogenInfo>("/api/logen/status", "GET");
+    },
+
+    async logenRegister(ids) {
+      return api<LogenRun>("/api/logen/register", "POST", { ids });
+    },
+
+    async logenSlips(ids) {
+      return api<LogenRun>("/api/logen/slips", "POST", { ids: ids ?? null });
+    },
+
+    async logenCheck() {
+      return api<LogenCheck>("/api/logen/check", "POST", {});
     },
 
     async kakaoStatus() {

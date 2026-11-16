@@ -1,5 +1,5 @@
 import type { PostgrestError } from "@supabase/supabase-js";
-import { normTime } from "../../day";
+import { tidyOrder } from "../../day";
 import type { Order, Product, ProductSource, Role, Supplier } from "../../types";
 import { adminClient } from "../admin";
 import { fetchBixolonDay, fetchBixolonGoods, PosNotReady } from "../bixolon";
@@ -201,13 +201,13 @@ export function supabaseBotDb(): BotDb {
         .lte("due_date", until)
         .limit(3000);
       if (error) dbFail(error, "주문");
-      return ((data ?? []) as Order[]).map((o) => ({ ...o, due_time: normTime(o.due_time), ship_date: o.ship_date ?? null }));
+      return ((data ?? []) as Order[]).map(tidyOrder);
     },
 
     async listOrders() {
       const { data, error } = await sb.from("orders").select("*").eq("status", "open").order("due_date").limit(200);
       if (error) dbFail(error, "주문 불러오기");
-      return (data as Order[]).map((o) => ({ ...o, due_time: normTime(o.due_time), ship_date: o.ship_date ?? null }));
+      return (data as Order[]).map(tidyOrder);
     },
   };
 }
