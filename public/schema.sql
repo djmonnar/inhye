@@ -54,7 +54,7 @@ create trigger on_auth_user_created
 create or replace function public.app_status() returns json
 language sql stable security definer set search_path = public as $$
   select json_build_object(
-    'version', 8,
+    'version', 9,
     'has_admin', exists (select 1 from public.profiles where role = 'admin')
   );
 $$;
@@ -473,6 +473,10 @@ alter table public.orders add column if not exists logen_status text
 alter table public.orders add column if not exists logen_at timestamptz;
 alter table public.orders add column if not exists logen_msg text;
 create unique index if not exists orders_logen_take_no_idx on public.orders (logen_take_no) where logen_take_no is not null;
+-- 입금 확인 (v9). 예전 주문은 null(기록 없음)로 두고, 새 주문부터 false(입금 전)로 시작해요
+alter table public.orders add column if not exists paid boolean;
+alter table public.orders alter column paid set default false;
+alter table public.orders add column if not exists paid_at timestamptz;
 
 drop trigger if exists orders_touch on public.orders;
 create trigger orders_touch before update on public.orders

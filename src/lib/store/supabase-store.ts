@@ -457,6 +457,7 @@ export function createSupabaseStore(): DataStore {
       const row = {
         ...input,
         ...(input.status ? { done_at: input.status === "done" ? new Date().toISOString() : null } : {}),
+        ...(input.paid !== undefined ? { paid_at: input.paid ? new Date().toISOString() : null } : {}),
       };
       const q = id ? sb.from("orders").update(row).eq("id", id) : sb.from("orders").insert(row);
       const { data, error } = await q.select("*").single();

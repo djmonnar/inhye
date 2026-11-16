@@ -405,6 +405,9 @@ export interface Order {
   logen_at: string | null;
   /** 로젠 마지막 안내·오류 */
   logen_msg: string | null;
+  /** 입금 확인 — true 입금 완료 · false 입금 전 · null 기록 없음(v9 전 주문) (스키마 v9) */
+  paid: boolean | null;
+  paid_at: string | null;
   method: OrderMethod;
   status: OrderStatus;
   memo: string | null;
@@ -426,6 +429,8 @@ export type OrderInput = Pick<
   /** 택배사·송장번호 — 넣지 않으면 그대로 (v8 전 DB에서도 저장되게) */
   carrier?: string | null;
   tracking_no?: string | null;
+  /** 입금 확인 — 넣지 않으면 그대로 (v9 전 DB에서도 저장되게). paid_at은 저장할 때 같이 */
+  paid?: boolean;
 };
 
 export type OrderChangeOp = "create" | "update" | "complete" | "reopen" | "cancel";

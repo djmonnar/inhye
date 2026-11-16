@@ -38,7 +38,7 @@ src/lib/server/       서버 전용: admin.ts(서비스 키, 권한), schema.ts(
                       kakao-bot/: bot.ts(챗봇 말 해석·대화 흐름·주문 — DB 없이 시험 가능), ai.ts(AI 해석기·주문 비서 연결), howto.ts(“발주 어떻게 해?” 사용법 답), kakao.ts(오픈빌더 응답·길이 제한·콜백), types.ts(BotDb·BotAi), supabase-db.ts
 src/lib/              excel.ts(빅솔론 양식), tspl.ts / labelCanvas.ts / usbPrinter.ts(라벨 직접 인쇄),
                       format.ts, queries.ts, report.ts, sources.ts(거래처별 가격 정렬·최저가 — 앱·챗봇 공용), josa.ts(을/를·이/가 조사),
-                      orderParse.ts(주문 한 줄을 AI 없이 바로 읽기 — 주문 비서 앞단), settle.ts(정산 묶기 — A·B 분류명 + 💐 꽃다발 주문 settleOrders, 챗봇 기간·사람·날짜 읽기), priceList.ts(주문 가격표 — 챗봇·주문 비서·주문 화면, 가격 바뀌면 여기만), shipNotice.ts(손님께 보낼 송장 안내문 — 챗봇·주문 비서, 문구 바뀌면 여기만), carriers.ts(택배사 이름·송장번호 읽기·배송 조회 링크)
+                      orderParse.ts(주문 한 줄을 AI 없이 바로 읽기 — 주문 비서 앞단), settle.ts(정산 묶기 — A·B 분류명 + 💐 꽃다발 주문 settleOrders, 챗봇 기간·사람·날짜 읽기), priceList.ts(주문 가격표 — 챗봇·주문 비서·주문 화면, 가격 바뀌면 여기만), shipNotice.ts(손님께 보낼 송장 안내문 — 챗봇·주문 비서, 문구 바뀌면 여기만), carriers.ts(택배사 이름·송장번호 읽기·배송 조회 링크), paid.ts(입금 확인 — 챗봇·주문 비서의 입금 처리·묻기 말 읽기와 답)
 public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해도 안전해야 함)
 ```
 
@@ -91,9 +91,10 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 6. **거래처별 가격 + 카카오 챗봇 (스키마 v6, 2026-11-13)**: `/setup`에서 v6 적용 → Vercel `KAKAO_SKILL_SECRET` → 오픈빌더 설정([suppliers-kakao-bot.md](docs/wiki/suppliers-kakao-bot.md) ‘처음 설정’). 다음 후보: 발주 화면에도 ‘더 싼 거래처’ 표시, 엑셀 백업에 거래처별 가격 포함.
 7. **택배 출고일 (스키마 v7, 2026-11-14)**: `orders.ship_date` — `/setup`에서 v7 적용(‘앱에서 바로 실행’). D-day·알림 기준은 `actDay()`(택배는 출고일, 없으면 받는 날).
 8. **빅솔론이 상품 원본 (2026-11-14)**: 상품 등록은 빅솔론에서만. 앱은 판매에 나온 새 상품을 자동 등록(`registerUnknownGoods`, 태그 `빅솔론 자동 등록`, 바코드 없음 → 스캔 화면 ‘이미 있는 상품에 붙이기’). 빅솔론에 상품 목록·등록 외부 API 문의 중 — 관리자 화면 API는 쓰지 않기.
-9. **(열림) 택배 ‘받는 날 미정’ 표시 (2026-11-14 발견)**: 출고일만 적힌 택배 주문은 `due_date`(받는 날)에도 출고일이 그대로 들어가요 — `src/lib/orderParse.ts`(`else if (ship) due = ship`)와 `src/lib/server/orders.ts` AI 지시(“출고일만 있으면 due_date도 같게”). 확인한 도착일처럼 보일 수 있음. 운영에 배포돼 있음(커밋 18d1786부터). 고칠 때: 받는 날을 모른다는 표시(예: `orders.due_unknown boolean`, 스키마 v8)를 두고 목록·챗봇·알림에서 ‘받는 날 미정’으로, AI 지시와 빠른 읽기도 그 표시를 쓰게. 출고 알림·D-day는 이미 출고일(`actDay`) 기준이라 그대로.
+9. **(열림) 택배 ‘받는 날 미정’ 표시 (2026-11-14 발견)**: 출고일만 적힌 택배 주문은 `due_date`(받는 날)에도 출고일이 그대로 들어가요 — `src/lib/orderParse.ts`(`else if (ship) due = ship`)와 `src/lib/server/orders.ts` AI 지시(“출고일만 있으면 due_date도 같게”). 확인한 도착일처럼 보일 수 있음. 운영에 배포돼 있음(커밋 18d1786부터). 고칠 때: 받는 날을 모른다는 표시(예: `orders.due_unknown boolean`, 다음 스키마 버전)를 두고 목록·챗봇·알림에서 ‘받는 날 미정’으로, AI 지시와 빠른 읽기도 그 표시를 쓰게. 출고 알림·D-day는 이미 출고일(`actDay`) 기준이라 그대로.
 10. **(문의 중) 히엘페이 결제 연동 모듈 (2026-11-15)**: 빅솔론 없이 앱이 키오스크 판매 화면을 맡을 수 있는지 — 히엘페이가 외부 프로그램용 결제 연동(SDK/에이전트)을 주는지가 관건. 문의 문구는 앱 ‘연동 안내’ 화면, 자세히는 [hielpay.md](docs/wiki/hielpay.md).
 12. **택배사·송장번호 + 로젠 API (스키마 v8, 2026-11-16)**: `/setup`에서 v8 적용. 로젠은 궁중수라간 저장소의 `functions/logenRelay.js`(별도 함수, `api`와 무관)를 거쳐요 — 배포는 Deploy Functions → `functions:logenRelay`만(전체·`api` 배포 금지), Secret Manager `LOGEN_RELAY_TOKEN` 먼저. 로젠에 IP 34.50.34.252 등록 요청. 처음 설정·환경변수: [logen.md](docs/wiki/logen.md).
+13. **입금 확인 (스키마 v9, 2026-11-16)**: `orders.paid`(null = v9 전 주문)·`paid_at` — `/setup`에서 v9 적용. 주문 고치기 💰 체크, 챗봇 “김포포 입금 완료”·“김포포 입금했어?”·“입금 안 한 사람”. 입금 ≠ 주문 완료. 자세히 [orders-kakao.md](docs/wiki/orders-kakao.md).
 11. **(준비 중) 로젠택배 · 네이버 스마트스토어 (2026-11-16)**: 사용자가 로젠 계약 코드 발급을 기다리는 중. 송장은 스마트스토어 굿스플로(윈도우 노트북)로 시작. 앱 연동(커머스API 주문 가져오기·발송처리)은 사용자가 원할 때 — 호출 IP 등록 요건부터 확인. 정산 귀속(A·B·따로)과 재고 겹침은 사용자 결정 필요.
 
 결정·발견 기록은 [`docs/wiki/decisions.md`](docs/wiki/decisions.md)에 날짜순으로 있어요.

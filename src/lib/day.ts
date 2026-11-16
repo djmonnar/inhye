@@ -60,7 +60,7 @@ export function actDay(o: { method: string; due_date: string; ship_date?: string
 }
 
 /**
- * DB에서 읽은 주문을 고르게 — 시간은 "HH:MM", 예전 DB에 없던 칸(출고일 v7, 택배사·송장·로젠 v8)은 null.
+ * DB에서 읽은 주문을 고르게 — 시간은 "HH:MM", 예전 DB에 없던 칸(출고일 v7, 택배사·송장·로젠 v8, 입금 v9)은 null.
  * 앱·서버·챗봇이 주문을 읽을 때 다 이걸 거쳐요.
  */
 export function tidyOrder<T extends { due_time: string | null }>(o: T): T & OrderExtra {
@@ -75,7 +75,12 @@ export function tidyOrder<T extends { due_time: string | null }>(o: T): T & Orde
     logen_status: x.logen_status ?? null,
     logen_at: x.logen_at ?? null,
     logen_msg: x.logen_msg ?? null,
+    paid: x.paid ?? null,
+    paid_at: x.paid_at ?? null,
   };
 }
 
-type OrderExtra = Pick<Order, "ship_date" | "carrier" | "tracking_no" | "logen_take_no" | "logen_status" | "logen_at" | "logen_msg">;
+type OrderExtra = Pick<Order, "ship_date" | "carrier" | "tracking_no" | "logen_take_no" | "logen_status" | "logen_at" | "logen_msg" | "paid" | "paid_at">;
+
+/** 입금 전으로 볼 주문 — 진행 중인데 입금 확인이 안 된 것 (v9 전 주문도 진행 중이면 포함) */
+export const unpaid = (o: Pick<Order, "status" | "paid">) => o.status === "open" && o.paid !== true;

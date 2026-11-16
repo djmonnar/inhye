@@ -587,11 +587,12 @@ export function createDemoStore(): DataStore {
       const list = await load<Order[]>("orders", []);
       const now = new Date().toISOString();
       const doneAt = input.status ? (input.status === "done" ? now : null) : undefined;
+      const paidAt = input.paid !== undefined ? { paid_at: input.paid ? now : null } : {};
       let result: Order;
       if (id) {
         const cur = list.find((o) => o.id === id);
         if (!cur) throw new StoreError("주문을 찾지 못했어요.");
-        result = { ...cur, ...input, ...(doneAt !== undefined ? { done_at: doneAt } : {}), updated_at: now };
+        result = { ...cur, ...input, ...(doneAt !== undefined ? { done_at: doneAt } : {}), ...paidAt, updated_at: now };
         await save("orders", list.map((o) => (o.id === id ? result : o)));
       } else {
         result = {
@@ -604,12 +605,15 @@ export function createDemoStore(): DataStore {
           logen_status: null,
           logen_at: null,
           logen_msg: null,
+          paid: false,
+          paid_at: null,
           source_text: null,
           done_at: null,
           created_at: now,
           updated_at: now,
           ...input,
           ...(doneAt !== undefined ? { done_at: doneAt } : {}),
+          ...paidAt,
         };
         await save("orders", [...list, result]);
       }

@@ -1,9 +1,10 @@
-import { actDay, normTime, tidyOrder, timeLabel } from "../day";
+import { actDay, normTime, tidyOrder, timeLabel, unpaid } from "../day";
 import { parseOrderLine, parseQuickAction, parseTrackingAction } from "../orderParse";
 import { adminClient } from "./admin";
 import { askJson, objectSchema, STRING } from "./openai";
 import { priceListText } from "../priceList";
 import { normTracking } from "../carriers";
+import { memoSaysPaid, paidAnswer, parsePaidAction, parsePaidAsk, pickPaidTarget } from "../paid";
 import { buildShipNotice, isShipNoticeAsk, shipNoticeForOrder, shipNoticeNote } from "../shipNotice";
 import type { Order, OrderChangeOp, OrderChatResult, OrderChatTurn, OrderMethod } from "../types";
 
@@ -42,6 +43,7 @@ const ACTION = objectSchema({
   ship_date: NSTR,
   carrier: NSTR,
   tracking_no: NSTR,
+  paid: { type: ["boolean", "null"] },
   method: { type: ["string", "null"], enum: ["pickup", "delivery", null] },
   memo: NSTR,
   contact: NSTR,
@@ -60,6 +62,7 @@ type Action = {
   ship_date: string | null;
   carrier: string | null;
   tracking_no: string | null;
+  paid: boolean | null;
   method: OrderMethod | null;
   memo: string | null;
   contact: string | null;
@@ -78,13 +81,16 @@ function instructions(today: string) {
 - 택배의 출고일·발송일(가게에서 보내는 날, "11/21 출고", "출고 11/21", "21일에 보내요") → ship_date "YYYY-MM-DD". 받는 날·도착일은 due_date. 출고일만 있고 받는 날이 없으면 due_date도 출고일과 같게. 출고일이 있으면 method "delivery". 픽업이면 ship_date null.
 - 택배사(로젠·우체국·CJ대한통운·한진·롯데·경동) → carrier, 송장번호·운송장번호(숫자 10~14자리) → tracking_no. 전화번호와 헷갈리지 말 것(010으로 시작하는 11자리는 전화번호).
 - 사람 이름 → customer, 상품 → item, 가격: "2.5만원"→25000, "3만"→30000, "25,000원"→25000.
-- 괄호 안이나 덧붙인 말("라넌으로 변경", "리본 핑크", "선입금 완료") → memo. 전화번호 → contact, 주소 → address.
+- 괄호 안이나 덧붙인 말("라넌으로 변경", "리본 핑크") → memo. 전화번호 → contact, 주소 → address.
+- 입금: "입금 완료", "선입금 완료", "입금했어", "돈 들어왔어" → paid true. "입금 취소", "아직 입금 전" → paid false. 말이 없으면 null(바꾸지 않음).
 - 여러 줄이면 줄마다 create 하나씩.
 
 [이미 있는 주문 바꾸기] 아래 ‘지금 주문 목록’의 #번호를 ref에 넣어.
 - 수정(날짜·시간·출고일·가격·상품·메모·택배사·송장번호 등) → op "update", 바꿀 칸만 넣고 나머지는 null. 시간을 지우라고 하면 due_time "", 출고일을 지우라고 하면 ship_date "", 송장번호를 지우라고 하면 tracking_no "".
 - ‘최근 대화’에서 방금 등록·수정한 주문을 이어서 말하면("가격은 3만원이야", "그거 4시로", "연핑크로 변경이야", "주소는 ~야") 그 주문을 update해. 이름이 없어도 방금 그 주문이면 돼. 상품을 바꾸는 말("○○ 꽃다발 + 연핑크")은 item을 고치고, 꽃·색 변경 같은 요청은 memo에 덧붙여.
 - "완료", "보냈어", "픽업해 갔어", "끝" → op "complete". 완료 취소/다시 진행 → "reopen".
+- 입금만 확인하는 말("김포포 입금 완료", "이토끼 돈 들어왔어")은 complete가 아니라 op "update" + paid true. 주문 완료와 입금은 따로예요.
+- "입금 안 한 사람?", "김포포 입금했어?" 같은 질문은 actions 없이 목록의 입금 칸(입금완료/입금전)을 보고 reply로 답해.
 - "삭제", "취소", "빼줘" → op "cancel".
 - 이름·날짜·상품으로 어떤 주문인지 하나로 정해지지 않으면 actions에 넣지 말고 reply에서 어느 주문인지 물어봐.
 - 목록에 없는 주문을 바꾸라고 하면 reply로 못 찾았다고 말해.
@@ -109,6 +115,7 @@ function orderLine(o: Order, ref: string) {
     o.item || "-",
     `${o.price}원`,
     statusLabel[o.status],
+    o.paid === true ? "입금완료" : unpaid(o) || o.paid === false ? "입금전" : "",
     o.memo ? `메모:${o.memo}` : "",
   ]
     .filter(Boolean)
@@ -128,7 +135,9 @@ const tidy = (o: Order): Order => tidyOrder(o);
 /** 출고일 칸이 없는 예전 DB(v6)에 출고일을 넣으려 할 때 */
 const NEEDS_V7 = "출고일을 저장하려면 DB 업데이트가 필요해요. 설정 화면(/setup)에서 ‘앱에서 바로 실행’을 눌러 주세요.";
 const missingColumn = (e: { code?: string; message?: string } | null) =>
-  Boolean(e && (e.code === "PGRST204" || e.code === "42703" || /ship_date|carrier|tracking_no/.test(e.message ?? "")));
+  Boolean(e && (e.code === "PGRST204" || e.code === "42703" || /ship_date|carrier|tracking_no|paid/.test(e.message ?? "")));
+/** 입금 칸이 없는 예전 DB(v8) */
+const NEEDS_V9 = "입금 확인을 저장하려면 DB 업데이트가 필요해요. 설정 화면(/setup)에서 ‘앱에서 바로 실행’을 눌러 주세요.";
 /** 택배사·송장번호 칸이 없는 예전 DB(v7) */
 const NEEDS_V8 = "송장번호를 저장하려면 DB 업데이트가 필요해요. 설정 화면(/setup)에서 ‘앱에서 바로 실행’을 눌러 주세요.";
 
@@ -206,6 +215,8 @@ export async function orderChat(
         ...(ship && method === "delivery" ? { ship_date: ship } : {}),
         // 송장번호도 있을 때만 (v8 전 DB에서도 다른 주문은 저장되게)
         ...(normTracking(a.tracking_no) ? { tracking_no: normTracking(a.tracking_no), carrier: clip(a.carrier, 20) || null } : {}),
+        // 입금 완료일 때만 (v9 전 DB에서도 다른 주문은 저장되게)
+        ...(a.paid === true || memoSaysPaid(a.memo) ? { paid: true, paid_at: new Date().toISOString() } : {}),
         memo: clip(a.memo, 300) || null,
         contact: clip(a.contact, 40) || null,
         address: clip(a.address, 200) || null,
@@ -213,7 +224,9 @@ export async function orderChat(
         created_by: callerId,
       };
       const { data: created, error: e } = await db.from("orders").insert(row).select("*").single();
-      if (e || !created) skipped.push(missingColumn(e) ? ("tracking_no" in row ? NEEDS_V8 : NEEDS_V7) : `저장하지 못했어요: ${row.customer} ${row.item}`);
+      if (e || !created) {
+        skipped.push(missingColumn(e) ? ("paid" in row ? NEEDS_V9 : "tracking_no" in row ? NEEDS_V8 : NEEDS_V7) : `저장하지 못했어요: ${row.customer} ${row.item}`);
+      }
       else changes.push({ op: "create", order: tidy(created as Order) });
       continue;
     }
@@ -258,6 +271,10 @@ export async function orderChat(
         }
       }
       if (has(a.carrier)) patch.carrier = clip(a.carrier, 20) || null;
+      if (has(a.paid) && a.paid !== (target.paid ?? false)) {
+        patch.paid = a.paid;
+        patch.paid_at = a.paid ? new Date().toISOString() : null;
+      }
       if (has(a.method)) patch.method = a.method === "delivery" ? "delivery" : "pickup";
       if (patch.ship_date && (patch.method ?? target.method) !== "delivery") patch.method = "delivery";
       if (has(a.memo)) patch.memo = clip(a.memo, 300) || null;
@@ -276,7 +293,9 @@ export async function orderChat(
     const { data: updated, error: e } = await db.from("orders").update(patch).eq("id", target.id).select("*").single();
     if (e || !updated) {
       skipped.push(
-        missingColumn(e) && ("tracking_no" in patch || "carrier" in patch)
+        missingColumn(e) && "paid" in patch
+          ? NEEDS_V9
+          : missingColumn(e) && ("tracking_no" in patch || "carrier" in patch)
           ? NEEDS_V8
           : missingColumn(e) && "ship_date" in patch
             ? NEEDS_V7
@@ -300,6 +319,35 @@ async function quickPath(message: string, orders: Order[], today: string, caller
     const n = buildShipNotice(lines.join(" "), orders, today);
     const note = shipNoticeNote(n);
     return { reply: `${n.text}${note ? `\n\n— — —\n${note}` : ""}`, changes: [], skipped: [], copy: n.text };
+  }
+
+  // 입금 묻기(“김포포 입금했어?”, “입금 안 한 사람”) → 주문을 바꾸지 않고 답만
+  if (lines.length === 1) {
+    const ask = parsePaidAsk(lines[0]);
+    if (ask) return { reply: paidAnswer(ask, orders, today).text, changes: [], skipped: [] };
+    // ‘김포포 입금 완료’ · ‘김포포 입금 취소’ — 그 이름 주문이 하나로 정해질 때만 (여럿이면 AI가 물어요)
+    const pa = parsePaidAction(lines[0]);
+    const target = pa ? pickPaidTarget(pa.name, orders) : null;
+    // 어느 주문인지 하나로 안 정해지면 AI에게 (아래 ‘완료’ 빠른 길이 “입금 완료”를 주문 완료로 오해하지 않게)
+    if (pa && !target) return null;
+    if (pa && target) {
+      const paid = pa.kind === "paid";
+      const { data, error } = await db
+        .from("orders")
+        .update({ paid, paid_at: paid ? new Date().toISOString() : null })
+        .eq("id", target.id)
+        .select("*")
+        .single();
+      if (error || !data) {
+        return { reply: missingColumn(error) ? NEEDS_V9 : `입금 상태를 바꾸지 못했어요: ${target.customer} ${target.item}`, changes: [], skipped: [] };
+      }
+      const o = tidy(data as Order);
+      return {
+        reply: paid ? `💰 ${o.customer}님 주문(${o.item}) 입금 확인했어요!` : `${o.customer}님 주문(${o.item})을 입금 전으로 바꿨어요.`,
+        changes: [{ op: "update", order: o }],
+        skipped: [],
+      };
+    }
   }
 
   // ‘김포포 로젠 12345678901’ — 그 이름 주문에 송장번호 적기 (주문이 하나로 정해질 때만, 아니면 AI가 되물어요)
@@ -348,6 +396,9 @@ async function quickPath(message: string, orders: Order[], today: string, caller
   if (!parsed.every((x): x is NonNullable<typeof x> => x !== null)) return null;
   // 출고일이 한 줄이라도 있을 때만 그 칸을 보내요 (예전 DB에서도 출고일 없는 주문은 저장되게)
   const anyShip = parsed.some((x) => x.ship_date);
+  // 메모에 “선입금 완료”가 있으면 입금 완료로 — 한 줄이라도 있을 때만 그 칸을 보내요(예전 DB에서도 저장되게)
+  const anyPaid = parsed.some((x) => memoSaysPaid(x.memo));
+  const paidNow = new Date().toISOString();
   const rows = parsed.map((x, i) => ({
     customer: x.customer.slice(0, 40),
     item: x.item.slice(0, 80),
@@ -356,6 +407,7 @@ async function quickPath(message: string, orders: Order[], today: string, caller
     due_time: x.due_time,
     method: x.method,
     ...(anyShip ? { ship_date: x.ship_date } : {}),
+    ...(anyPaid ? { paid: memoSaysPaid(x.memo), paid_at: memoSaysPaid(x.memo) ? paidNow : null } : {}),
     memo: x.memo?.slice(0, 300) ?? null,
     contact: x.contact,
     source_text: lines[i].slice(0, 1000),
@@ -363,6 +415,7 @@ async function quickPath(message: string, orders: Order[], today: string, caller
   }));
   const { data, error } = await db.from("orders").insert(rows).select("*");
   if (error && anyShip && missingColumn(error)) throw new Error(NEEDS_V7);
+  if (error && anyPaid && missingColumn(error)) throw new Error(NEEDS_V9);
   if (error || !data) return null;
   const created = (data as Order[]).map(tidy);
   return {
@@ -389,11 +442,11 @@ export function buildBrief(orders: Order[], today = kstDate()): string | null {
   const lines: string[] = [];
   for (const o of ship) {
     const d = actDay(o);
-    lines.push(`📦 ${md(d)} ${dLabel(daysUntil(d, today))}${o.ship_date ? " 출고" : ""} ${o.customer} ${o.item}`.trim());
+    lines.push(`📦 ${md(d)} ${dLabel(daysUntil(d, today))}${o.ship_date ? " 출고" : ""} ${o.customer} ${o.item}${unpaid(o) ? " (입금 전)" : ""}`.trim());
   }
   for (const o of pick) {
     const t = timeLabel(o.due_time);
-    lines.push(`🛍 ${md(o.due_date)} ${daysUntil(o.due_date, today) === 0 ? "오늘" : "내일"}${t ? ` ${t}` : ""} 픽업 ${o.customer} ${o.item}`.trim());
+    lines.push(`🛍 ${md(o.due_date)} ${daysUntil(o.due_date, today) === 0 ? "오늘" : "내일"}${t ? ` ${t}` : ""} 픽업 ${o.customer} ${o.item}${unpaid(o) ? " (입금 전)" : ""}`.trim());
   }
 
   const head = `🌸 포포하우스 주문 알림 ${md(today)}`;

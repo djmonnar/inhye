@@ -1,4 +1,4 @@
-import { actDay, normTime, timeLabel } from "../../day";
+import { actDay, normTime, timeLabel, unpaid } from "../../day";
 import { margin, num, parseKoreanWon, relTime, won } from "../../format";
 import { j } from "../../josa";
 import {
@@ -19,6 +19,7 @@ import {
 } from "../../settle";
 import { isPriceListAsk, PRICE_FOOTER, PRICE_LIST, priceAnswer } from "../../priceList";
 import { parseTrackingAction } from "../../orderParse";
+import { paidAnswer, parsePaidAction, parsePaidAsk, type PaidAsk } from "../../paid";
 import { buildShipNotice, isShipNoticeAsk, shipNoticeNote } from "../../shipNotice";
 import { cheaperThanMain, isStale, sortSources, suggestQty } from "../../sources";
 import type { Order, OrderChangeOp, OrderChatResult, OrderChatTurn, Product, ProductSource, Supplier, SupplierInput, SupplierKind } from "../../types";
@@ -251,6 +252,11 @@ class Bot {
 
     // 손님께 보낼 택배 송장 안내문 (“송장안내문”, “송장안내문 김포포 로젠 12345678901”) — 주문 말보다 먼저
     if (isShipNoticeAsk(said)) return this.shipNotice(said);
+    // 입금 묻기 — “김포포 입금했어?”, “입금 안 한 사람” (AI 없이, 주문을 바꾸지 않아요)
+    const paidAsk = parsePaidAsk(said);
+    if (paidAsk) return this.paidReply(paidAsk);
+    // 입금 처리 — “김포포 입금 완료” → 주문 비서 빠른 길 (주문 ‘완료’와는 따로)
+    if (parsePaidAction(said)) return this.orderFlow(said);
 
     // 가게 주문 가격표 (“꽃다발 M 얼마야?”, “가격표”) — 사용법 질문보다 먼저 (“꽃다발 가격 어떻게 돼?”)
     if (isPriceListAsk(said)) return this.priceReply(said);
@@ -357,6 +363,7 @@ class Bot {
             "• 주문 목록 / 오늘 픽업 / 내일 픽업",
             "• 주문은 그대로 보내면 등록돼요 — 11/20 금 오후 3시 픽업 김포포 꽃다발 2.5만원",
             "• 김포포 꽃다발 보냈어(완료) · 김포포 4시로 바꿔줘 · 김포포 주문 취소",
+            "• 김포포 입금 완료 · 김포포 입금했어? · 입금 안 한 사람",
             "• 김포포 로젠 12345678901 — 주문에 송장번호 저장 + 송장 안내문",
             "• 송장안내문 김포포 로젠 12345678901 — 손님께 보낼 송장 안내 글",
             "• 거래처 목록 / 거래처 도매꾹",
@@ -1115,6 +1122,13 @@ class Bot {
     );
   }
 
+  /** 입금 상태 답 — 그 손님 주문 또는 입금 전 목록 (입금 전이면 바로 처리 버튼) */
+  async paidReply(ask: PaidAsk): Promise<SkillResponse> {
+    const a = paidAnswer(ask, await this.db.listOrders(), kstDay(this.now));
+    const btns = a.unpaidNames.slice(0, 3).map((n): [string, string] => [`${n} 입금 완료`, `${n} 입금 완료`]);
+    return reply([text(a.text)], quick(...btns, ask.kind === "one" ? "입금 안 한 사람" : "주문 목록", "메뉴"));
+  }
+
   /** 손님께 보낼 택배 송장 안내문 — 첫 말풍선은 그대로 복사해서 보내는 글, 둘째는 메모 */
   async shipNotice(said: string): Promise<SkillResponse> {
     const n = buildShipNotice(said, await this.db.listOrders(), kstDay(this.now));
@@ -1363,6 +1377,7 @@ class Bot {
         o.price ? won(o.price) : "",
         ship ? `출고 ${md(ship)}${d ? ` ${d}` : ""}` : d,
         o.tracking_no ? `📮 ${o.carrier ? `${o.carrier} ` : ""}${o.tracking_no}` : o.logen_status === "registered" ? "📮 로젠 접수(송장 대기)" : "",
+        o.paid === true ? "💰입금" : unpaid(o) || o.paid === false ? "입금 전" : "",
       ]
         .filter(Boolean)
         .join(" · "),

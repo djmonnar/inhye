@@ -9,7 +9,7 @@ import { useAuth, useToast } from "@/components/providers";
 import { EmptyState, Field, Loading, MoneyInput, PageHeader, Segmented, Sheet } from "@/components/ui";
 import { CARRIER_NAMES, normTracking, trackingUrl } from "@/lib/carriers";
 import { IS_DEMO } from "@/lib/config";
-import { actDay, kstToday, timeLabel } from "@/lib/day";
+import { actDay, kstToday, timeLabel, unpaid } from "@/lib/day";
 import { num, telOf, won } from "@/lib/format";
 import { j } from "@/lib/josa";
 import { itemLabel, PRICE_FOOTER, PRICE_LIST } from "@/lib/priceList";
@@ -33,6 +33,12 @@ function logenMissing(o: Pick<Order, "status" | "method" | "customer" | "address
   return p;
 }
 
+/** 입금 확인한 때 — "11/16 오후 2:30" */
+function paidTime(iso: string): string {
+  const k = new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString();
+  return `${Number(k.slice(5, 7))}/${Number(k.slice(8, 10))} ${timeLabel(k.slice(11, 16))}`;
+}
+
 /** 로젠 결과 → 한 줄 안내 */
 function logenSummary(r: LogenRun): { msg: string; ok: boolean } {
   const parts = [
@@ -53,6 +59,7 @@ const blank = (today: string): OrderInput => ({
   ship_date: null,
   carrier: null,
   tracking_no: null,
+  paid: false,
   memo: null,
   contact: null,
   address: null,
@@ -63,7 +70,7 @@ const blank = (today: string): OrderInput => ({
  * (예전 DB(v6·v7)에 그 칸이 없어도 그 칸을 안 쓰는 주문은 그대로 저장돼요).
  */
 function toInput(f: OrderInput, existing: Order | null): OrderInput {
-  const { ship_date, carrier, tracking_no, ...rest } = f;
+  const { ship_date, carrier, tracking_no, paid, ...rest } = f;
   const delivery = f.method === "delivery";
   const ship = delivery ? (ship_date ?? null) : null;
   const no = delivery ? normTracking(tracking_no) : null;
@@ -73,6 +80,8 @@ function toInput(f: OrderInput, existing: Order | null): OrderInput {
     ...(ship || existing?.ship_date ? { ship_date: ship } : {}),
     ...(no || existing?.tracking_no ? { tracking_no: no } : {}),
     ...(car || existing?.carrier ? { carrier: car } : {}),
+    // 입금은 바뀔 때만 (새 주문은 체크했을 때만) — 예전 DB(v8)에서도 다른 주문은 저장되게
+    ...(paid !== undefined && (existing ? paid !== (existing.paid ?? false) : paid) ? { paid } : {}),
   };
 }
 
@@ -102,6 +111,7 @@ function OrderSheet({ order, onClose, today }: { order: Order | "new" | null; on
             ship_date: order.ship_date,
             carrier: order.carrier,
             tracking_no: order.tracking_no,
+            paid: order.paid ?? false,
             memo: order.memo,
             contact: order.contact,
             address: order.address,
@@ -124,6 +134,24 @@ function OrderSheet({ order, onClose, today }: { order: Order | "new" | null; on
   }
 
   const set = <K extends keyof OrderInput>(k: K, v: OrderInput[K]) => setF((o) => ({ ...o, [k]: v }));
+
+  /** 입금 체크 — 이미 있는 주문은 누르자마자 저장 (시트는 열어 둔 채로), 새 주문은 저장할 때 같이 */
+  async function togglePaid(next: boolean) {
+    set("paid", next);
+    if (!existing) return;
+    setBusy(true);
+    try {
+      const { customer, item, price, due_date, due_time, method, memo, contact, address } = existing;
+      await store().saveOrder({ customer, item, price, due_date, due_time, method, memo, contact, address, paid: next }, existing.id);
+      await refresh("orders");
+      toast(next ? `${existing.customer || "손님"} 입금 확인했어요 💰` : "입금 전으로 바꿨어요", next ? "wow" : "wink");
+    } catch (e) {
+      set("paid", !next);
+      toast(e instanceof Error ? e.message : "바꾸지 못했어요", "sad");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function runLogen(fn: () => Promise<LogenRun>) {
     setBusy(true);
@@ -192,6 +220,17 @@ function OrderSheet({ order, onClose, today }: { order: Order | "new" | null; on
           {(id) => <input id={id} className="input" value={f.item} onChange={(e) => set("item", e.target.value)} placeholder="예: 하치와레 꽃다발" />}
         </Field>
         <Field label="가격">{(id) => <MoneyInput id={id} value={f.price} onChange={(n) => set("price", n)} />}</Field>
+        <label
+          className={`flex cursor-pointer items-center justify-between gap-3 rounded-2xl border-2 px-3 py-2.5 ${
+            f.paid ? "border-matcha-300 bg-matcha-100 text-matcha-700" : "border-butter-300 bg-butter-100 text-butter-700"
+          }`}
+        >
+          <span className="font-cute">
+            💰 {f.paid ? "입금 확인했어요" : "입금 전"}
+            {existing?.paid && existing.paid_at && <span className="ml-1.5 text-xs font-normal opacity-80">{paidTime(existing.paid_at)}</span>}
+          </span>
+          <input type="checkbox" className="h-6 w-6 accent-matcha-500" checked={Boolean(f.paid)} disabled={busy} onChange={(e) => void togglePaid(e.target.checked)} aria-label="입금 확인" />
+        </label>
         <Field label="연락처 (선택)">
           {(id) => (
             <input
@@ -522,6 +561,7 @@ function Orders() {
   }, [orders, tab]);
 
   const openOrders = orders.filter((o) => o.status === "open");
+  const unpaidCount = openOrders.filter(unpaid).length;
   const { data: logen } = useLogenStatus(!IS_DEMO);
   const slipWaiting = orders.filter((o) => o.logen_status === "registered" && !o.tracking_no);
   const [logenBusy, setLogenBusy] = useState(false);
@@ -582,7 +622,7 @@ function Orders() {
           <div className="mb-3 flex items-baseline justify-between gap-2">
             <p className="font-cute text-lg">주문 목록</p>
             <p className="text-xs text-ink-soft">
-              진행 중 {num(openOrders.length)}건{shipSoon ? ` · 7일 안에 보낼 택배 ${shipSoon}건` : ""}
+              진행 중 {num(openOrders.length)}건{unpaidCount ? ` · 입금 전 ${unpaidCount}건` : ""}{shipSoon ? ` · 7일 안에 보낼 택배 ${shipSoon}건` : ""}
             </p>
           </div>
           {logen?.configured && slipWaiting.length > 0 && (
@@ -634,6 +674,11 @@ function Orders() {
                         ) : (
                           <span className="rounded-full bg-cream-deep px-2 py-0.5 text-[11px] text-ink-soft">{o.status === "done" ? "완료" : "취소"}</span>
                         )}
+                        {o.status !== "canceled" && o.paid === true ? (
+                          <span className="rounded-full bg-matcha-100 px-2 py-0.5 text-[11px] text-matcha-700">💰 입금</span>
+                        ) : o.status !== "canceled" && (o.paid === false || unpaid(o)) ? (
+                          <span className="rounded-full bg-butter-100 px-2 py-0.5 text-[11px] text-butter-700">입금 전</span>
+                        ) : null}
                       </span>
                       <span className={`mt-0.5 block truncate text-sm font-medium ${o.status === "canceled" ? "line-through" : ""}`}>
                         {o.customer} · {o.item}
