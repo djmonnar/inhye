@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle, Send, ShoppingBag, Truck } from "lucide-react";
+import { Copy, MessageCircle, Send, ShoppingBag, Truck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/providers";
 import { timeLabel } from "@/lib/day";
@@ -70,6 +70,15 @@ export function OrderChat({ bare = false }: { bare?: boolean }) {
     // 새 메시지가 오면 맨 아래로 (scrollIntoView가 Promise를 돌려주는 브라우저가 있어서 값은 버려요)
     void endRef.current?.scrollIntoView({ block: "nearest" });
   }, [msgs]);
+
+  async function copyText(t: string) {
+    try {
+      await navigator.clipboard.writeText(t);
+      toast("복사했어요. 손님 카톡에 붙여 넣으세요!", "wink");
+    } catch {
+      toast("복사하지 못했어요. 글을 길게 눌러 복사해 주세요.", "sad");
+    }
+  }
 
   async function send() {
     const message = text.trim();
@@ -147,6 +156,11 @@ export function OrderChat({ bare = false }: { bare?: boolean }) {
                       </li>
                     ))}
                   </ul>
+                )}
+                {m.result?.copy && (
+                  <button type="button" className="btn-soft btn-sm mt-2" onClick={() => copyText(m.result!.copy!)}>
+                    <Copy size={14} /> 손님께 보낼 글 복사
+                  </button>
                 )}
                 {m.result?.skipped.map((s, j) => (
                   <p key={j} className="mt-1 text-xs text-danger">

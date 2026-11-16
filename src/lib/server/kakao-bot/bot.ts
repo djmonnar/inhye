@@ -18,6 +18,7 @@ import {
   type OrderSettle,
 } from "../../settle";
 import { isPriceListAsk, PRICE_FOOTER, PRICE_LIST, priceAnswer } from "../../priceList";
+import { buildShipNotice, isShipNoticeAsk, shipNoticeNote } from "../../shipNotice";
 import { cheaperThanMain, isStale, sortSources, suggestQty } from "../../sources";
 import type { Order, OrderChangeOp, OrderChatResult, OrderChatTurn, Product, ProductSource, Supplier, SupplierInput, SupplierKind } from "../../types";
 import {
@@ -247,6 +248,9 @@ class Bot {
     if (/^연결\s*(해제|끊기|끊어)/.test(said)) return this.unlink();
     if (/^연결/.test(said)) return reply([text(`이미 ${this.user.name}님 계정과 연결돼 있어요.`)], MENU);
 
+    // 손님께 보낼 택배 송장 안내문 (“송장안내문”, “송장안내문 김포포 로젠 12345678901”) — 주문 말보다 먼저
+    if (isShipNoticeAsk(said)) return this.shipNotice(said);
+
     // 가게 주문 가격표 (“꽃다발 M 얼마야?”, “가격표”) — 사용법 질문보다 먼저 (“꽃다발 가격 어떻게 돼?”)
     if (isPriceListAsk(said)) return this.priceReply(said);
     // 상품 원가 — “곰돌이 털 키링 원가 3500원”(적기), “곰돌이 원가 얼마야?”(보기)
@@ -350,6 +354,7 @@ class Bot {
             "• 주문 목록 / 오늘 픽업 / 내일 픽업",
             "• 주문은 그대로 보내면 등록돼요 — 11/20 금 오후 3시 픽업 김포포 꽃다발 2.5만원",
             "• 김포포 꽃다발 보냈어(완료) · 김포포 4시로 바꿔줘 · 김포포 주문 취소",
+            "• 송장안내문 김포포 로젠 12345678901 — 손님께 보낼 송장 안내 글",
             "• 거래처 목록 / 거래처 도매꾹",
             "• 거래처 등록 / 거래처 수정 도매꾹",
             "• 거래처 상품 도매꾹 — 거기서 사는 상품·가격",
@@ -1103,6 +1108,17 @@ class Bot {
         ),
       ],
       quick(old && old !== amount ? ["되돌리기", `${saved.name} 원가 ${old}원`] : null, `상품 ${saved.name}`.slice(0, 50), "메뉴"),
+    );
+  }
+
+  /** 손님께 보낼 택배 송장 안내문 — 첫 말풍선은 그대로 복사해서 보내는 글, 둘째는 메모 */
+  async shipNotice(said: string): Promise<SkillResponse> {
+    const n = buildShipNotice(said, await this.db.listOrders(), kstDay(this.now));
+    const note = [shipNoticeNote(n), "💬 위 말풍선을 길게 눌러 복사해서 손님께 보내면 돼요."].filter(Boolean).join("\n");
+    const o = n.order;
+    return reply(
+      [text(n.text), text(note)],
+      quick(o?.status === "open" && [`${o.customer} 완료로`, `${o.customer} 보냈어`], "주문 목록", "메뉴"),
     );
   }
 

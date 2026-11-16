@@ -3,6 +3,7 @@ import { parseOrderLine, parseQuickAction } from "../orderParse";
 import { adminClient } from "./admin";
 import { askJson, objectSchema, STRING } from "./openai";
 import { priceListText } from "../priceList";
+import { buildShipNotice, isShipNoticeAsk, shipNoticeNote } from "../shipNotice";
 import type { Order, OrderChangeOp, OrderChatResult, OrderChatTurn, OrderMethod } from "../types";
 
 /**
@@ -265,6 +266,13 @@ async function quickPath(message: string, orders: Order[], today: string, caller
   const db = adminClient();
   const lines = message.split(/\n+/).map((l) => l.trim()).filter(Boolean);
   if (!lines.length || lines.length > 20) return null;
+
+  // 손님께 보낼 송장 안내문 (“송장안내문 김포포 로젠 12345678901”) — 주문을 바꾸지 않고 글만 줘요
+  if (lines.length <= 2 && isShipNoticeAsk(message)) {
+    const n = buildShipNotice(lines.join(" "), orders, today);
+    const note = shipNoticeNote(n);
+    return { reply: `${n.text}${note ? `\n\n— — —\n${note}` : ""}`, changes: [], skipped: [], copy: n.text };
+  }
 
   // ‘김포포 보냈어’ · ‘김포포 주문 취소’ — 진행 중인 주문 중 그 이름이 딱 하나일 때만
   if (lines.length === 1) {

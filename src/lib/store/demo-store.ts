@@ -13,6 +13,8 @@ import type {
   Supplier,
   SupplierInput,
 } from "../types";
+import { kstToday } from "../day";
+import { buildShipNotice, isShipNoticeAsk, shipNoticeNote } from "../shipNotice";
 import { StoreError, type DataStore } from "./types";
 
 /**
@@ -613,7 +615,14 @@ export function createDemoStore(): DataStore {
       await save("orders", list.filter((o) => o.id !== id));
     },
 
-    async orderChat() {
+    async orderChat(message) {
+      // 송장 안내문은 AI 없이 만들어요 (서버 주문 비서와 같은 글)
+      const lines = message.split(/\n+/).map((l) => l.trim()).filter(Boolean);
+      if (lines.length && lines.length <= 2 && isShipNoticeAsk(message)) {
+        const n = buildShipNotice(lines.join(" "), await load<Order[]>("orders", []), kstToday());
+        const note = shipNoticeNote(n);
+        return { reply: `${n.text}${note ? `\n\n— — —\n${note}` : ""}`, changes: [], skipped: [], copy: n.text };
+      }
       throw new StoreError("체험 모드에서는 주문 비서(AI)를 쓸 수 없어요. ‘직접 추가’로 넣어 보세요.");
     },
 

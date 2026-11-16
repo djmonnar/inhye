@@ -424,6 +424,8 @@ export interface OrderChatResult {
   reply: string;
   changes: { op: OrderChangeOp; order: Order }[];
   skipped: string[];
+  /** 손님께 그대로 보낼 글 (송장 안내문) — 있으면 ‘복사’ 버튼 */
+  copy?: string;
 }
 
 export interface KakaoStatus {
