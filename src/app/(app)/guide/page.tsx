@@ -29,6 +29,21 @@ const HIEL_ASK = `[문의] 키오스크 결제 연동 모듈(SDK) 제공 여부
 
 답변 주시면 검토 후 다시 연락드릴게요. 감사합니다.`;
 
+const LOGEN_ASK = `[문의] 로젠 Open API 연동 신청 — ${SHOP_NAME}
+
+안녕하세요. 진주에서 무인 소품샵을 하는 ‘${SHOP_NAME}’입니다. 대리점을 통해 거래처 코드 발급을 요청드렸고, 저희 주문 관리 프로그램에서 로젠 Open API로 택배 주문을 바로 접수하려고 해요.
+
+1. Open API 사용 신청: 주문등록(registerOrderData), 송장번호 조회(inquirySlipNoMulti), 화물추적(inquiryCargoTrackingMulti), 계약운임 조회(contPickFares)를 쓰려고 해요. 테스트·운영 secretKey 발급 절차를 알려 주세요.
+2. 호출 IP 등록: 34.50.34.252 를 등록해 주세요. 같은 대표가 운영하는 다른 거래처(궁중수라간)가 이미 이 IP로 Open API를 쓰고 있어요. 한 IP를 두 거래처 키가 같이 써도 되는지도 알려 주세요.
+3. 코드: 거래처코드(custCd)와 연동업체코드(userId)를 알려 주세요. 연동업체코드가 따로 없으면 거래처코드를 그대로 써도 되나요?
+4. 운임: 운임 구분(신용 030이 맞는지), 박스 크기별 계약 운임과 박스 크기 코드(boxTyCd), 제주·도서산간 추가 운임을 알려 주세요.
+5. 송장 출력: API로 보낸 주문은 ‘주문등록출력(복수건)’ 화면에서 출력하는 게 맞나요? 출력 프로그램(iLOGEN 등) 계정, 송장 용지 크기와 제공 여부, 저희 4인치 감열 프린터(Xprinter XP-T4501B)로 출력할 수 있는지도 궁금해요.
+6. 집하: 무인 매장이라 기사님 방문 시간과 물건 두는 곳을 정하고 싶어요.
+7. 생화 꽃다발·유리 화병처럼 깨지기 쉬운 물건도 접수되는지, 파손 시 보상은 어떻게 되는지 궁금해요.
+8. 네이버 스마트스토어 반품 택배사로 로젠을 지정(굿스플로)하려면 무엇이 필요한가요?
+
+secretKey는 메일 등으로 따로 보내 주시면 돼요. 감사합니다.`;
+
 const STATUS = [
   { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "앱에서 등록·수정 → 빅솔론 대량등록 엑셀 → 빅솔론에 업로드" },
   { tone: "bg-matcha-100 text-matcha-700", mark: "지금 됨", text: "빅솔론 상품 목록 엑셀 → 앱으로 가져오기 (상품 코드 맞추기)" },
@@ -162,6 +177,24 @@ export default function GuidePage() {
           <p className="text-xs text-ink-soft">
             보낼 곳: <a href="mailto:info@hielpay.com" className="font-semibold underline">info@hielpay.com</a> (대표, 참조 mkt@hielpay.com 제휴) ·
             고객센터 <a href="tel:15771984" className="underline">1577-1984</a> · 신규·가맹 상담 1577-5526
+          </p>
+        </section>
+
+        <section className="card space-y-3 p-4">
+          <p className="font-cute text-xl">📦 로젠택배 (택배 접수·송장번호)</p>
+          <div className="rounded-2xl bg-butter-100 p-3 text-sm">
+            <b>준비 상태:</b> 앱 쪽 연동은 미리 만들어 뒀어요. 로젠은 <b>등록된 IP(34.50.34.252)</b>에서 온 요청만 받아서, 궁중수라간 서버를 거쳐
+            보내요. 로젠에서 <b>Open API 키·거래처코드</b>를 받으면 켤 수 있어요(2026-11-16).
+          </div>
+          <div className="rounded-2xl border-2 border-dashed border-line bg-cream p-3 text-xs whitespace-pre-wrap text-ink-soft">
+            {LOGEN_ASK}
+          </div>
+          <button type="button" className="btn-soft btn-sm w-full" onClick={() => copy(LOGEN_ASK)}>
+            <Copy size={16} /> 로젠 문의 문구 복사
+          </button>
+          <p className="text-xs text-ink-soft">
+            보낼 곳: 거래처 코드를 만들어 주는 <b>로젠 대리점 담당자</b>에게 보내고, Open API는 본사 담당으로 넘겨 달라고 하면 돼요. 받은 키는
+            채팅에 붙이지 말고 Vercel 환경변수에만 넣어요.
           </p>
         </section>
       </div>

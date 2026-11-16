@@ -189,14 +189,20 @@ export function parseOrderLine(raw: string, today: string): ParsedOrder | null {
   };
 }
 
-/** "김포포 꽃다발 보냈어" → 완료, "김포포 주문 취소" → 취소 (이름은 첫 단어) */
-export function parseQuickAction(raw: string): { kind: "complete" | "cancel"; name: string } | null {
+/** "김포포 꽃다발 보냈어" → 완료, "김포포 완료 취소" → 진행 중으로 되돌리기, "김포포 주문 취소" → 취소 (이름은 첫 단어) */
+export function parseQuickAction(raw: string): { kind: "complete" | "cancel" | "reopen"; name: string } | null {
   const s = raw.trim().replace(/[.!~?]+$/, "").replace(/\s+/g, " ");
   const words = s.split(" ");
   if (words.length < 2 || words.length > 5) return null;
   const name = words[0].replace(/님$/, "");
   if (!/^[가-힣A-Za-z]{2,10}$/.test(name)) return null;
   const tail = words.slice(1).join(" ");
+  // 완료 취소 — ‘취소’가 들어 있어도 주문 취소가 아니에요. 그래서 맨 먼저 봐요
+  if (
+    /(?:완료\s*(?:취소|해제|철회|무르기|되돌려|되돌리기)(?:\s*(?:해\s*줘|해주세요|할게요?|요|함))?|다시\s*진행(?:\s*(?:해\s*줘|해주세요|으로|중으로))?|진행\s*중으로(?:\s*(?:바꿔|돌려)\s*줘)?|아직\s*안\s*(?:보냈어요?|찾아\s*갔어요?|가져\s*갔어요?))$/.test(tail)
+  ) {
+    return { kind: "reopen", name };
+  }
   if (/(보냈어요?|보냈음|보냄|(?:발송|출고)\s*(?:완료|했어요?)|완료(?:했어요?|함|요)?|찾아\s*갔어요?|가져\s*갔어요?|픽업\s*(?:완료|했어요?))$/.test(tail)) {
     return { kind: "complete", name };
   }

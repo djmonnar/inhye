@@ -18,7 +18,7 @@ const OP_LABEL: Record<OrderChangeOp, string> = {
   create: "등록",
   update: "수정",
   complete: "완료",
-  reopen: "다시 진행",
+  reopen: "완료 취소",
   cancel: "취소",
 };
 

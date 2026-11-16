@@ -80,7 +80,7 @@ const md = (day: string) => `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10
 const daysUntil = (day: string, today: string) =>
   Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
 const dLabel = (n: number) => (n === 0 ? "오늘" : n > 0 ? `D-${n}` : `${-n}일 지남`);
-const OP_LABEL: Record<OrderChangeOp, string> = { create: "등록", update: "수정", complete: "완료", reopen: "다시 진행", cancel: "취소" };
+const OP_LABEL: Record<OrderChangeOp, string> = { create: "등록", update: "수정", complete: "완료", reopen: "완료 취소", cancel: "취소" };
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 200);
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, Math.max(0, ms)));
 const SLOW: unique symbol = Symbol("slow");
@@ -362,7 +362,7 @@ class Bot {
             "이렇게 말해 보세요 🐾",
             "• 주문 목록 / 오늘 픽업 / 내일 픽업",
             "• 주문은 그대로 보내면 등록돼요 — 11/20 금 오후 3시 픽업 김포포 꽃다발 2.5만원",
-            "• 김포포 꽃다발 보냈어(완료) · 김포포 4시로 바꿔줘 · 김포포 주문 취소",
+            "• 김포포 꽃다발 보냈어(완료) · 김포포 완료 취소(다시 진행 중으로) · 김포포 4시로 바꿔줘 · 김포포 주문 취소",
             "• 김포포 입금 완료 · 김포포 입금했어? · 입금 안 한 사람",
             "• 김포포 로젠 12345678901 — 주문에 송장번호 저장 + 송장 안내문",
             "• 송장안내문 김포포 로젠 12345678901 — 손님께 보낼 송장 안내 글",

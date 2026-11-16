@@ -35,7 +35,7 @@
 
 ## 처음 설정 (계약 코드·키를 받으면)
 
-**1. 로젠에 Open API 신청할 때** — 호출 IP로 **34.50.34.252** 를 등록해 달라고 해요(궁중수라간과 같은 IP).
+**1. 로젠에 Open API 신청할 때** — 호출 IP로 **34.50.34.252** 를 등록해 달라고 해요(궁중수라간과 같은 IP). 문의 문구(IP·키·코드·운임·송장 출력·집하·파손·스마트스토어 반품 8가지)는 앱 **더보기 → 연동 안내 → 📦 로젠택배**에 복사 버튼과 함께 있어요(`src/app/(app)/guide/page.tsx` `LOGEN_ASK`). 보낼 곳: 거래처 코드를 만드는 대리점 담당자 → 본사 Open API 담당.
 
 **2. 궁중수라간 쪽 (한 번)**
 - 저장소 `djmonnar/gjsuragan` 브랜치 **`logen-relay-popohouse`** 에 `logenRelay` 코드를 올려 뒀어요(2026-11-16, 사용자 허락). 그 저장소 검사(유닛 627개·lint·smoke) 통과. **기본 브랜치(main)에 머지**해야 배포할 수 있어요: https://github.com/djmonnar/gjsuragan/pull/new/logen-relay-popohouse

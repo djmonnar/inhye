@@ -345,8 +345,8 @@ function OrderSheet({ order, onClose, today }: { order: Order | "new" | null; on
                 <Check size={16} /> 완료
               </button>
             ) : (
-              <button type="button" className="btn-soft btn-sm" disabled={busy} onClick={() => run(() => store().saveOrder({ ...toInput(f, existing), status: "open" }, existing.id), "다시 진행 중이에요")}>
-                <RotateCcw size={16} /> 다시 진행
+              <button type="button" className="btn-soft btn-sm" disabled={busy} onClick={() => run(() => store().saveOrder({ ...toInput(f, existing), status: "open" }, existing.id), "완료를 취소했어요. 다시 진행 중이에요")}>
+                <RotateCcw size={16} /> 완료 취소
               </button>
             )}
             {existing.status !== "canceled" ? (
@@ -597,7 +597,7 @@ function Orders() {
       };
       await store().saveOrder(input, o.id);
       await refresh("orders");
-      toast(o.status === "open" ? `${o.customer || o.item} 완료!` : "다시 진행 중이에요", "wow");
+      toast(o.status === "open" ? `${o.customer || o.item} 완료!` : "완료를 취소했어요. 다시 진행 중이에요", "wow");
     } catch (e) {
       toast(e instanceof Error ? e.message : "바꾸지 못했어요", "sad");
     }
@@ -709,7 +709,7 @@ function Orders() {
                         type="button"
                         className={`btn-sm shrink-0 ${o.status === "open" ? "btn-soft" : "btn-ghost"}`}
                         onClick={() => complete(o)}
-                        aria-label={o.status === "open" ? `${o.customer} 완료` : `${o.customer} 다시 진행`}
+                        aria-label={o.status === "open" ? `${o.customer} 완료` : `${o.customer} 완료 취소`}
                       >
                         {o.status === "open" ? <Check size={16} /> : <RotateCcw size={16} />}
                       </button>

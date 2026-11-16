@@ -88,7 +88,7 @@ function instructions(today: string) {
 [이미 있는 주문 바꾸기] 아래 ‘지금 주문 목록’의 #번호를 ref에 넣어.
 - 수정(날짜·시간·출고일·가격·상품·메모·택배사·송장번호 등) → op "update", 바꿀 칸만 넣고 나머지는 null. 시간을 지우라고 하면 due_time "", 출고일을 지우라고 하면 ship_date "", 송장번호를 지우라고 하면 tracking_no "".
 - ‘최근 대화’에서 방금 등록·수정한 주문을 이어서 말하면("가격은 3만원이야", "그거 4시로", "연핑크로 변경이야", "주소는 ~야") 그 주문을 update해. 이름이 없어도 방금 그 주문이면 돼. 상품을 바꾸는 말("○○ 꽃다발 + 연핑크")은 item을 고치고, 꽃·색 변경 같은 요청은 memo에 덧붙여.
-- "완료", "보냈어", "픽업해 갔어", "끝" → op "complete". 완료 취소/다시 진행 → "reopen".
+- "완료", "보냈어", "픽업해 갔어", "끝" → op "complete". "완료 취소", "다시 진행", "아직 안 찾아갔어"(완료로 잘못 눌렀을 때) → "reopen". ‘완료 취소’는 주문 취소(cancel)가 아니에요 — 주문을 없애지 말고 진행 중으로 되돌려.
 - 입금만 확인하는 말("김포포 입금 완료", "이토끼 돈 들어왔어")은 complete가 아니라 op "update" + paid true. 주문 완료와 입금은 따로예요.
 - "입금 안 한 사람?", "김포포 입금했어?" 같은 질문은 actions 없이 목록의 입금 칸(입금완료/입금전)을 보고 reply로 답해.
 - "삭제", "취소", "빼줘" → op "cancel".
@@ -377,6 +377,14 @@ async function quickPath(message: string, orders: Order[], today: string, caller
   // ‘김포포 보냈어’ · ‘김포포 주문 취소’ — 진행 중인 주문 중 그 이름이 딱 하나일 때만
   if (lines.length === 1) {
     const a = parseQuickAction(lines[0]);
+    // ‘김포포 완료 취소’ — 완료한 주문이 그 이름으로 딱 하나일 때만 진행 중으로 (여럿이면 AI가 어느 건지 물어요)
+    if (a?.kind === "reopen") {
+      const done = orders.filter((o) => o.status === "done" && o.customer === a.name);
+      if (done.length !== 1) return null;
+      const { data, error } = await db.from("orders").update({ status: "open", done_at: null }).eq("id", done[0].id).select("*").single();
+      if (error || !data) return null;
+      return { reply: `${a.name}님 주문 완료를 취소했어요. 다시 진행 중이에요 ↩️`, changes: [{ op: "reopen", order: tidy(data as Order) }], skipped: [] };
+    }
     if (a) {
       const hits = orders.filter((o) => o.status === "open" && o.customer === a.name);
       if (hits.length !== 1) return null;
