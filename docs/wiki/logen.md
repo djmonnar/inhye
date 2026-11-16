@@ -38,7 +38,7 @@
 **1. 로젠에 Open API 신청할 때** — 호출 IP로 **34.50.34.252** 를 등록해 달라고 해요(궁중수라간과 같은 IP).
 
 **2. 궁중수라간 쪽 (한 번)**
-- 저장소 `djmonnar/gjsuragan`에 `logenRelay` 코드가 들어가 있어야 해요(2026-11-16 준비, 사용자 확인 후 올림).
+- 저장소 `djmonnar/gjsuragan` 브랜치 **`logen-relay-popohouse`** 에 `logenRelay` 코드를 올려 뒀어요(2026-11-16, 사용자 허락). 그 저장소 검사(유닛 627개·lint·smoke) 통과. **기본 브랜치(main)에 머지**해야 배포할 수 있어요: https://github.com/djmonnar/gjsuragan/pull/new/logen-relay-popohouse
 - GCP Secret Manager(프로젝트 `gjsuragan-60505`)에 비밀 **`LOGEN_RELAY_TOKEN`** 을 긴 무작위 값으로 만들어요.
 - 로젠 통로가 켜져 있을 때 GitHub Actions → Deploy Functions → `functions:logenRelay` (이것만! `api`나 전체 배포 아님).
 - 주소: `https://asia-northeast3-gjsuragan-60505.cloudfunctions.net/logenRelay`
