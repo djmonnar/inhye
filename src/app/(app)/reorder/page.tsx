@@ -68,7 +68,7 @@ export default function ReorderPage() {
 
   return (
     <div>
-      <PageHeader title="발주" sub={total ? `채워야 할 상품 ${total}개` : undefined} />
+      <PageHeader back title="발주" sub={total ? `채워야 할 상품 ${total}개` : undefined} />
       <OrderTabs />
       {isLoading ? (
         <Loading />

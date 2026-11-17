@@ -231,7 +231,7 @@ export default function SettlePage() {
 
   return (
     <div>
-      <PageHeader back title="정산" sub="A = 인혜 · B = 경령 · 💐 꽃다발 주문(픽업·배달·택배)" />
+      <PageHeader title="정산" sub="A = 인혜 · B = 경령 · 💐 꽃다발 주문(픽업·배달·택배)" />
       <div className="space-y-4">
         <section className="card space-y-3 p-4">
           <Segmented<Period>

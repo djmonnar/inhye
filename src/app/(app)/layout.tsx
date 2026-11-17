@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList, Ellipsis, House, Package, ScanBarcode } from "lucide-react";
+import { Calculator, Ellipsis, House, Package, ScanBarcode } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -66,13 +66,9 @@ const TABS = [
   { href: "/", label: "홈", icon: House, match: (p: string) => p === "/" },
   { href: "/products", label: "상품", icon: Package, match: (p: string) => p.startsWith("/products") },
   { href: "/scan", label: "스캔", icon: ScanBarcode, match: (p: string) => p.startsWith("/scan") },
-  {
-    href: "/reorder",
-    label: "발주",
-    icon: ClipboardList,
-    match: (p: string) => p.startsWith("/reorder") || p.startsWith("/suppliers"),
-  },
-  { href: "/more", label: "더보기", icon: Ellipsis, match: (p: string) => !["/", "/products", "/scan", "/reorder", "/suppliers"].some((x) => (x === "/" ? p === "/" : p.startsWith(x))) },
+  // 정산(A·B·꽃다발) — 발주는 홈 빠른 버튼·더보기에서 (2026-11-17 사용자 요청)
+  { href: "/sales/settle", label: "정산", icon: Calculator, match: (p: string) => p.startsWith("/sales/settle") },
+  { href: "/more", label: "더보기", icon: Ellipsis, match: (p: string) => !["/", "/products", "/scan", "/sales/settle"].some((x) => (x === "/" ? p === "/" : p.startsWith(x))) },
 ];
 
 function BottomNav() {
