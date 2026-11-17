@@ -176,6 +176,24 @@ export function settlePeriod(said: string, today: string): SettlePeriod {
     return { start: d, end: d, label: "어제", word: "어제" };
   }
   if (/오늘/.test(said)) return { start: today, end: today, label: "오늘", word: "오늘" };
+  // 하루: “11/15 정산”, “11월 15일 정산”, “15일 정산” (앱 정산 탭의 날짜별과 같게)
+  const dm = said.match(/(?<!\d)(\d{1,2})\s*[/.]\s*(\d{1,2})(?!\d)/) ?? said.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+  const dOnly = dm ? null : said.match(/(?<![\d월])(\d{1,2})\s*일(?!\s*(?:간|치|동안))/);
+  if (dm || dOnly) {
+    const mo = dm ? Number(dm[1]) : m;
+    const d = Number(dm ? dm[2] : dOnly![1]);
+    let yy = y;
+    let mm2 = mo;
+    // 아직 안 온 날이면: 월까지 말했으면 작년, 날만 말했으면 지난달
+    if (`${yy}-${pad(mm2)}-${pad(d)}` > today) {
+      if (dm) yy = y - 1;
+      else [yy, mm2] = m === 1 ? [y - 1, 12] : [y, m - 1];
+    }
+    if (mm2 >= 1 && mm2 <= 12 && d >= 1 && d <= lastDayOf(yy, mm2)) {
+      const day = `${yy}-${pad(mm2)}-${pad(d)}`;
+      return { start: day, end: day, label: `${mm2}/${d}`, word: `${mm2}/${d}` };
+    }
+  }
   const dow = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7; // 월요일 = 0
   if (/지난\s*주|저번\s*주/.test(said)) {
     const start = addDays(today, -dow - 7);
@@ -213,7 +231,8 @@ export function settleMethod(said: string): "pickup" | "delivery" | null {
 
 /** 정산을 묻는 말인지 (주문 줄·숫자 날짜는 아니에요) */
 export function isSettleAsk(said: string): boolean {
-  if (/\d{1,2}\s*[/.]\s*\d{1,2}/.test(said)) return false;
+  // 날짜(11/15)가 있으면 ‘정산’이라고 했을 때만 (주문 줄·날짜 매출과 헷갈리지 않게)
+  if (/\d{1,2}\s*[/.]\s*\d{1,2}/.test(said) && !/정산/.test(said)) return false;
   if (/정산/.test(said)) return !/출고|보냈|완료|취소|바꿔|변경/.test(said);
   // “이번 달 꽃다발 매출”, “픽업 주문 총액” — 주문 등록·수정 말은 아니에요
   if (FLOWER_WORDS.test(said) && /매출|총액|합계|얼마\s*(?:벌|팔)|수입/.test(said) && !/출고|보냈|완료|취소|바꿔|변경|등록/.test(said)) return true;

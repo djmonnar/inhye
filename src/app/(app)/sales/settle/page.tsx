@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Copy, Download, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
+import { DayNav } from "@/components/DayNav";
 import { useToast } from "@/components/providers";
 import { EmptyState, Loading, PageHeader, Segmented } from "@/components/ui";
 import { actDay, kstToday, shiftDay } from "@/lib/day";
@@ -16,14 +17,15 @@ import { store } from "@/lib/store";
  * 빅솔론에서 바로 받아요(저장 없음, 최대 31일). 엑셀로 받거나 카톡용 글로 복사할 수 있어요.
  */
 
-type Period = "this" | "last" | "custom";
+type Period = "day" | "this" | "last" | "custom";
 const MAX_DAYS = 31;
 
 const monthStart = (day: string) => `${day.slice(0, 8)}01`;
 const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
 const spanDays = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000) + 1;
 
-function rangeOf(p: Period, today: string, custom: { start: string; end: string }) {
+function rangeOf(p: Period, today: string, day: string, custom: { start: string; end: string }) {
+  if (p === "day") return { start: day, end: day };
   if (p === "this") return { start: monthStart(today), end: today };
   if (p === "last") {
     const end = shiftDay(monthStart(today), -1);
@@ -185,9 +187,11 @@ function FlowerDetail({ f }: { f: OrderSettle }) {
 export default function SettlePage() {
   const toast = useToast();
   const [today] = useState(kstToday);
-  const [period, setPeriod] = useState<Period>("this");
+  // 들어오면 날짜별(오늘)부터 — 달력으로 날짜를 골라요 (2026-11-17 사용자 요청)
+  const [period, setPeriod] = useState<Period>("day");
+  const [day, setDay] = useState(today);
   const [custom, setCustom] = useState(() => ({ start: monthStart(today), end: today }));
-  const { start, end } = rangeOf(period, today, custom);
+  const { start, end } = rangeOf(period, today, day, custom);
   const days = spanDays(start, end);
   const invalid = !start || !end || start > end || end > today ? "시작일 ≤ 끝날 ≤ 오늘로 골라 주세요." : days > MAX_DAYS ? `한 번에 ${MAX_DAYS}일까지 볼 수 있어요.` : null;
 
@@ -236,13 +240,15 @@ export default function SettlePage() {
         <section className="card space-y-3 p-4">
           <Segmented<Period>
             options={[
+              { value: "day", label: "날짜별" },
               { value: "this", label: "이번 달" },
               { value: "last", label: "지난달" },
-              { value: "custom", label: "직접" },
+              { value: "custom", label: "기간" },
             ]}
             value={period}
             onChange={setPeriod}
           />
+          {period === "day" && <DayNav day={day} today={today} onChange={setDay} disabled={q.isFetching && !q.data} />}
           {period === "custom" && (
             <div className="grid grid-cols-2 gap-2">
               <label className="text-xs text-ink-soft">
@@ -269,7 +275,9 @@ export default function SettlePage() {
           )}
           <div className="flex items-center justify-between gap-2 text-xs text-ink-soft">
             <span>
-              {md(start)} ~ {md(end)} · {num(days)}일{q.data ? ` · ${relTime(q.data.fetchedAt)} 받음` : ""}
+              {start === end ? `${md(start)} 하루` : `${md(start)} ~ ${md(end)} · ${num(days)}일`}
+              {q.data ? ` · ${relTime(q.data.fetchedAt)} 받음` : ""}
+              {end === today ? " · 키오스크 합계는 10분쯤 늦을 수 있어요" : ""}
             </span>
             <button
               type="button"
