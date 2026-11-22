@@ -4,7 +4,9 @@ import { Laptop, Printer, RotateCcw, Usb, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
+  BrowserFitPanel,
   LabelPrintPortal,
+  labelKey,
   PresetPicker,
   buildUsbJobs,
   printNow,
@@ -15,6 +17,7 @@ import {
   type PrintItem,
   renderLabelImages,
 } from "@/components/labels";
+import { issueAsProduct } from "@/components/BarcodeMaker";
 import { Mascot } from "@/components/Mascot";
 import { STATION_BEAT_MS, STATION_KEY } from "@/components/PrintStations";
 import { useToast } from "@/components/providers";
@@ -52,6 +55,9 @@ function chime() {
   }
 }
 
+/** 크기 확인용 테스트 한 장 (라벨 인쇄 화면과 같은 테두리 그림) */
+const SIZE_TEST = issueAsProduct({ id: "size-test", code: "", name: "", price: null, memo: null, product_id: null, created_at: "" });
+
 export default function PrintStationPage() {
   const toast = useToast();
   const refresh = useRefresh();
@@ -59,7 +65,7 @@ export default function PrintStationPage() {
   const [engine, setEngine] = useState<Engine>("browser");
   const [auto, setAuto] = useState(false);
   const settings = usePrintSettings(engine === "browser");
-  const { preset, show, usb, updateUsb } = settings;
+  const { preset, show, usb, updateUsb, nudge } = settings;
   // 실시간으로 받으면(보내는 순간 알림) 가끔만 확인하고, 실시간이 안 되면 4초마다 (v11)
   const [live, setLive] = useState(false);
   const { data: pendingAll = [] } = usePrintJobs("pending", live ? 20000 : 4000);
@@ -168,7 +174,7 @@ export default function PrintStationPage() {
       } else {
         const items = ready.flatMap((j) => Array.from({ length: j.copies }, () => ({ p: fresh.get(j.product_id)!, style: j.style })));
         // 라벨을 프린터 해상도 그림으로 먼저 그려서 꽉 채워 인쇄해요
-        const images = await renderLabelImages(items, { w: preset.w, h: preset.h }, show);
+        const images = await renderLabelImages(items, { w: preset.w, h: preset.h }, show, nudge);
         flushSync(() => {
           setBatchImages(images);
           setBatch(items);
@@ -206,6 +212,25 @@ export default function PrintStationPage() {
   async function cancel(job: PrintJob) {
     await store().deletePrintJob(job.id);
     void refresh("print-jobs");
+  }
+
+  /** 드라이버 인쇄: 테두리 + 크기 글자 한 장 — 라벨·용지 크기와 위치가 맞는지 보기 */
+  async function printSizeTest() {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      const c = await renderTestCanvas({ w: preset.w, h: preset.h }, nudge.x, nudge.y);
+      flushSync(() => {
+        setBatchImages({ [labelKey(SIZE_TEST, "label")]: c.toDataURL("image/png") });
+        setBatch([{ p: SIZE_TEST, style: "label" }]);
+      });
+      await printNow();
+      setBatch([]);
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
   }
 
   function printTest() {
@@ -369,7 +394,7 @@ export default function PrintStationPage() {
               <summary className="cursor-pointer list-none font-cute text-[15px]">💡 인쇄 창 없이 자동으로 나오게 하기 (윈도우, 한 번만)</summary>
               <ol className="mt-2 list-decimal space-y-1 pl-5 text-ink-soft">
                 <li>Xprinter 드라이버 설치 → 설정 › 프린터에서 Xprinter를 <b>기본 프린터</b>로</li>
-                <li>Xprinter ‘인쇄 기본 설정’ › 용지에서 <b>실제 라벨 크기</b>(한 칸, 간격 빼고 — 예: 50×25mm)를 새로 만들어 고르고, 아래 ‘라벨 크기’도 같게 (다르면 라벨이 작게·한쪽에 나와요)</li>
+                <li>Xprinter ‘인쇄 기본 설정’ › 용지에서 <b>실제 라벨 크기</b>(한 칸, 간격 빼고 — 우리 매장은 40×20mm)를 새로 만들어 고르고, 아래 ‘라벨 크기’도 같게 (다르면 라벨이 작게·한쪽에 나와요)</li>
                 <li>
                   바탕화면 크롬 아이콘 복사 → 속성 → ‘대상’ 맨 끝에 한 칸 띄고 <code className="rounded bg-white px-1">--kiosk-printing</code> 추가
                 </li>
@@ -379,6 +404,7 @@ export default function PrintStationPage() {
               <p className="mt-2 text-xs text-ink-soft">이 설정 없이도 돼요. 그땐 인쇄할 때마다 인쇄 창이 떠서 Enter만 누르면 돼요.</p>
             </details>
           )}
+          {engine === "browser" && <BrowserFitPanel settings={settings} onTest={() => void printSizeTest()} busy={busy} />}
           <PresetPicker settings={settings} />
         </section>
 

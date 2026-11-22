@@ -41,6 +41,13 @@ export interface UsbSettings {
 
 const DEFAULT_USB: UsbSettings = { gapMm: 2, density: 8, offsetMm: 0, direction: 0, invert: false };
 
+/** 브라우저(드라이버) 인쇄 위치 미세 조정 — mm, 오른쪽·아래가 + */
+export interface Nudge {
+  x: number;
+  y: number;
+}
+const NO_NUDGE: Nudge = { x: 0, y: 0 };
+
 function readJson<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
@@ -77,6 +84,7 @@ export function usePrintSettings(sheetsAllowed: boolean) {
   const [custom, setCustomState] = useState({ w: 40, h: 20 });
   const [show, setShowState] = useState<LabelShow>({ name: true, price: true, barcode: true });
   const [usb, setUsb] = useState<UsbSettings>(DEFAULT_USB);
+  const [nudge, setNudgeState] = useState<Nudge>(NO_NUDGE);
 
   useEffect(() => {
     const saved = readPref("popo.labelPreset");
@@ -91,6 +99,7 @@ export function usePrintSettings(sheetsAllowed: boolean) {
     setCustomState(readJson("popo.labelCustom", { w: 40, h: 20 }));
     setShowState(readJson("popo.labelShow", { name: true, price: true, barcode: true }));
     setUsb(readJson("popo.usbPrint", DEFAULT_USB));
+    setNudgeState(readJson("popo.printNudge", NO_NUDGE));
   }, []);
 
   const presets = useMemo(() => {
@@ -125,7 +134,15 @@ export function usePrintSettings(sheetsAllowed: boolean) {
     });
   }, []);
 
-  return { presets, preset, setPresetId, custom, setCustom, show, setShow, usb, updateUsb };
+  const setNudge = useCallback((patch: Partial<Nudge>) => {
+    setNudgeState((cur) => {
+      const next = { ...cur, ...patch };
+      writePref("popo.printNudge", next);
+      return next;
+    });
+  }, []);
+
+  return { presets, preset, setPresetId, custom, setCustom, show, setShow, usb, updateUsb, nudge, setNudge };
 }
 
 export function LabelFace({ p, preset, show, style }: { p: Product; preset: Preset; show: LabelShow; style: LabelStyle }) {
@@ -172,12 +189,17 @@ export const labelKey = (p: Pick<Product, "name" | "barcode" | "sale_price">, st
  * 브라우저 인쇄용 라벨 그림 — USB 직접 인쇄와 같은 203dpi 그림이라 라벨을 꽉 채워요.
  * (전엔 화면용 HTML이라 라벨이 커도 바코드·글자가 작게 가운데만 찍혔어요)
  */
-export async function renderLabelImages(items: PrintItem[], size: { w: number; h: number }, show: LabelShow): Promise<Record<string, string>> {
+export async function renderLabelImages(
+  items: PrintItem[],
+  size: { w: number; h: number },
+  show: LabelShow,
+  nudge: Nudge = NO_NUDGE,
+): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
   for (const it of items) {
     const k = labelKey(it.p, it.style);
     if (out[k]) continue;
-    const c = await renderLabelCanvas(it.p, size, show, it.style);
+    const c = await renderLabelCanvas(it.p, size, show, it.style, nudge.x, nudge.y);
     out[k] = c.toDataURL("image/png");
   }
   return out;
@@ -380,6 +402,40 @@ export function UsbSettingsPanel({
           테두리가 라벨 안에 꽉 차게 나오면 맞은 거예요. 한쪽으로 치우치면 ‘좌우 위치’를, 라벨이 밀리면 ‘간격’을 조절해 주세요.
           라벨 크기가 바뀌면 프린터의 FEED 버튼을 길게 눌러 용지를 다시 인식시켜 주세요.
         </p>
+      </div>
+    </details>
+  );
+}
+
+/**
+ * 브라우저(윈도우 드라이버) 인쇄 맞추기: 크기 확인 테스트 + 위치 미세 조정 + 맞추는 순서.
+ * 라벨이 작게·한쪽에·반쯤 내려가서 나오는 건 거의 다 ‘드라이버 용지 크기 ≠ 라벨’이라 그것부터 안내해요.
+ */
+export function BrowserFitPanel({ settings, onTest, busy }: { settings: ReturnType<typeof usePrintSettings>; onTest: () => void; busy?: boolean }) {
+  const { preset, nudge, setNudge } = settings;
+  if (preset.sheet) return null;
+  const size = `${preset.w}×${preset.h}`;
+  return (
+    <details className="rounded-2xl bg-cream p-3 text-sm">
+      <summary className="cursor-pointer list-none font-cute text-[15px]">📏 라벨 위치·크기 맞추기 (작게·한쪽에·밀려 나오면)</summary>
+      <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-ink-soft">
+        <li>
+          윈도우 설정 › 프린터 › Xprinter › <b>인쇄 기본 설정</b> › 용지(Page Setup) › <b>새로 만들기</b>: 가로 {preset.w} · 세로 {preset.h}mm → 그 용지
+          고르고 확인. <b className="text-ink">이게 안 맞으면 라벨이 작게 줄거나 반쯤 내려가서 나와요.</b>
+        </li>
+        <li>프린터 FEED 버튼을 길게 눌러 라벨 사이 간격을 다시 익히게 해요 (라벨 몇 장이 그냥 나와요)</li>
+        <li>
+          크롬 인쇄 창 ‘설정 더보기’: 프린터 Xprinter · 용지 크기 <b>{size}</b> · 여백 <b>없음</b> · 배율 <b>기본값</b> · 머리글/바닥글 끄기
+        </li>
+        <li>아래 테스트 1장 → 테두리가 라벨 가장자리에 맞으면 끝</li>
+      </ol>
+      <button type="button" className="btn-soft btn-sm mt-3 w-full" disabled={busy} onClick={onTest}>
+        📏 크기 확인용 테스트 1장 뽑기 ({size}mm)
+      </button>
+      <p className="mt-3 text-xs text-ink-soft">테두리가 라벨 크기와 같은데 1~3mm 밀릴 때만 여기서 옮겨요 (오른쪽·아래가 +). 작게 나오면 1번부터.</p>
+      <div className="mt-1.5 grid grid-cols-2 gap-2">
+        <NumberField label="좌우 위치" unit="mm" step={0.5} min={-10} max={10} value={nudge.x} onChange={(x) => setNudge({ x })} />
+        <NumberField label="위아래 위치" unit="mm" step={0.5} min={-10} max={10} value={nudge.y} onChange={(y) => setNudge({ y })} />
       </div>
     </details>
   );

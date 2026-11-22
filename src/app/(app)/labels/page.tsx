@@ -7,7 +7,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
 import { BarcodeMaker, isIssueItem, issueAsProduct } from "@/components/BarcodeMaker";
 import { StationPicker, useSendStation } from "@/components/PrintStations";
-import { LabelFace, LabelPrintPortal, PresetPicker, buildUsbJobs, labelKey, printNow, readPref, renderLabelImages, usePrintSettings, UsbSettingsPanel, writePref } from "@/components/labels";
+import { BrowserFitPanel, LabelFace, LabelPrintPortal, PresetPicker, buildUsbJobs, labelKey, printNow, readPref, renderLabelImages, usePrintSettings, UsbSettingsPanel, writePref } from "@/components/labels";
 import { useAuth, useToast } from "@/components/providers";
 import { toInput } from "@/components/ProductForm";
 import { Loading, PageHeader, ProductThumb, Segmented } from "@/components/ui";
@@ -37,7 +37,7 @@ function LabelsInner() {
   const [style, setStyle] = useState<LabelStyle>("label");
   const [method, setMethod] = useState<Method>("print");
   const settings = usePrintSettings(method === "print");
-  const { preset, show, usb, updateUsb } = settings;
+  const { preset, show, usb, updateUsb, nudge } = settings;
   const [usbOk, setUsbOk] = useState(false);
   const [device, setDevice] = useState<USBDevice | null>(null);
   const [sending, setSending] = useState(false);
@@ -132,7 +132,7 @@ function LabelsInner() {
   /** 브라우저 인쇄: 지금 라벨 크기로 테두리 + 크기 글자 한 장 — 실제 라벨·용지 크기와 맞는지 보기 */
   async function printSizeTest() {
     try {
-      const c = await renderTestCanvas(size, 0);
+      const c = await renderTestCanvas(size, nudge.x, nudge.y);
       flushSync(() => setTestImage(c.toDataURL("image/png")));
       await printNow();
     } finally {
@@ -191,7 +191,7 @@ function LabelsInner() {
     }
   }
 
-  const imagesKey = `${previewKey}|${style}|${size.w}x${size.h}|${JSON.stringify(show)}`;
+  const imagesKey = `${previewKey}|${style}|${size.w}x${size.h}|${JSON.stringify(show)}|${nudge.x},${nudge.y}`;
   const imagesReady = printImages.key === imagesKey;
 
   useEffect(() => {
@@ -202,6 +202,7 @@ function LabelsInner() {
       selected.map((p) => ({ p, style })),
       size,
       show,
+      nudge,
     ).then((images) => alive && setPrintImages({ key, images }));
     return () => {
       alive = false;
@@ -254,25 +255,7 @@ function LabelsInner() {
             <PresetPicker settings={settings} />
           )}
           {method === "send" && <StationPicker {...sendStation} />}
-          {method === "print" && (
-            <>
-              <button type="button" className="btn-soft btn-sm w-full" onClick={() => void printSizeTest()}>
-                📏 크기 확인용 테스트 1장 뽑기
-              </button>
-              <details className="rounded-2xl bg-cream p-3 text-sm">
-                <summary className="cursor-pointer list-none font-cute text-[15px]">💡 라벨이 꽉 안 차고 작게·한쪽에 나오면</summary>
-                <ol className="mt-2 list-decimal space-y-1 pl-5 text-ink-soft">
-                  <li>라벨 한 칸을 자로 재요 (사이 간격 빼고, 예: 가로 50 · 세로 25mm)</li>
-                  <li>위 ‘라벨 크기’를 그 크기로 (없으면 ‘직접’)</li>
-                  <li>
-                    윈도우 설정 › 프린터 › Xprinter › <b>인쇄 기본 설정</b> › 용지(Page Setup)에서 같은 크기를 <b>새로 만들어</b> 고르기
-                  </li>
-                  <li>인쇄 창: 프린터 Xprinter · 용지 크기 같은 크기 · 여백 없음 · 배율 <b>기본(100%)</b></li>
-                  <li>‘크기 확인용 테스트’를 뽑아 테두리가 라벨 가장자리에 맞으면 끝</li>
-                </ol>
-              </details>
-            </>
-          )}
+          {method === "print" && <BrowserFitPanel settings={settings} onTest={() => void printSizeTest()} />}
         </section>
 
         {method === "usb" && (

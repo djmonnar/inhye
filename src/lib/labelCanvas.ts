@@ -37,6 +37,9 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, size: number, maxW
   return { text: `${t}…`, size: s };
 }
 
+/** 바코드 양옆에 남길 빈 공간(모듈 수, 한쪽) — 라벨 가장자리까지 포함 */
+const QUIET_MODULES = 5;
+
 function barcodeCanvas(value: string, maxWidth: number, barHeight: number, digits: number | null): HTMLCanvasElement | null {
   const format = barcodeFormat(value);
   const draw = (moduleWidth: number, height: number, withDigits: boolean) => {
@@ -57,8 +60,9 @@ function barcodeCanvas(value: string, maxWidth: number, barHeight: number, digit
   };
   try {
     const modules = draw(1, 1, false).width;
-    // 바코드 양옆에 스캐너용 빈 공간(약 9모듈씩)을 남기고, 막대 굵기는 정수 점으로 (선명하게).
-    let moduleWidth = Math.max(1, Math.min(4, Math.floor(maxWidth / (modules + 18))));
+    // 라벨 가로를 거의 꽉 채워요 (사장님 요청 2026-11-17): 양옆 빈 공간은 5모듈씩만 — maxWidth는 라벨 전체 폭.
+    // 막대 굵기는 정수 점으로 (선명하게, 스캔 잘 되게). 40mm 라벨: 8자리 4점(약 84%), 13자리 3점(약 89%).
+    let moduleWidth = Math.max(1, Math.min(4, Math.floor(maxWidth / (modules + QUIET_MODULES * 2))));
     let c = draw(moduleWidth, Math.max(8, barHeight), digits !== null);
     while (c.width > maxWidth && moduleWidth > 1) {
       moduleWidth -= 1;
@@ -76,6 +80,7 @@ export async function renderLabelCanvas(
   show: LabelShow,
   style: LabelStyle,
   offsetXmm = 0,
+  offsetYmm = 0,
 ): Promise<HTMLCanvasElement> {
   const W = Math.round(size.w * DOTS_PER_MM);
   const H = Math.round(size.h * DOTS_PER_MM);
@@ -99,7 +104,7 @@ export async function renderLabelCanvas(
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, W, H);
   ctx.imageSmoothingEnabled = false;
-  ctx.translate(Math.round(offsetXmm * DOTS_PER_MM), 0);
+  ctx.translate(Math.round(offsetXmm * DOTS_PER_MM), Math.round(offsetYmm * DOTS_PER_MM));
   ctx.fillStyle = "#000";
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
@@ -116,7 +121,7 @@ export async function renderLabelCanvas(
     }
     const barH = show.barcode && p.barcode ? Math.round(H * 0.16) : 0;
     if (barH) {
-      const bc = barcodeCanvas(p.barcode as string, inner, barH, null);
+      const bc = barcodeCanvas(p.barcode as string, W, barH, null);
       if (bc) {
         ctx.drawImage(bc, Math.round((W - bc.width) / 2), bottom - bc.height);
         bottom -= bc.height + Math.round(DOTS_PER_MM * 0.8);
@@ -152,14 +157,14 @@ export async function renderLabelCanvas(
     bottom -= Math.round(fc.size * 1.05);
     const gap = Math.round(DOTS_PER_MM * 0.4);
     const barH = bottom - top - gap * 2;
-    const bc = barcodeCanvas(code, inner, barH, null);
+    const bc = barcodeCanvas(code, W, barH, null);
     if (bc) ctx.drawImage(bc, Math.round((W - bc.width) / 2), top + gap + Math.max(0, Math.round((barH - bc.height) / 2)));
   }
   return canvas;
 }
 
 /** 위치·크기 맞추기용: 테두리 + 십자선 + 글자 */
-export async function renderTestCanvas(size: { w: number; h: number }, offsetXmm = 0): Promise<HTMLCanvasElement> {
+export async function renderTestCanvas(size: { w: number; h: number }, offsetXmm = 0, offsetYmm = 0): Promise<HTMLCanvasElement> {
   const W = Math.round(size.w * DOTS_PER_MM);
   const H = Math.round(size.h * DOTS_PER_MM);
   const fontSize = Math.max(16, Math.round(H * 0.12));
@@ -171,7 +176,7 @@ export async function renderTestCanvas(size: { w: number; h: number }, offsetXmm
   if (!ctx) throw new Error("canvas unavailable");
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, W, H);
-  ctx.translate(Math.round(offsetXmm * DOTS_PER_MM), 0);
+  ctx.translate(Math.round(offsetXmm * DOTS_PER_MM), Math.round(offsetYmm * DOTS_PER_MM));
   ctx.strokeStyle = "#000";
   ctx.lineWidth = 3;
   ctx.strokeRect(4, 4, W - 8, H - 8);
