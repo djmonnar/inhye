@@ -1,10 +1,11 @@
 "use client";
 
 import { Copy, Minus, Plus, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { readPref, writePref } from "@/components/labels";
 import { useToast } from "@/components/providers";
 import { MoneyInput } from "@/components/ui";
-import { cleanBarcodeInput, shortDate, won } from "@/lib/format";
+import { cleanBarcodeInput, shortDate, STORE_CODE_LENGTHS, won, type StoreCodeLength } from "@/lib/format";
 import { useRefresh } from "@/lib/queries";
 import { store } from "@/lib/store";
 import type { BarcodeIssue, Product } from "@/lib/types";
@@ -73,6 +74,13 @@ export function BarcodeMaker({
   const [customCode, setCustomCode] = useState("");
   /** 자동 번호로 몇 개 만들지 */
   const [count, setCount] = useState(1);
+  /** 자동 번호 자릿수 (이 기기에 기억) */
+  const [len, setLen] = useState<StoreCodeLength>(13);
+  useEffect(() => {
+    const saved = Number(readPref("popo.barcodeLength"));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 기기에 기억한 자릿수는 화면이 뜬 뒤에만 읽을 수 있어요
+    if ((STORE_CODE_LENGTHS as readonly number[]).includes(saved)) setLen(saved as StoreCodeLength);
+  }, []);
   /** 한 개당 몇 장 뽑을지 */
   const [each, setEach] = useState(1);
   const [last, setLast] = useState<BarcodeIssue[]>([]);
@@ -93,7 +101,7 @@ export function BarcodeMaker({
       const made = await store().issueBarcodes({
         name: name.trim() || null,
         price: price > 0 ? price : null,
-        ...(mode === "custom" ? { code: customCode } : { count }),
+        ...(mode === "custom" ? { code: customCode } : { count, length: len }),
       });
       setLast(made);
       setCopies((c) => ({ ...c, ...Object.fromEntries(made.map((i) => [key(i), each])) }));
@@ -162,7 +170,31 @@ export function BarcodeMaker({
           </p>
         </div>
       ) : (
-        <Stepper label="몇 개 만들까요 (번호 각각 다르게)" value={count} min={1} max={50} onChange={setCount} />
+        <>
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm">번호 자릿수</span>
+              <div className="flex gap-1.5">
+                {STORE_CODE_LENGTHS.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    className="chip"
+                    data-on={len === n}
+                    onClick={() => {
+                      setLen(n);
+                      writePref("popo.barcodeLength", String(n));
+                    }}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-ink-faint">{LEN_HINT[len]}</p>
+          </div>
+          <Stepper label="몇 개 만들까요 (번호 각각 다르게)" value={count} min={1} max={50} onChange={setCount} />
+        </>
       )}
       <Stepper label="한 개당 몇 장 뽑을까요" value={each} min={1} max={100} onChange={setEach} />
 
@@ -242,6 +274,13 @@ export function BarcodeMaker({
     </section>
   );
 }
+
+const LEN_HINT: Record<StoreCodeLength, string> = {
+  8: "8자리 짧은 표준 바코드(EAN-8) · 예: 2000001… — 작은 라벨에 좋아요",
+  10: "10자리 일반 바코드(CODE128) · 예: 2000000001",
+  12: "12자리 일반 바코드(CODE128) · 예: 200000000001",
+  13: "13자리 매장용 표준 바코드(EAN-13) · 예: 2000000000015 — 기본",
+};
 
 /** − 숫자 + (직접 입력도 돼요) */
 function Stepper({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void }) {

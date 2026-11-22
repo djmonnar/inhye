@@ -1,7 +1,7 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { IMAGE_BUCKET, SUPABASE_URL } from "../config";
 import { shiftDay, tidyOrder } from "../day";
-import { cleanBarcodeInput, nextStoreBarcodes } from "../format";
+import { cleanBarcodeInput, nextStoreBarcodes, STORE_CODE_LENGTHS, storeCodeLike } from "../format";
 import { blobToDataUrl } from "../image";
 import { loginEmail, setRemember, supabase } from "../supabase";
 import type {
@@ -389,18 +389,27 @@ export function createSupabaseStore(): DataStore {
       }
       // 다음 매장용 번호부터 n개 — 누르는 순간 가장 큰 번호를 다시 봐요. 두 기기가 동시에 누르면(23505) 다시 계산
       const n = Math.max(1, Math.min(50, Math.round(input.count ?? 1)));
+      const len = (STORE_CODE_LENGTHS as readonly number[]).includes(input.length ?? 13) ? (input.length ?? 13) : 13;
+      const like = storeCodeLike(len);
       for (let attempt = 0; attempt < 4; attempt++) {
+        // 같은 자릿수·모양의 큰 번호 몇 개 (영문 섞인 직접 번호가 맨 위에 올 수 있어서 넉넉히 보고 숫자만 셈)
         const [prod, iss] = await Promise.all([
-          sb.from("products").select("barcode").like("barcode", "200%").order("barcode", { ascending: false }).limit(1),
-          sb.from("barcode_issues").select("code").like("code", "200%").order("code", { ascending: false }).limit(1),
+          sb.from("products").select("barcode").like("barcode", like).order("barcode", { ascending: false }).limit(30),
+          sb.from("barcode_issues").select("code").like("code", like).order("code", { ascending: false }).limit(30),
         ]);
         if (prod.error) fail(prod.error);
         if (iss.error) fail(iss.error);
-        const codes = nextStoreBarcodes(
-          (prod.data ?? []) as { barcode: string | null }[],
-          ((iss.data ?? []) as { code: string }[]).map((r) => r.code),
-          n,
-        );
+        let codes: string[];
+        try {
+          codes = nextStoreBarcodes(
+            (prod.data ?? []) as { barcode: string | null }[],
+            ((iss.data ?? []) as { code: string }[]).map((r) => r.code),
+            n,
+            len,
+          );
+        } catch (e) {
+          throw new StoreError(e instanceof Error ? e.message : "번호를 만들지 못했어요.");
+        }
         const { data, error } = await sb
           .from("barcode_issues")
           .insert(codes.map((code) => ({ code, name, price, memo })))

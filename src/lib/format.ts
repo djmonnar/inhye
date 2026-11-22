@@ -133,23 +133,60 @@ export function isValidEan13(code: string): boolean {
   return /^\d{13}$/.test(code) && ean13CheckDigit(code.slice(0, 12)) === Number(code[12]);
 }
 
+/** 매장용 바코드로 고를 수 있는 자릿수 — 13: EAN-13(200…+검사), 8: EAN-8(2…+검사), 10·12: 2로 시작하는 일련번호(CODE128) */
+export const STORE_CODE_LENGTHS = [8, 10, 12, 13] as const;
+export type StoreCodeLength = (typeof STORE_CODE_LENGTHS)[number];
+
+function ean8CheckDigit(first7: string): number {
+  let sum = 0;
+  for (let i = 0; i < 7; i++) sum += Number(first7[i]) * (i % 2 === 0 ? 3 : 1);
+  return (10 - (sum % 10)) % 10;
+}
+
+/** 자릿수별 매장용 번호 모양 (2로 시작 = GS1 ‘매장 안에서만’ 쓰는 대역이라 제조사 바코드와 안 겹쳐요) */
+function storeShape(len: number): { prefix: string; serial: number; check: "ean13" | "ean8" | null } {
+  if (len === 13) return { prefix: "200", serial: 9, check: "ean13" };
+  if (len === 8) return { prefix: "2", serial: 6, check: "ean8" };
+  return { prefix: "2", serial: len - 1, check: null };
+}
+
+/** DB에서 이 자릿수 매장용 번호를 찾을 LIKE 모양 (예: 13 → 200__________) */
+export function storeCodeLike(len: number): string {
+  const sh = storeShape(len);
+  return sh.prefix + "_".repeat(len - sh.prefix.length);
+}
+
+/**
+ * 이 자릿수의 다음 매장용 번호 — `existing`(상품 바코드 + 상품 없이 만든 번호) 중 같은 모양의 가장 큰 번호 + 1.
+ * 그 자릿수로 만들 수 있는 번호를 다 쓰면 알려줘요.
+ */
+export function nextStoreCode(existing: readonly (string | null | undefined)[], len: number = 13): string {
+  const sh = storeShape(len);
+  const re = new RegExp(`^${sh.prefix}(\\d{${sh.serial}})${sh.check ? "\\d" : ""}$`);
+  let max = 0;
+  for (const b of existing) {
+    const m = b ? re.exec(b) : null;
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  const next = String(max + 1);
+  if (next.length > sh.serial) throw new Error(`${len}자리로 만들 수 있는 번호를 다 썼어요. 자릿수를 늘려 주세요.`);
+  const body = sh.prefix + next.padStart(sh.serial, "0");
+  return sh.check === "ean13" ? body + ean13CheckDigit(body) : sh.check === "ean8" ? body + ean8CheckDigit(body) : body;
+}
+
 /**
  * Next in-store EAN-13 (prefix 200 = 매장 내부용 번호 대역, never clashes with
  * manufacturer barcodes). `issued` = 상품 없이 만든 바코드 번호들(v10) — 그 번호도 피해요.
  */
 export function nextStoreBarcode(products: Pick<Product, "barcode">[], issued: readonly string[] = []): string {
-  let max = 0;
-  for (const b of [...products.map((p) => p.barcode), ...issued]) {
-    if (b && /^200\d{10}$/.test(b)) max = Math.max(max, Number(b.slice(3, 12)));
-  }
-  const body = `200${String(max + 1).padStart(9, "0")}`;
-  return body + ean13CheckDigit(body);
+  return nextStoreCode([...products.map((p) => p.barcode), ...issued], 13);
 }
 
-/** 다음 매장용 바코드부터 n개 (같은 규칙으로 차례로) */
-export function nextStoreBarcodes(products: Pick<Product, "barcode">[], issued: readonly string[], n: number): string[] {
+/** 다음 매장용 번호부터 n개 (같은 자릿수 규칙으로 차례로) */
+export function nextStoreBarcodes(products: Pick<Product, "barcode">[], issued: readonly string[], n: number, len: number = 13): string[] {
+  const existing: string[] = [...products.map((p) => p.barcode ?? ""), ...issued];
   const out: string[] = [];
-  for (let i = 0; i < n; i++) out.push(nextStoreBarcode(products, [...issued, ...out]));
+  for (let i = 0; i < n; i++) out.push(nextStoreCode([...existing, ...out], len));
   return out;
 }
 

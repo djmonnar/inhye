@@ -80,6 +80,8 @@ export interface BarcodeIssueInput {
   code?: string | null;
   /** 자동 번호로 몇 개 (1~50) */
   count?: number;
+  /** 자동 번호 자릿수 (8 · 10 · 12 · 13, 기본 13) */
+  length?: number;
 }
 
 export type ProductInput = Omit<

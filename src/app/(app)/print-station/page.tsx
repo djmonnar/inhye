@@ -13,6 +13,7 @@ import {
   UsbSettingsPanel,
   writePref,
   type PrintItem,
+  renderLabelImages,
 } from "@/components/labels";
 import { Mascot } from "@/components/Mascot";
 import { useToast } from "@/components/providers";
@@ -60,6 +61,7 @@ export default function PrintStationPage() {
   const { data: pending = [] } = usePrintJobs("pending", 4000);
   const { data: recent = [] } = usePrintJobs("recent", 15000);
   const [batch, setBatch] = useState<PrintItem[]>([]);
+  const [batchImages, setBatchImages] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [device, setDevice] = useState<USBDevice | null>(null);
   const [usbOk, setUsbOk] = useState(false);
@@ -141,9 +143,13 @@ export default function PrintStationPage() {
         );
         await sendToPrinter(dev, concatJobs(data));
       } else {
-        flushSync(() =>
-          setBatch(ready.flatMap((j) => Array.from({ length: j.copies }, () => ({ p: fresh.get(j.product_id)!, style: j.style })))),
-        );
+        const items = ready.flatMap((j) => Array.from({ length: j.copies }, () => ({ p: fresh.get(j.product_id)!, style: j.style })));
+        // 라벨을 프린터 해상도 그림으로 먼저 그려서 꽉 채워 인쇄해요
+        const images = await renderLabelImages(items, { w: preset.w, h: preset.h }, show);
+        flushSync(() => {
+          setBatchImages(images);
+          setBatch(items);
+        });
         await printNow();
         setBatch([]);
       }
@@ -337,7 +343,7 @@ export default function PrintStationPage() {
         )}
       </div>
 
-      {engine === "browser" && <LabelPrintPortal items={batch} preset={preset} show={show} />}
+      {engine === "browser" && <LabelPrintPortal items={batch} preset={preset} show={show} images={batchImages} />}
     </div>
   );
 }

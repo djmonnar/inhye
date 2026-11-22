@@ -15,7 +15,7 @@ import type {
   SupplierInput,
 } from "../types";
 import { kstToday, tidyOrder } from "../day";
-import { cleanBarcodeInput, nextStoreBarcodes } from "../format";
+import { cleanBarcodeInput, nextStoreBarcodes, STORE_CODE_LENGTHS } from "../format";
 import { buildShipNotice, isShipNoticeAsk, shipNoticeNote } from "../shipNotice";
 import { StoreError, type DataStore } from "./types";
 
@@ -466,7 +466,12 @@ export function createDemoStore(): DataStore {
         codes = [code];
       } else {
         const n = Math.max(1, Math.min(50, Math.round(input.count ?? 1)));
-        codes = nextStoreBarcodes(products, issues.map((i) => i.code), n);
+        const len = (STORE_CODE_LENGTHS as readonly number[]).includes(input.length ?? 13) ? (input.length ?? 13) : 13;
+        try {
+          codes = nextStoreBarcodes(products, issues.map((i) => i.code), n, len);
+        } catch (e) {
+          throw new StoreError(e instanceof Error ? e.message : "번호를 만들지 못했어요.");
+        }
       }
       const now = new Date().toISOString();
       const rows: BarcodeIssue[] = codes.map((code) => ({ ...base, id: crypto.randomUUID(), code, created_at: now }));

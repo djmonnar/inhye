@@ -133,11 +133,12 @@ export async function renderLabelCanvas(
     return canvas;
   }
 
+  // 바코드 라벨: 위에 이름 · 가격, 아래에 바코드 (화면 LabelFace와 같은 배치)
   if (showPrice) {
     const f = fitText(ctx, price, priceSize, inner);
     ctx.font = `800 ${f.size}px ${FONT}`;
-    ctx.fillText(f.text, W / 2, bottom - f.size * 0.08);
-    bottom -= Math.round(f.size * 1.15);
+    ctx.fillText(f.text, W / 2, top + f.size * 0.92);
+    top += Math.round(f.size * 1.15);
   }
 
   if (show.barcode && p.barcode) {
@@ -145,7 +146,8 @@ export async function renderLabelCanvas(
     const avail = bottom - top - gap * 2;
     const bc = barcodeCanvas(p.barcode, inner, avail - Math.round(digitSize * 1.1), digitSize);
     if (bc) {
-      const y = top + gap + Math.max(0, Math.round((avail - bc.height) / 2));
+      // 글이 있으면 바닥에 붙이고, 바코드만이면 가운데
+      const y = showName || showPrice ? bottom - gap - bc.height : top + gap + Math.max(0, Math.round((avail - bc.height) / 2));
       ctx.drawImage(bc, Math.round((W - bc.width) / 2), y);
     }
   }

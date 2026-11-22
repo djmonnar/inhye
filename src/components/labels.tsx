@@ -127,15 +127,26 @@ export function LabelFace({ p, preset, show, style }: { p: Product; preset: Pres
       </div>
     );
   }
+  // 바코드 라벨: 위에 이름 · 가격, 아래에 바코드 (2026-11-17 사용자 선택). 이름·가격이 없으면 바코드만 가운데
+  const hasName = show.name && p.name.trim() !== "";
+  const hasPrice = show.price && p.sale_price > 0;
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-[0.6mm] overflow-hidden px-[1.5mm] py-[1mm] text-center text-black">
-      {show.name && p.name.trim() !== "" && <div className={`line-clamp-1 w-full font-semibold leading-tight ${small ? "text-[6.5pt]" : "text-[8pt]"}`}>{p.name}</div>}
+    <div
+      className={`flex h-full w-full flex-col items-center overflow-hidden px-[1.5mm] py-[1mm] text-center text-black ${
+        hasName || hasPrice ? "justify-between gap-[0.5mm]" : "justify-center"
+      }`}
+    >
+      {(hasName || hasPrice) && (
+        <div className="w-full">
+          {hasName && <div className={`line-clamp-1 w-full font-semibold leading-tight ${small ? "text-[6.5pt]" : "text-[8pt]"}`}>{p.name}</div>}
+          {hasPrice && <div className={`font-bold leading-tight ${small ? "text-[8pt]" : "text-[10pt]"}`}>{won(p.sale_price)}</div>}
+        </div>
+      )}
       {show.barcode && p.barcode ? (
-        <BarcodeSvg value={p.barcode} height={small ? 26 : 40} width={1.3} fontSize={small ? 9 : 11} className="max-h-[70%] max-w-full" />
+        <BarcodeSvg value={p.barcode} height={small ? 26 : 40} width={1.3} fontSize={small ? 9 : 11} className="max-h-[66%] max-w-full" />
       ) : show.barcode ? (
         <div className="text-[6pt] text-gray-400">바코드 없음</div>
       ) : null}
-      {show.price && p.sale_price > 0 && <div className={`font-bold leading-none ${small ? "text-[8pt]" : "text-[10pt]"}`}>{won(p.sale_price)}</div>}
     </div>
   );
 }
@@ -145,8 +156,37 @@ export interface PrintItem {
   style: LabelStyle;
 }
 
-/** 브라우저 인쇄용: <body> 바로 아래에 라벨만 그려두고, 인쇄할 때만 보여요. */
-export function LabelPrintPortal({ items, preset, show }: { items: PrintItem[]; preset: Preset; show: LabelShow }) {
+/** 라벨 그림을 찾는 열쇠 — 같은 이름·바코드·가격·모양이면 한 번만 그려요 */
+export const labelKey = (p: Pick<Product, "name" | "barcode" | "sale_price">, style: LabelStyle) =>
+  `${style}|${p.name}|${p.barcode ?? ""}|${p.sale_price}`;
+
+/**
+ * 브라우저 인쇄용 라벨 그림 — USB 직접 인쇄와 같은 203dpi 그림이라 라벨을 꽉 채워요.
+ * (전엔 화면용 HTML이라 라벨이 커도 바코드·글자가 작게 가운데만 찍혔어요)
+ */
+export async function renderLabelImages(items: PrintItem[], size: { w: number; h: number }, show: LabelShow): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const it of items) {
+    const k = labelKey(it.p, it.style);
+    if (out[k]) continue;
+    const c = await renderLabelCanvas(it.p, size, show, it.style);
+    out[k] = c.toDataURL("image/png");
+  }
+  return out;
+}
+
+/** 브라우저 인쇄용: <body> 바로 아래에 라벨만 그려두고, 인쇄할 때만 보여요. `images`가 있으면 그 그림으로 꽉 채워요. */
+export function LabelPrintPortal({
+  items,
+  preset,
+  show,
+  images,
+}: {
+  items: PrintItem[];
+  preset: Preset;
+  show: LabelShow;
+  images?: Record<string, string>;
+}) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- portal target exists only after mount
@@ -155,6 +195,15 @@ export function LabelPrintPortal({ items, preset, show }: { items: PrintItem[]; 
   if (!mounted) return null;
 
   const pageCss = preset.sheet ? `@page { size: A4; margin: 0; }` : `@page { size: ${preset.w}mm ${preset.h}mm; margin: 0; }`;
+  const face = (it: PrintItem) => {
+    const src = images?.[labelKey(it.p, it.style)];
+    return src ? (
+      // eslint-disable-next-line @next/next/no-img-element -- 인쇄용 그림(data URL)
+      <img src={src} alt="" style={{ display: "block", width: "100%", height: "100%", imageRendering: "pixelated" }} />
+    ) : (
+      <LabelFace p={it.p} preset={preset} show={show} style={it.style} />
+    );
+  };
   let content;
   if (preset.sheet) {
     const s = preset.sheet;
@@ -174,7 +223,7 @@ export function LabelPrintPortal({ items, preset, show }: { items: PrintItem[]; 
               height: `${preset.h}mm`,
             }}
           >
-            <LabelFace p={it.p} preset={preset} show={show} style={it.style} />
+            {face(it)}
           </div>
         ))}
       </div>
@@ -182,7 +231,7 @@ export function LabelPrintPortal({ items, preset, show }: { items: PrintItem[]; 
   } else {
     content = items.map((it, i) => (
       <div key={i} style={{ width: `${preset.w}mm`, height: `${preset.h}mm`, breakAfter: "page", overflow: "hidden" }}>
-        <LabelFace p={it.p} preset={preset} show={show} style={it.style} />
+        {face(it)}
       </div>
     ));
   }
@@ -330,5 +379,8 @@ export function UsbSettingsPanel({
  */
 export async function printNow() {
   await new Promise((r) => setTimeout(r, 250));
+  // 라벨 그림이 다 그려진 뒤에 인쇄 창을 열어요 (안 그러면 빈 라벨이 나올 수 있어요)
+  const imgs = [...document.querySelectorAll<HTMLImageElement>("#print-root img")];
+  await Promise.all(imgs.map((i) => i.decode().catch(() => undefined)));
   window.print();
 }

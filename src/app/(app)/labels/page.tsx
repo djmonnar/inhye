@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { BarcodeMaker, isIssueItem, issueAsProduct } from "@/components/BarcodeMaker";
-import { LabelFace, LabelPrintPortal, PresetPicker, buildUsbJobs, readPref, usePrintSettings, UsbSettingsPanel, writePref } from "@/components/labels";
+import { LabelFace, LabelPrintPortal, PresetPicker, buildUsbJobs, labelKey, printNow, readPref, renderLabelImages, usePrintSettings, UsbSettingsPanel, writePref } from "@/components/labels";
 import { useAuth, useToast } from "@/components/providers";
 import { toInput } from "@/components/ProductForm";
 import { Loading, PageHeader, ProductThumb, Segmented } from "@/components/ui";
@@ -37,6 +37,8 @@ function LabelsInner() {
   const [device, setDevice] = useState<USBDevice | null>(null);
   const [sending, setSending] = useState(false);
   const [previews, setPreviews] = useState<Record<string, string>>({});
+  // 이 기기 인쇄: 라벨을 프린터 해상도 그림으로 미리 그려 둬요 (라벨을 꽉 채우게) — 어떤 선택으로 그렸는지 같이 기억
+  const [printImages, setPrintImages] = useState<{ key: string; images: Record<string, string> }>({ key: "", images: {} });
   const [fixing, setFixing] = useState(false);
 
   useEffect(() => {
@@ -170,6 +172,24 @@ function LabelsInner() {
     }
   }
 
+  const imagesKey = `${previewKey}|${style}|${size.w}x${size.h}|${JSON.stringify(show)}`;
+  const imagesReady = printImages.key === imagesKey;
+
+  useEffect(() => {
+    if (method !== "print" || !selected.length) return;
+    let alive = true;
+    const key = imagesKey;
+    void renderLabelImages(
+      selected.map((p) => ({ p, style })),
+      size,
+      show,
+    ).then((images) => alive && setPrintImages({ key, images }));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [method, imagesKey]);
+
   if (isLoading) return <Loading />;
 
   const printItems = selected.flatMap((p) => Array.from({ length: copies[p.id] }, () => ({ p, style })));
@@ -247,15 +267,15 @@ function LabelsInner() {
         {total > 0 && (
           <section className="card p-4">
             <p className="mb-2 font-cute">
-              미리보기 {method === "usb" && <span className="text-xs text-ink-soft">(프린터로 가는 그림 그대로)</span>}
+              미리보기 {method !== "send" && <span className="text-xs text-ink-soft">(프린터로 가는 그림 그대로)</span>}
             </p>
             <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
               {selected.map((p) =>
-                method === "usb" && previews[p.id] ? (
+                (method === "usb" ? previews[p.id] : method === "print" && imagesReady ? printImages.images[labelKey(p, style)] : undefined) ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={p.id}
-                    src={previews[p.id]}
+                    src={method === "usb" ? previews[p.id] : printImages.images[labelKey(p, style)]}
                     alt={`${p.name} 라벨`}
                     className="shrink-0 rounded-md border border-dashed border-ink-faint bg-white"
                     style={{ width: `${preset.w}mm`, height: `${preset.h}mm`, imageRendering: "pixelated" }}
@@ -289,8 +309,8 @@ function LabelsInner() {
               </button>
             ) : (
               <>
-                <button type="button" className="btn-primary mt-3 w-full text-lg" onClick={() => window.print()}>
-                  <Printer size={20} /> {total}장 인쇄하기
+                <button type="button" className="btn-primary mt-3 w-full text-lg" disabled={!imagesReady} onClick={() => void printNow()}>
+                  <Printer size={20} /> {imagesReady ? `${total}장 인쇄하기` : "라벨 그리는 중..."}
                 </button>
                 <p className="mt-2 text-xs text-ink-soft">
                   인쇄 창에서 프린터(Xprinter 등 라벨 프린터)와 용지 크기를 고르고, 배율은 ‘100%/실제 크기’로 맞춰 주세요.
@@ -348,7 +368,7 @@ function LabelsInner() {
         </section>
       </div>
 
-      {method === "print" && <LabelPrintPortal items={printItems} preset={preset} show={show} />}
+      {method === "print" && <LabelPrintPortal items={printItems} preset={preset} show={show} images={imagesReady ? printImages.images : undefined} />}
     </div>
   );
 }
