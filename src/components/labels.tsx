@@ -21,7 +21,7 @@ export interface Preset {
 }
 
 export const PRESETS: Preset[] = [
-  { id: "roll-40x20", label: "롤 40×20", w: 40, h: 20 },
+  { id: "roll-40x20", label: "롤 40×20 (매장)", w: 40, h: 20 },
   { id: "roll-40x30", label: "롤 40×30", w: 40, h: 30 },
   { id: "roll-50x25", label: "롤 50×25", w: 50, h: 25 },
   { id: "roll-50x30", label: "롤 50×30", w: 50, h: 30 },
@@ -67,17 +67,28 @@ export function readPref(key: string): string | null {
 }
 
 /** 라벨 크기·표시 항목·USB 설정 — 기기마다 저장돼요 (라벨 화면과 인쇄 스테이션이 같이 씀). */
+/** 매장 롤 라벨 크기 — 사장님 확인: 가로 4cm × 세로 2cm (2026-11-17) */
+export const DEFAULT_PRESET = "roll-40x20";
+/** 이 기본값으로 한 번 바꿔 줬는지 (예전에 다른 크기를 기억한 기기도 한 번은 40×20으로) */
+const PRESET_DEFAULT_MARK = "popo.labelPresetDefault";
+
 export function usePrintSettings(sheetsAllowed: boolean) {
-  const [presetId, setPresetIdState] = useState("roll-40x30");
-  const [custom, setCustomState] = useState({ w: 40, h: 30 });
+  const [presetId, setPresetIdState] = useState(DEFAULT_PRESET);
+  const [custom, setCustomState] = useState({ w: 40, h: 20 });
   const [show, setShowState] = useState<LabelShow>({ name: true, price: true, barcode: true });
   const [usb, setUsb] = useState<UsbSettings>(DEFAULT_USB);
 
   useEffect(() => {
     const saved = readPref("popo.labelPreset");
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- restore per-device preferences after mount
-    if (saved && (saved === "custom" || PRESETS.some((p) => p.id === saved))) setPresetIdState(saved);
-    setCustomState(readJson("popo.labelCustom", { w: 40, h: 30 }));
+    if (readPref(PRESET_DEFAULT_MARK) !== DEFAULT_PRESET) {
+      // 기본 크기가 바뀌었어요 → 이 기기도 한 번은 40×20으로 (그 뒤에 고른 건 기억해요)
+      writePref(PRESET_DEFAULT_MARK, DEFAULT_PRESET);
+      writePref("popo.labelPreset", DEFAULT_PRESET);
+    } else if (saved && (saved === "custom" || PRESETS.some((p) => p.id === saved))) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restore per-device preferences after mount
+      setPresetIdState(saved);
+    }
+    setCustomState(readJson("popo.labelCustom", { w: 40, h: 20 }));
     setShowState(readJson("popo.labelShow", { name: true, price: true, barcode: true }));
     setUsb(readJson("popo.usbPrint", DEFAULT_USB));
   }, []);
