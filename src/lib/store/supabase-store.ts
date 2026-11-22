@@ -28,6 +28,7 @@ import type {
   PosSyncRun,
   PriceLog,
   PrintJob,
+  PrintStation,
   Product,
   ProductInput,
   ProductSource,
@@ -420,18 +421,69 @@ export function createSupabaseStore(): DataStore {
       throw new StoreError("바코드를 만들지 못했어요. 한 번 더 눌러 주세요.");
     },
 
-    async addPrintJobs(items, requestedBy) {
+    async addPrintJobs(items, requestedBy, stationId) {
       if (!items.length) return;
       const { error } = await sb
         .from("print_jobs")
-        .insert(items.map((i) => ({ ...i, requested_by_name: requestedBy })));
+        // 노트북을 골랐을 때만 그 칸을 보내요 (v11 전 DB에서도 보내지게)
+        .insert(items.map((i) => ({ ...i, requested_by_name: requestedBy, ...(stationId ? { station_id: stationId } : {}) })));
       if (error) fail(error);
     },
 
-    async claimPrintJobs() {
+    async claimPrintJobs(stationId) {
+      if (stationId) {
+        const r = await sb.rpc("claim_print_jobs", { p_limit: 50, p_station: stationId });
+        if (!r.error) return (r.data ?? []) as PrintJob[];
+        // v11 전 DB(함수에 p_station 없음)면 예전처럼
+        if (r.error.code !== "PGRST202") fail(r.error);
+      }
       const { data, error } = await sb.rpc("claim_print_jobs", { p_limit: 50 });
       if (error) fail(error);
       return (data ?? []) as PrintJob[];
+    },
+
+    watchPrintJobs(onChange, onStatus) {
+      const ch = sb
+        .channel(`print-jobs-${Math.random().toString(36).slice(2, 10)}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "print_jobs" }, () => onChange())
+        .subscribe((status) => onStatus?.(status === "SUBSCRIBED"));
+      return () => {
+        void sb.removeChannel(ch);
+      };
+    },
+
+    async listPrintStations() {
+      const { data, error } = await sb.from("print_stations").select("*").order("created_at");
+      if (error) {
+        if (error.code === "PGRST205" || error.code === "42P01") return [];
+        fail(error);
+      }
+      return data as PrintStation[];
+    },
+
+    async registerPrintStation(name) {
+      const { data, error } = await sb
+        .from("print_stations")
+        .insert({ name: name.trim().slice(0, 30) || "매장 노트북", last_seen_at: new Date().toISOString() })
+        .select("*")
+        .single();
+      if (error) fail(error);
+      return data as PrintStation;
+    },
+
+    async updatePrintStation(id, patch) {
+      const row = {
+        ...(patch.name !== undefined ? { name: patch.name.trim().slice(0, 30) || "매장 노트북" } : {}),
+        ...(patch.seen ? { last_seen_at: new Date().toISOString() } : {}),
+      };
+      if (!Object.keys(row).length) return;
+      const { error } = await sb.from("print_stations").update(row).eq("id", id);
+      if (error) fail(error);
+    },
+
+    async removePrintStation(id) {
+      const { error } = await sb.from("print_stations").delete().eq("id", id);
+      if (error) fail(error);
     },
 
     async finishPrintJobs(ids, ok, errorText) {

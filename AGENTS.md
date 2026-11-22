@@ -32,7 +32,7 @@ src/app/(app)/        로그인 후 화면: 홈, products, scan, reorder, suppli
 src/app/login, setup  로그인(자동 로그인) / 처음 설정(SQL 안내, 관리자 계정)
 src/app/api/          setup/admin, setup/schema(DB에 schema.sql 바로 적용), members, pos/status, pos/sync, pos/live(빅솔론 하루치 바로 보기, 저장 없음), pos/receipts(영수증별, 저장 없음), pos/settle(기간 상품별+분류명, 정산의 A/B 쪽, 최대 31일 — 꽃다발 주문은 store.settleOrders), orders/chat(주문 비서), logen/{status,register,slips,check}(로젠택배 — 궁중수라간 서버 logenRelay 경유), kakao/{status,connect,callback,test}, kakao/skill(카카오 챗봇 스킬 서버), kakao/bot(챗봇 연결 코드·연결 관리), cron/orders(매일 알림), ai/{product,link,promo,report}
 src/components/       ui.tsx(공용 UI), OrderChat(주문 비서 — 주문 화면·홈 떠 있는 버튼 공용), WhenPicker(날짜·시간 버튼), DayNav, ProductForm, BarcodeScanner, StockSheet, SupplierSheet,
-                      SourcePrices(상품 화면 ‘거래처별 가격’ + 가격 기록 시트), labels.tsx(라벨 공용), BarcodeMaker(상품 없이 바코드만 만들기 — 라벨 화면), SendLabelSheet, AiFillSheet, PromoSheet, Mascot
+                      SourcePrices(상품 화면 ‘거래처별 가격’ + 가격 기록 시트), labels.tsx(라벨 공용), BarcodeMaker(상품 없이 바코드만 만들기 — 라벨 화면), PrintStations(인쇄 노트북 고르기·켜져 있는지), SendLabelSheet, AiFillSheet, PromoSheet, Mascot
 src/lib/store/        데이터 계층 인터페이스(types.ts) + supabase-store.ts + demo-store.ts
 src/lib/server/       서버 전용: admin.ts(서비스 키, 권한), schema.ts(pg로 schema.sql 적용), orders.ts(주문 비서·알림 글), kakao.ts(나에게 보내기), logen.ts(로젠 Open API — 주문등록·송장번호, 중계/직접·시험 모드), pos.ts, bixolon.ts, openai.ts, ai-*.ts, fetch-page.ts
                       kakao-bot/: bot.ts(챗봇 말 해석·대화 흐름·주문 — DB 없이 시험 가능), ai.ts(AI 해석기·주문 비서 연결), howto.ts(“발주 어떻게 해?” 사용법 답), kakao.ts(오픈빌더 응답·길이 제한·콜백), types.ts(BotDb·BotAi), supabase-db.ts
@@ -96,6 +96,7 @@ public/schema.sql     Supabase 스키마 전체 (멱등 — 여러 번 실행해
 12. **택배사·송장번호 + 로젠 API (스키마 v8, 2026-11-16)**: `/setup`에서 v8 적용. 로젠은 궁중수라간 저장소의 `functions/logenRelay.js`(별도 함수, `api`와 무관)를 거쳐요 — 배포는 Deploy Functions → `functions:logenRelay`만(전체·`api` 배포 금지), Secret Manager `LOGEN_RELAY_TOKEN` 먼저. 로젠에 IP 34.50.34.252 등록 요청. 처음 설정·환경변수: [logen.md](docs/wiki/logen.md).
 13. **입금 확인 (스키마 v9, 2026-11-16)**: `orders.paid`(null = v9 전 주문)·`paid_at` — `/setup`에서 v9 적용. 주문 고치기 💰 체크, 챗봇 “김포포 입금 완료”·“김포포 입금했어?”·“입금 안 한 사람”. 입금 ≠ 주문 완료. 자세히 [orders-kakao.md](docs/wiki/orders-kakao.md).
 14. **상품 없이 바코드만 만들기 (스키마 v10, 2026-11-17)**: `barcode_issues` — `/setup`에서 v10 적용. 매장용 바코드(200…)를 새로 만들 땐 **꼭 `nextStoreBarcode(products, issued)`에 만든 번호(`listBarcodeIssues`)도 넘기기**(안 그러면 번호가 겹쳐요). 만든 번호는 지우지 않기. 자세히 [printing.md](docs/wiki/printing.md).
+15. **인쇄 노트북 등록 + 실시간 (스키마 v11, 2026-11-17)**: `print_stations`, `print_jobs.station_id`, `claim_print_jobs(p_limit, p_station)`(예전 1인자 함수는 지우고 새로), `print_jobs` 실시간 발행 — `/setup`에서 v11 적용. 라벨 인쇄가 작게·밀려 나오면 윈도우 드라이버 용지 = 라벨 크기부터([printing.md](docs/wiki/printing.md)).
 11. **(준비 중) 로젠택배 · 네이버 스마트스토어 (2026-11-16)**: 사용자가 로젠 계약 코드 발급을 기다리는 중. 송장은 스마트스토어 굿스플로(윈도우 노트북)로 시작. 앱 연동(커머스API 주문 가져오기·발송처리)은 사용자가 원할 때 — 호출 IP 등록 요건부터 확인. 정산 귀속(A·B·따로)과 재고 겹침은 사용자 결정 필요.
 
 결정·발견 기록은 [`docs/wiki/decisions.md`](docs/wiki/decisions.md)에 날짜순으로 있어요.

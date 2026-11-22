@@ -88,7 +88,6 @@ export async function renderLabelCanvas(
 
   const nameSize = Math.max(16, Math.round(H * (style === "price" ? 0.12 : 0.1)));
   const priceSize = Math.max(18, Math.round(H * (style === "price" ? 0.3 : 0.13)));
-  const digitSize = Math.max(14, Math.round(H * 0.085));
   await ensureFont(nameSize, p.name);
   await ensureFont(priceSize, `${price}0123456789`);
 
@@ -108,14 +107,13 @@ export async function renderLabelCanvas(
   let top = pad;
   let bottom = H - pad;
 
-  if (showName) {
-    const f = fitText(ctx, p.name, nameSize, inner);
-    ctx.font = `700 ${f.size}px ${FONT}`;
-    ctx.fillText(f.text, W / 2, top + f.size * 0.92);
-    top += Math.round(f.size * 1.2);
-  }
-
   if (style === "price") {
+    if (showName) {
+      const f = fitText(ctx, p.name, nameSize, inner);
+      ctx.font = `700 ${f.size}px ${FONT}`;
+      ctx.fillText(f.text, W / 2, top + f.size * 0.92);
+      top += Math.round(f.size * 1.2);
+    }
     const barH = show.barcode && p.barcode ? Math.round(H * 0.16) : 0;
     if (barH) {
       const bc = barcodeCanvas(p.barcode as string, inner, barH, null);
@@ -133,23 +131,29 @@ export async function renderLabelCanvas(
     return canvas;
   }
 
-  // 바코드 라벨: 위에 이름 · 가격, 아래에 바코드 (화면 LabelFace와 같은 배치)
-  if (showPrice) {
-    const f = fitText(ctx, price, priceSize, inner);
-    ctx.font = `800 ${f.size}px ${FONT}`;
-    ctx.fillText(f.text, W / 2, top + f.size * 0.92);
-    top += Math.round(f.size * 1.15);
+  // 바코드 라벨 (사장님 예시 라벨과 같게, 2026-11-17):
+  //   맨 위 한 줄 ‘이름 가격’ (크게) · 가운데 바코드 막대 (가로 꽉) · 아래 바코드 번호 (크게, 가운데)
+  const line = [showName ? p.name.trim() : "", showPrice ? price : ""].filter(Boolean).join("  ");
+  const lineSize = Math.max(18, Math.round(H * 0.19));
+  const codeSize = Math.max(16, Math.round(H * 0.15));
+  await ensureFont(lineSize, line || "0");
+  if (line) {
+    const f = fitText(ctx, line, lineSize, inner);
+    ctx.font = `700 ${f.size}px ${FONT}`;
+    ctx.fillText(f.text, W / 2, top + f.size * 0.9);
+    top += Math.round(f.size * 1.12);
   }
 
   if (show.barcode && p.barcode) {
-    const gap = Math.round(DOTS_PER_MM * 0.5);
-    const avail = bottom - top - gap * 2;
-    const bc = barcodeCanvas(p.barcode, inner, avail - Math.round(digitSize * 1.1), digitSize);
-    if (bc) {
-      // 글이 있으면 바닥에 붙이고, 바코드만이면 가운데
-      const y = showName || showPrice ? bottom - gap - bc.height : top + gap + Math.max(0, Math.round((avail - bc.height) / 2));
-      ctx.drawImage(bc, Math.round((W - bc.width) / 2), y);
-    }
+    const code = p.barcode;
+    const fc = fitText(ctx, code, codeSize, inner);
+    ctx.font = `600 ${fc.size}px ${FONT}`;
+    ctx.fillText(fc.text, W / 2, bottom - fc.size * 0.1);
+    bottom -= Math.round(fc.size * 1.05);
+    const gap = Math.round(DOTS_PER_MM * 0.4);
+    const barH = bottom - top - gap * 2;
+    const bc = barcodeCanvas(code, inner, barH, null);
+    if (bc) ctx.drawImage(bc, Math.round((W - bc.width) / 2), top + gap + Math.max(0, Math.round((barH - bc.height) / 2)));
   }
   return canvas;
 }

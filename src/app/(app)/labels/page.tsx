@@ -4,7 +4,9 @@ import { Printer, Search, Send, Sparkles, Usb, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { BarcodeMaker, isIssueItem, issueAsProduct } from "@/components/BarcodeMaker";
+import { StationPicker, useSendStation } from "@/components/PrintStations";
 import { LabelFace, LabelPrintPortal, PresetPicker, buildUsbJobs, labelKey, printNow, readPref, renderLabelImages, usePrintSettings, UsbSettingsPanel, writePref } from "@/components/labels";
 import { useAuth, useToast } from "@/components/providers";
 import { toInput } from "@/components/ProductForm";
@@ -18,6 +20,9 @@ import { buildTsplJob, canvasToMono, concatJobs } from "@/lib/tspl";
 import { deviceLabel, getPrinter, sendToPrinter, usbAvailable } from "@/lib/usbPrinter";
 
 type Method = "print" | "usb" | "send";
+
+/** 크기 확인용 테스트 라벨 (테두리 + 크기 글자) — 상품처럼 인쇄 목록에 넣으려는 빈 모양 */
+const SIZE_TEST = issueAsProduct({ id: "size-test", code: "", name: "", price: null, memo: null, product_id: null, created_at: "" });
 
 function LabelsInner() {
   const params = useSearchParams();
@@ -40,6 +45,8 @@ function LabelsInner() {
   // 이 기기 인쇄: 라벨을 프린터 해상도 그림으로 미리 그려 둬요 (라벨을 꽉 채우게) — 어떤 선택으로 그렸는지 같이 기억
   const [printImages, setPrintImages] = useState<{ key: string; images: Record<string, string> }>({ key: "", images: {} });
   const [fixing, setFixing] = useState(false);
+  const sendStation = useSendStation();
+  const [testImage, setTestImage] = useState<string | null>(null);
 
   useEffect(() => {
     const hasUsb = usbAvailable();
@@ -122,6 +129,17 @@ function LabelsInner() {
     }
   }
 
+  /** 브라우저 인쇄: 지금 라벨 크기로 테두리 + 크기 글자 한 장 — 실제 라벨·용지 크기와 맞는지 보기 */
+  async function printSizeTest() {
+    try {
+      const c = await renderTestCanvas(size, 0);
+      flushSync(() => setTestImage(c.toDataURL("image/png")));
+      await printNow();
+    } finally {
+      setTestImage(null);
+    }
+  }
+
   function printTest() {
     void sendUsb(async () => {
       const bitmap = canvasToMono(await renderTestCanvas(size, usb.offsetMm));
@@ -142,6 +160,7 @@ function LabelsInner() {
       await store().addPrintJobs(
         real.map((p) => ({ product_id: p.id, copies: copies[p.id], style })),
         user?.display_name ?? "",
+        sendStation.target?.id,
       );
       await refresh("print-jobs");
       toast(`${real.reduce((n, p) => n + copies[p.id], 0)}장 노트북으로 보냈어요!`, "wow");
@@ -233,6 +252,26 @@ function LabelsInner() {
             </p>
           ) : (
             <PresetPicker settings={settings} />
+          )}
+          {method === "send" && <StationPicker {...sendStation} />}
+          {method === "print" && (
+            <>
+              <button type="button" className="btn-soft btn-sm w-full" onClick={() => void printSizeTest()}>
+                📏 크기 확인용 테스트 1장 뽑기
+              </button>
+              <details className="rounded-2xl bg-cream p-3 text-sm">
+                <summary className="cursor-pointer list-none font-cute text-[15px]">💡 라벨이 꽉 안 차고 작게·한쪽에 나오면</summary>
+                <ol className="mt-2 list-decimal space-y-1 pl-5 text-ink-soft">
+                  <li>라벨 한 칸을 자로 재요 (사이 간격 빼고, 예: 가로 50 · 세로 25mm)</li>
+                  <li>위 ‘라벨 크기’를 그 크기로 (없으면 ‘직접’)</li>
+                  <li>
+                    윈도우 설정 › 프린터 › Xprinter › <b>인쇄 기본 설정</b> › 용지(Page Setup)에서 같은 크기를 <b>새로 만들어</b> 고르기
+                  </li>
+                  <li>인쇄 창: 프린터 Xprinter · 용지 크기 같은 크기 · 여백 없음 · 배율 <b>기본(100%)</b></li>
+                  <li>‘크기 확인용 테스트’를 뽑아 테두리가 라벨 가장자리에 맞으면 끝</li>
+                </ol>
+              </details>
+            </>
           )}
         </section>
 
@@ -368,7 +407,12 @@ function LabelsInner() {
         </section>
       </div>
 
-      {method === "print" && <LabelPrintPortal items={printItems} preset={preset} show={show} images={imagesReady ? printImages.images : undefined} />}
+      {method === "print" &&
+        (testImage ? (
+          <LabelPrintPortal items={[{ p: SIZE_TEST, style: "label" }]} preset={preset} show={show} images={{ [labelKey(SIZE_TEST, "label")]: testImage }} />
+        ) : (
+          <LabelPrintPortal items={printItems} preset={preset} show={show} images={imagesReady ? printImages.images : undefined} />
+        ))}
     </div>
   );
 }

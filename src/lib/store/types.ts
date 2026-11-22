@@ -27,6 +27,7 @@ import type {
   PriceInput,
   PriceLog,
   PrintJob,
+  PrintStation,
   PrintRequest,
   Product,
   ProductInput,
@@ -97,9 +98,19 @@ export interface DataStore {
   /** 새 매장용 바코드 만들기 — 상품 바코드·이미 만든 번호와 안 겹치게 번호를 정해 기록해요 (지우기는 없어요: 지운 번호가 다시 나가면 이미 붙인 라벨과 겹쳐서) */
   issueBarcodes(input: BarcodeIssueInput): Promise<BarcodeIssue[]>;
   listPrintJobs(which: "pending" | "recent"): Promise<PrintJob[]>;
-  addPrintJobs(items: PrintRequest[], requestedBy: string): Promise<void>;
+  /** stationId = 보낼 노트북 (없으면 아무 노트북이나) */
+  addPrintJobs(items: PrintRequest[], requestedBy: string, stationId?: string | null): Promise<void>;
   /** Atomically takes waiting jobs (pending → printing) so two stations never double-print. */
-  claimPrintJobs(): Promise<PrintJob[]>;
+  /** stationId를 주면 그 노트북 것 + 노트북을 안 고른 것만 가져가요 */
+  claimPrintJobs(stationId?: string | null): Promise<PrintJob[]>;
+  /** 인쇄 대기열이 바뀌면 바로 알려줘요 (실시간). onStatus(true) = 실시간 연결됨. 돌려준 함수로 끊어요 */
+  watchPrintJobs(onChange: () => void, onStatus?: (live: boolean) => void): () => void;
+  /** 인쇄 노트북 (v11) — v11 전 DB면 빈 목록 */
+  listPrintStations(): Promise<PrintStation[]>;
+  registerPrintStation(name: string): Promise<PrintStation>;
+  /** 이름 바꾸기 · seen = ‘지금 켜져 있어요’ 알리기 */
+  updatePrintStation(id: string, patch: { name?: string; seen?: boolean }): Promise<void>;
+  removePrintStation(id: string): Promise<void>;
   finishPrintJobs(ids: string[], ok: boolean, error?: string): Promise<void>;
   deletePrintJob(id: string): Promise<void>;
 

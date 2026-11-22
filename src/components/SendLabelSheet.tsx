@@ -4,9 +4,11 @@ import { Send } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { IS_DEMO } from "@/lib/config";
+import { j } from "@/lib/josa";
 import { useRefresh } from "@/lib/queries";
 import { store } from "@/lib/store";
 import type { PrintStyle, Product } from "@/lib/types";
+import { StationPicker, useSendStation } from "./PrintStations";
 import { useAuth, useToast } from "./providers";
 import { Field, Segmented, Sheet, Stepper } from "./ui";
 
@@ -18,13 +20,14 @@ export function SendLabelSheet({ product, open, onClose }: { product: Product; o
   const [copies, setCopies] = useState(1);
   const [style, setStyle] = useState<PrintStyle>("label");
   const [busy, setBusy] = useState(false);
+  const station = useSendStation();
 
   async function send() {
     setBusy(true);
     try {
-      await store().addPrintJobs([{ product_id: product.id, copies, style }], user?.display_name ?? "");
+      await store().addPrintJobs([{ product_id: product.id, copies, style }], user?.display_name ?? "", station.target?.id);
       await refresh("print-jobs");
-      toast(`${copies}장 노트북으로 보냈어요!`, "wow");
+      toast(`${copies}장 ${station.target ? j(`‘${station.target.name}’`, "로") : "노트북으로"} 보냈어요!`, "wow");
       onClose();
     } catch (e) {
       toast(e instanceof Error ? e.message : "보내지 못했어요", "sad");
@@ -59,6 +62,7 @@ export function SendLabelSheet({ product, open, onClose }: { product: Product; o
         {!product.barcode && style === "label" && (
           <p className="rounded-2xl bg-butter-100 p-3 text-sm text-butter-700">이 상품은 바코드가 없어요. 수정 화면에서 ‘매장용 바코드’를 먼저 만들어 주세요.</p>
         )}
+        <StationPicker {...station} />
         <button type="button" className="btn-primary w-full text-lg" disabled={busy} onClick={send}>
           <Send size={18} /> {busy ? "보내는 중..." : `${copies}장 보내기`}
         </button>

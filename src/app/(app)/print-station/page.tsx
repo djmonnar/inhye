@@ -1,6 +1,6 @@
 "use client";
 
-import { Printer, RotateCcw, Usb, X } from "lucide-react";
+import { Laptop, Printer, RotateCcw, Usb, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
@@ -16,12 +16,14 @@ import {
   renderLabelImages,
 } from "@/components/labels";
 import { Mascot } from "@/components/Mascot";
+import { STATION_BEAT_MS, STATION_KEY } from "@/components/PrintStations";
 import { useToast } from "@/components/providers";
 import { PageHeader, ProductThumb, Segmented, Toggle } from "@/components/ui";
 import { APP_NAME, IS_DEMO } from "@/lib/config";
 import { relTime } from "@/lib/format";
+import { j } from "@/lib/josa";
 import { renderTestCanvas } from "@/lib/labelCanvas";
-import { usePrintJobs, useProducts, useRefresh } from "@/lib/queries";
+import { usePrintJobs, usePrintStations, useProducts, useRefresh } from "@/lib/queries";
 import { store } from "@/lib/store";
 import { buildTsplJob, canvasToMono, concatJobs } from "@/lib/tspl";
 import type { PrintJob } from "@/lib/types";
@@ -58,7 +60,15 @@ export default function PrintStationPage() {
   const [auto, setAuto] = useState(false);
   const settings = usePrintSettings(engine === "browser");
   const { preset, show, usb, updateUsb } = settings;
-  const { data: pending = [] } = usePrintJobs("pending", 4000);
+  // 실시간으로 받으면(보내는 순간 알림) 가끔만 확인하고, 실시간이 안 되면 4초마다 (v11)
+  const [live, setLive] = useState(false);
+  const { data: pendingAll = [] } = usePrintJobs("pending", live ? 20000 : 4000);
+  // 이 노트북 (등록했으면) — 다른 노트북으로 보낸 건 여기서 안 뽑아요
+  const { data: stations = [] } = usePrintStations();
+  const [stationId, setStationId] = useState<string | null>(null);
+  const station = stations.find((x) => x.id === stationId) ?? null;
+  const [stationName, setStationName] = useState("매장 노트북");
+  const pending = pendingAll.filter((j) => !station || !j.station_id || j.station_id === station.id);
   const { data: recent = [] } = usePrintJobs("recent", 15000);
   const [batch, setBatch] = useState<PrintItem[]>([]);
   const [batchImages, setBatchImages] = useState<Record<string, string>>({});
@@ -71,8 +81,21 @@ export default function PrintStationPage() {
   const waiting = pending.filter((j) => j.status === "pending");
   const waitingSheets = waiting.reduce((n, j) => n + j.copies, 0);
 
+  // 폰에서 보내는 순간 바로 알기 (Supabase 실시간)
+  useEffect(() => store().watchPrintJobs(() => void refresh("print-jobs"), setLive), [refresh]);
+
+  // 자동 인쇄를 켜 둔 동안 ‘켜져 있어요’를 알려요 → 폰에서 🟢로 보여요
+  useEffect(() => {
+    if (!auto || !station) return;
+    const beat = () => void store().updatePrintStation(station.id, { seen: true }).catch(() => {});
+    beat();
+    const t = setInterval(beat, STATION_BEAT_MS);
+    return () => clearInterval(t);
+  }, [auto, station]);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- per-device station prefs exist only after mount
+    setStationId(readPref(STATION_KEY));
     setUsbOk(usbAvailable());
     if (readPref("popo.stationEngine") === "usb" && usbAvailable()) setEngine("usb");
     void getPrinter(false).then((d) => d && setDevice(d)).catch(() => {});
@@ -124,7 +147,7 @@ export default function PrintStationPage() {
     setBusy(true);
     let jobs: PrintJob[] = [];
     try {
-      jobs = await store().claimPrintJobs();
+      jobs = await store().claimPrintJobs(station?.id);
       if (!jobs.length) return;
       const fresh = new Map((await store().listProducts()).map((p) => [p.id, p]));
       const ready = jobs.filter((j) => fresh.has(j.product_id));
@@ -176,7 +199,7 @@ export default function PrintStationPage() {
   }, [auto, waiting.length, pending]);
 
   async function retry(job: PrintJob) {
-    await store().addPrintJobs([{ product_id: job.product_id, copies: job.copies, style: job.style }], job.requested_by_name ?? "");
+    await store().addPrintJobs([{ product_id: job.product_id, copies: job.copies, style: job.style }], job.requested_by_name ?? "", job.station_id ?? station?.id);
     void refresh("print-jobs");
   }
 
@@ -204,6 +227,73 @@ export default function PrintStationPage() {
     <div>
       <PageHeader back title="인쇄 스테이션" sub="프린터 꽂은 노트북에 띄워두세요" />
       <div className="space-y-4">
+        <section className="card space-y-2 p-4">
+          <p className="flex items-center gap-1.5 font-cute text-lg">
+            <Laptop size={18} className="text-soda-700" /> 이 노트북
+          </p>
+          {station ? (
+            <>
+              <p className="text-sm">
+                <b>‘{station.name}’</b>
+                {j(station.name, "로").slice(station.name.length)} 등록됐어요. 폰에서 이 노트북을 골라 보내면 여기서만 뽑아요.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  className="btn-soft btn-sm"
+                  onClick={async () => {
+                    const name = window.prompt("노트북 이름", station.name);
+                    if (!name?.trim()) return;
+                    await store().updatePrintStation(station.id, { name });
+                    void refresh("print-stations");
+                  }}
+                >
+                  이름 바꾸기
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost btn-sm text-danger"
+                  onClick={async () => {
+                    if (!window.confirm(`‘${station.name}’ 등록을 해제할까요? 이 노트북으로 보낸 대기 인쇄는 아무 노트북이나 뽑게 돼요.`)) return;
+                    await store().removePrintStation(station.id);
+                    writePref(STATION_KEY, "");
+                    setStationId(null);
+                    void refresh("print-stations", "print-jobs");
+                  }}
+                >
+                  등록 해제
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-ink-soft">
+                라벨을 뽑을 노트북으로 등록하면, 폰에서 이 노트북이 켜져 있는지(🟢) 보고 골라 보낼 수 있어요. 노트북이 여러 대면 각각 등록해요.
+              </p>
+              <div className="flex gap-2">
+                <input className="input flex-1" value={stationName} onChange={(e) => setStationName(e.target.value)} placeholder="예: 매장 노트북" aria-label="노트북 이름" maxLength={30} />
+                <button
+                  type="button"
+                  className="btn-primary btn-sm shrink-0"
+                  onClick={async () => {
+                    try {
+                      const st = await store().registerPrintStation(stationName);
+                      writePref(STATION_KEY, st.id);
+                      setStationId(st.id);
+                      await refresh("print-stations");
+                      toast(`${j(`‘${st.name}’`, "로")} 등록했어요! 자동 인쇄를 켜 두세요`, "wow");
+                    } catch (e) {
+                      toast(e instanceof Error ? e.message : "등록하지 못했어요", "sad");
+                    }
+                  }}
+                >
+                  이 노트북 등록
+                </button>
+              </div>
+            </>
+          )}
+        </section>
+
         <section className={`card p-4 ${auto ? "border-matcha-300 bg-matcha-100/60" : ""}`}>
           <div className="flex items-center gap-3">
             <Mascot mood={busy ? "wow" : auto ? "happy" : "sleep"} size={64} className={auto ? "animate-float" : ""} />
@@ -224,7 +314,11 @@ export default function PrintStationPage() {
                 if (v) chime();
               }}
               label="자동 인쇄"
-              desc="이 창을 띄워두는 동안 4초마다 확인해요"
+              desc={
+                live
+                  ? "폰에서 보내는 순간 바로 받아요 (실시간 연결됨) · 이 창은 켜 둬요(최소화 OK)"
+                  : "이 창을 켜 두는 동안 4초마다 확인해요 (실시간 연결 기다리는 중)"
+              }
             />
           </div>
           <button
@@ -275,7 +369,7 @@ export default function PrintStationPage() {
               <summary className="cursor-pointer list-none font-cute text-[15px]">💡 인쇄 창 없이 자동으로 나오게 하기 (윈도우, 한 번만)</summary>
               <ol className="mt-2 list-decimal space-y-1 pl-5 text-ink-soft">
                 <li>Xprinter 드라이버 설치 → 설정 › 프린터에서 Xprinter를 <b>기본 프린터</b>로</li>
-                <li>Xprinter ‘인쇄 기본 설정’에서 용지 크기를 라벨 크기(예: 40×30mm)로</li>
+                <li>Xprinter ‘인쇄 기본 설정’ › 용지에서 <b>실제 라벨 크기</b>(한 칸, 간격 빼고 — 예: 50×25mm)를 새로 만들어 고르고, 아래 ‘라벨 크기’도 같게 (다르면 라벨이 작게·한쪽에 나와요)</li>
                 <li>
                   바탕화면 크롬 아이콘 복사 → 속성 → ‘대상’ 맨 끝에 한 칸 띄고 <code className="rounded bg-white px-1">--kiosk-printing</code> 추가
                 </li>

@@ -20,6 +20,7 @@ import {
 } from "@/lib/format";
 import { useCategories, useProducts, useRefresh, useSuppliers } from "@/lib/queries";
 import { store } from "@/lib/store";
+import { useSendStation } from "@/components/PrintStations";
 import type { AiProductDraft, Product, ProductInput, Supplier, SupplierInput } from "@/lib/types";
 import { AiFillSheet, FOREIGN_KEYS } from "./AiFillSheet";
 import { BarcodeScanner } from "./BarcodeScanner";
@@ -83,6 +84,7 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
   const [initialStock, setInitialStock] = useState(initial?.stock_qty ?? 0);
   const { user } = useAuth();
   const [sendLabel, setSendLabel] = useState(false);
+  const sendStation = useSendStation();
   const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [photoRemoved, setPhotoRemoved] = useState(false);
   const [compressing, setCompressing] = useState(false);
@@ -236,7 +238,7 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
       if (!product && sendLabel && saved.barcode) {
         sent = Math.min(500, Math.max(1, initialStock));
         await store()
-          .addPrintJobs([{ product_id: saved.id, copies: sent, style: "label" }], user?.display_name ?? "")
+          .addPrintJobs([{ product_id: saved.id, copies: sent, style: "label" }], user?.display_name ?? "", sendStation.target?.id)
           .catch(() => (sent = 0));
       }
       await refresh("products", "moves", "print-jobs", "sources");

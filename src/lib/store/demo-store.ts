@@ -7,6 +7,7 @@ import type {
   PriceInput,
   PriceLog,
   PrintJob,
+  PrintStation,
   Product,
   ProductInput,
   ProductSource,
@@ -489,25 +490,61 @@ export function createDemoStore(): DataStore {
             .slice(0, 30);
     },
 
-    async addPrintJobs(items, requestedBy) {
+    async addPrintJobs(items, requestedBy, stationId) {
       const jobs = await load<PrintJob[]>("printJobs", []);
       const now = new Date().toISOString();
       for (const i of items) {
         jobs.push({
           ...i, id: crypto.randomUUID(), status: "pending", requested_by_name: requestedBy, error: null,
-          created_at: now, claimed_at: null, printed_at: null,
+          created_at: now, claimed_at: null, printed_at: null, station_id: stationId ?? null,
         });
       }
       await save("printJobs", jobs);
     },
 
-    async claimPrintJobs() {
+    // 체험 모드는 이 기기 안이라 실시간 알림이 없어요 (화면이 가끔 확인해요)
+    watchPrintJobs(_onChange, onStatus) {
+      onStatus?.(false);
+      return () => {};
+    },
+
+    async listPrintStations() {
+      return load<PrintStation[]>("printStations", []);
+    },
+
+    async registerPrintStation(name) {
+      const list = await load<PrintStation[]>("printStations", []);
+      const now = new Date().toISOString();
+      const row: PrintStation = { id: crypto.randomUUID(), name: name.trim().slice(0, 30) || "매장 노트북", last_seen_at: now, created_at: now };
+      await save("printStations", [...list, row]);
+      return row;
+    },
+
+    async updatePrintStation(id, patch) {
+      const list = await load<PrintStation[]>("printStations", []);
+      await save(
+        "printStations",
+        list.map((x) =>
+          x.id === id
+            ? { ...x, ...(patch.name !== undefined ? { name: patch.name.trim().slice(0, 30) || "매장 노트북" } : {}), ...(patch.seen ? { last_seen_at: new Date().toISOString() } : {}) }
+            : x,
+        ),
+      );
+    },
+
+    async removePrintStation(id) {
+      const list = await load<PrintStation[]>("printStations", []);
+      await save("printStations", list.filter((x) => x.id !== id));
+    },
+
+    async claimPrintJobs(stationId) {
       const jobs = await load<PrintJob[]>("printJobs", []);
       const now = new Date();
       const stale = (j: PrintJob) => j.status === "printing" && j.claimed_at && now.getTime() - new Date(j.claimed_at).getTime() > 120000;
+      const mine = (j: PrintJob) => !stationId || !j.station_id || j.station_id === stationId;
       const claimed: PrintJob[] = [];
       const next = jobs.map((j) => {
-        if (j.status !== "pending" && !stale(j)) return j;
+        if ((j.status !== "pending" && !stale(j)) || !mine(j)) return j;
         const c = { ...j, status: "printing" as const, claimed_at: now.toISOString(), error: null };
         claimed.push(c);
         return c;

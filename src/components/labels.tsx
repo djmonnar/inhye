@@ -21,8 +21,11 @@ export interface Preset {
 }
 
 export const PRESETS: Preset[] = [
+  { id: "roll-40x20", label: "롤 40×20", w: 40, h: 20 },
   { id: "roll-40x30", label: "롤 40×30", w: 40, h: 30 },
+  { id: "roll-50x25", label: "롤 50×25", w: 50, h: 25 },
   { id: "roll-50x30", label: "롤 50×30", w: 50, h: 30 },
+  { id: "roll-60x30", label: "롤 60×30", w: 60, h: 30 },
   { id: "roll-60x40", label: "롤 60×40", w: 60, h: 40 },
   { id: "a4-21", label: "A4 21칸", w: 63.5, h: 38.1, sheet: { cols: 3, rows: 7, top: 15.1, left: 7.2, gapX: 2.5, gapY: 0 } },
   { id: "a4-40", label: "A4 40칸", w: 48.5, h: 25.4, sheet: { cols: 4, rows: 10, top: 21.5, left: 8, gapX: 0, gapY: 0 } },
@@ -127,23 +130,17 @@ export function LabelFace({ p, preset, show, style }: { p: Product; preset: Pres
       </div>
     );
   }
-  // 바코드 라벨: 위에 이름 · 가격, 아래에 바코드 (2026-11-17 사용자 선택). 이름·가격이 없으면 바코드만 가운데
-  const hasName = show.name && p.name.trim() !== "";
-  const hasPrice = show.price && p.sale_price > 0;
+  // 바코드 라벨 (사장님 예시 라벨과 같게): 맨 위 한 줄 ‘이름 가격’ · 바코드 막대(가로 꽉) · 아래 큰 번호
+  //   인쇄는 보통 labelCanvas 그림으로 해요 — 이건 그림이 아직 없을 때 쓰는 화면용
+  const line = [show.name ? p.name.trim() : "", show.price && p.sale_price > 0 ? won(p.sale_price) : ""].filter(Boolean).join("  ");
   return (
-    <div
-      className={`flex h-full w-full flex-col items-center overflow-hidden px-[1.5mm] py-[1mm] text-center text-black ${
-        hasName || hasPrice ? "justify-between gap-[0.5mm]" : "justify-center"
-      }`}
-    >
-      {(hasName || hasPrice) && (
-        <div className="w-full">
-          {hasName && <div className={`line-clamp-1 w-full font-semibold leading-tight ${small ? "text-[6.5pt]" : "text-[8pt]"}`}>{p.name}</div>}
-          {hasPrice && <div className={`font-bold leading-tight ${small ? "text-[8pt]" : "text-[10pt]"}`}>{won(p.sale_price)}</div>}
-        </div>
-      )}
+    <div className="flex h-full w-full flex-col items-center justify-between overflow-hidden px-[1.5mm] py-[1mm] text-center text-black">
+      {line && <div className={`line-clamp-1 w-full font-semibold leading-tight ${small ? "text-[8pt]" : "text-[11pt]"}`}>{line}</div>}
       {show.barcode && p.barcode ? (
-        <BarcodeSvg value={p.barcode} height={small ? 26 : 40} width={1.3} fontSize={small ? 9 : 11} className="max-h-[66%] max-w-full" />
+        <>
+          <BarcodeSvg value={p.barcode} height={small ? 26 : 40} width={1.6} displayValue={false} className="min-h-0 w-[88%] flex-1" />
+          <div className={`font-semibold leading-none tracking-wide ${small ? "text-[8pt]" : "text-[10pt]"}`}>{p.barcode}</div>
+        </>
       ) : show.barcode ? (
         <div className="text-[6pt] text-gray-400">바코드 없음</div>
       ) : null}
@@ -326,6 +323,11 @@ export function PresetPicker({ settings }: { settings: ReturnType<typeof usePrin
           <NumberField label="가로" unit="mm" min={15} max={104} value={custom.w} onChange={(w) => setCustom({ w })} />
           <NumberField label="세로" unit="mm" min={10} max={200} value={custom.h} onChange={(h) => setCustom({ h })} />
         </div>
+      )}
+      {!preset.sheet && (
+        <p className="rounded-2xl bg-cream px-3 py-2 text-xs text-ink-soft">
+          📏 지금 <b className="text-ink">{preset.w}×{preset.h}mm</b> — 실제 라벨 한 칸(사이 간격 빼고) 크기, 인쇄 창의 ‘용지 크기’와 셋 다 같아야 꽉 차요. 자로 재서 없으면 ‘직접’으로 넣어요.
+        </p>
       )}
       <div className="grid grid-cols-3 gap-x-3">
         <Toggle checked={show.name} onChange={(v) => setShow({ name: v })} label="이름" />

@@ -270,6 +270,16 @@ export interface PrintJob {
   created_at: string;
   claimed_at: string | null;
   printed_at: string | null;
+  /** 보낸 노트북 (v11, 비어 있으면 아무 노트북이나) */
+  station_id?: string | null;
+}
+
+/** 라벨을 뽑는 노트북 (v11) — last_seen_at이 최근이면 ‘자동 인쇄 켜짐’ */
+export interface PrintStation {
+  id: string;
+  name: string;
+  last_seen_at: string | null;
+  created_at: string;
 }
 
 export interface PrintRequest {

@@ -90,6 +90,7 @@ export function useRefresh() {
         | "kakao-bot"
         | "logen"
         | "barcode-issues"
+        | "print-stations"
       )[]
     ) => Promise.all(keys.map((k) => qc.invalidateQueries({ queryKey: [k] }))),
     [qc],
@@ -99,6 +100,11 @@ export function useRefresh() {
 /** 로젠 연동 준비 상태 — 체험 모드나 실패면 ‘준비 안 됨’으로 */
 export function useLogenStatus(enabled = true) {
   return useQuery({ queryKey: ["logen"], queryFn: () => store().logenStatus(), enabled, retry: false, staleTime: 5 * 60_000 });
+}
+
+/** 인쇄 노트북 (v11) — 켜져 있는지 보려고 30초마다 새로 */
+export function usePrintStations() {
+  return useQuery({ queryKey: ["print-stations"], queryFn: () => store().listPrintStations(), refetchInterval: 30_000, retry: false });
 }
 
 /** 상품 없이 만든 매장용 바코드 (v10) */

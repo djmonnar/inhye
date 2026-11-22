@@ -54,7 +54,7 @@ create trigger on_auth_user_created
 create or replace function public.app_status() returns json
 language sql stable security definer set search_path = public as $$
   select json_build_object(
-    'version', 10,
+    'version', 11,
     'has_admin', exists (select 1 from public.profiles where role = 'admin')
   );
 $$;
@@ -287,9 +287,38 @@ create policy "print jobs update" on public.print_jobs for update to authenticat
 drop policy if exists "print jobs delete" on public.print_jobs;
 create policy "print jobs delete" on public.print_jobs for delete to authenticated using (public.is_member());
 
+-- ---------------------------------------------------------------------
+-- 인쇄 노트북 (v11) — 라벨을 뽑을 노트북을 등록해 두고, 폰에서 그 노트북으로 보내요.
+--   last_seen_at = 그 노트북의 인쇄 스테이션이 ‘자동 인쇄’를 켜고 마지막으로 알린 때 (켜져 있는지 보기)
+-- ---------------------------------------------------------------------
+create table if not exists public.print_stations (
+  id uuid primary key default gen_random_uuid(),
+  name text not null default '매장 노트북',
+  last_seen_at timestamptz,
+  created_by uuid default auth.uid() references auth.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.print_stations enable row level security;
+grant select, insert, update, delete on public.print_stations to authenticated;
+
+drop policy if exists "print stations read" on public.print_stations;
+create policy "print stations read" on public.print_stations for select to authenticated using (public.is_member());
+drop policy if exists "print stations insert" on public.print_stations;
+create policy "print stations insert" on public.print_stations for insert to authenticated with check (public.is_member());
+drop policy if exists "print stations update" on public.print_stations;
+create policy "print stations update" on public.print_stations for update to authenticated
+  using (public.is_member()) with check (public.is_member());
+drop policy if exists "print stations delete" on public.print_stations;
+create policy "print stations delete" on public.print_stations for delete to authenticated using (public.is_member());
+
+-- 이 노트북으로 보낸 인쇄 (비어 있으면 아무 노트북이나)
+alter table public.print_jobs add column if not exists station_id uuid references public.print_stations (id) on delete set null;
+
 -- 대기 중인 인쇄를 한 번에 가져가요. 인쇄 스테이션이 두 대여도 같은 라벨을 두 번 뽑지 않아요.
--- (2분 넘게 ‘인쇄 중’으로 멈춘 건 다시 가져가요)
-create or replace function public.claim_print_jobs(p_limit integer default 50)
+-- (2분 넘게 ‘인쇄 중’으로 멈춘 건 다시 가져가요) p_station을 주면 그 노트북 것 + 노트북을 안 고른 것만 (v11)
+drop function if exists public.claim_print_jobs(integer);
+create or replace function public.claim_print_jobs(p_limit integer default 50, p_station uuid default null)
 returns setof public.print_jobs
 language plpgsql security invoker set search_path = public as $$
 begin
@@ -301,7 +330,8 @@ begin
      set status = 'printing', claimed_at = now(), error = null
    where j.id in (
      select id from public.print_jobs
-      where status = 'pending' or (status = 'printing' and claimed_at < now() - interval '2 minutes')
+      where (status = 'pending' or (status = 'printing' and claimed_at < now() - interval '2 minutes'))
+        and (p_station is null or station_id is null or station_id = p_station)
       order by created_at
       limit p_limit
       for update skip locked
@@ -309,7 +339,20 @@ begin
   returning j.*;
 end $$;
 
-grant execute on function public.claim_print_jobs(integer) to authenticated;
+grant execute on function public.claim_print_jobs(integer, uuid) to authenticated;
+
+-- 인쇄 대기열을 실시간으로 받아요 — 폰에서 보내는 순간 노트북이 알아요 (v11). 안 되면 화면이 가끔 확인해요
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+     and not exists (
+       select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'print_jobs'
+     ) then
+    alter publication supabase_realtime add table public.print_jobs;
+  end if;
+exception when others then
+  raise notice 'realtime publication skipped: %', sqlerrm;
+end $$;
 
 -- ---------------------------------------------------------------------
 -- 5-1-2. 상품 없이 만든 매장용 바코드 (v10)
