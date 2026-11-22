@@ -15,7 +15,7 @@ import type {
   SupplierInput,
 } from "../types";
 import { kstToday, tidyOrder } from "../day";
-import { nextStoreBarcode } from "../format";
+import { cleanBarcodeInput, nextStoreBarcodes } from "../format";
 import { buildShipNotice, isShipNoticeAsk, shipNoticeNote } from "../shipNotice";
 import { StoreError, type DataStore } from "./types";
 
@@ -452,20 +452,26 @@ export function createDemoStore(): DataStore {
       return (await load<BarcodeIssue[]>("barcodeIssues", [])).sort((a, b) => b.created_at.localeCompare(a.created_at));
     },
 
-    async issueBarcode(input) {
+    async issueBarcodes(input) {
       const issues = await load<BarcodeIssue[]>("barcodeIssues", []);
       const products = await load<Product[]>("products", []);
-      const row: BarcodeIssue = {
-        id: crypto.randomUUID(),
-        code: nextStoreBarcode(products, issues.map((i) => i.code)),
-        name: input.name?.trim() || null,
-        price: input.price ?? null,
-        memo: input.memo?.trim() || null,
-        product_id: null,
-        created_at: new Date().toISOString(),
-      };
-      await save("barcodeIssues", [...issues, row]);
-      return row;
+      const base = { name: input.name?.trim() || null, price: input.price ?? null, memo: input.memo?.trim() || null, product_id: null };
+      let codes: string[];
+      if (input.code != null && input.code.trim() !== "") {
+        const code = cleanBarcodeInput(input.code);
+        if (!code) throw new StoreError("번호는 숫자·영문으로 3~30자예요.");
+        const p = products.find((x) => x.barcode === code);
+        if (p) throw new StoreError(`이미 ‘${p.name}’ 상품 바코드예요. 다른 번호로 해 주세요.`);
+        if (issues.some((i) => i.code === code)) throw new StoreError("이미 만든 번호예요. 아래 ‘최근 만든 바코드’에서 다시 뽑을 수 있어요.");
+        codes = [code];
+      } else {
+        const n = Math.max(1, Math.min(50, Math.round(input.count ?? 1)));
+        codes = nextStoreBarcodes(products, issues.map((i) => i.code), n);
+      }
+      const now = new Date().toISOString();
+      const rows: BarcodeIssue[] = codes.map((code) => ({ ...base, id: crypto.randomUUID(), code, created_at: now }));
+      await save("barcodeIssues", [...issues, ...rows]);
+      return rows;
     },
 
     async listPrintJobs(which) {

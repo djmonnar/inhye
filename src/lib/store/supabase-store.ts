@@ -1,7 +1,7 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { IMAGE_BUCKET, SUPABASE_URL } from "../config";
 import { shiftDay, tidyOrder } from "../day";
-import { nextStoreBarcode } from "../format";
+import { cleanBarcodeInput, nextStoreBarcodes } from "../format";
 import { blobToDataUrl } from "../image";
 import { loginEmail, setRemember, supabase } from "../supabase";
 import type {
@@ -369,8 +369,26 @@ export function createSupabaseStore(): DataStore {
       return data as BarcodeIssue[];
     },
 
-    async issueBarcode(input) {
-      // 누르는 순간 가장 큰 번호를 다시 봐요. 두 기기가 동시에 누르면 한쪽이 겹침(23505) → 다시 계산
+    async issueBarcodes(input) {
+      const name = input.name?.trim() || null;
+      const price = input.price ?? null;
+      const memo = input.memo?.trim() || null;
+      // 직접 정한 번호 하나
+      if (input.code != null && input.code.trim() !== "") {
+        const code = cleanBarcodeInput(input.code);
+        if (!code) throw new StoreError("번호는 숫자·영문으로 3~30자예요.");
+        const same = await sb.from("products").select("name").eq("barcode", code).limit(1);
+        if (same.error) fail(same.error);
+        if (same.data?.length) throw new StoreError(`이미 ‘${(same.data[0] as { name: string }).name}’ 상품 바코드예요. 다른 번호로 해 주세요.`);
+        const { data, error } = await sb.from("barcode_issues").insert({ code, name, price, memo }).select("*").single();
+        if (error) {
+          if (error.code === "23505") throw new StoreError("이미 만든 번호예요. 아래 ‘최근 만든 바코드’에서 다시 뽑을 수 있어요.");
+          fail(error);
+        }
+        return [data as BarcodeIssue];
+      }
+      // 다음 매장용 번호부터 n개 — 누르는 순간 가장 큰 번호를 다시 봐요. 두 기기가 동시에 누르면(23505) 다시 계산
+      const n = Math.max(1, Math.min(50, Math.round(input.count ?? 1)));
       for (let attempt = 0; attempt < 4; attempt++) {
         const [prod, iss] = await Promise.all([
           sb.from("products").select("barcode").like("barcode", "200%").order("barcode", { ascending: false }).limit(1),
@@ -378,16 +396,16 @@ export function createSupabaseStore(): DataStore {
         ]);
         if (prod.error) fail(prod.error);
         if (iss.error) fail(iss.error);
-        const code = nextStoreBarcode(
+        const codes = nextStoreBarcodes(
           (prod.data ?? []) as { barcode: string | null }[],
           ((iss.data ?? []) as { code: string }[]).map((r) => r.code),
+          n,
         );
         const { data, error } = await sb
           .from("barcode_issues")
-          .insert({ code, name: input.name?.trim() || null, price: input.price ?? null, memo: input.memo?.trim() || null })
-          .select("*")
-          .single();
-        if (!error) return data as BarcodeIssue;
+          .insert(codes.map((code) => ({ code, name, price, memo })))
+          .select("*");
+        if (!error) return ((data ?? []) as BarcodeIssue[]).sort((a, b) => a.code.localeCompare(b.code));
         if (error.code !== "23505") fail(error);
       }
       throw new StoreError("바코드를 만들지 못했어요. 한 번 더 눌러 주세요.");

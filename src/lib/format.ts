@@ -146,6 +146,19 @@ export function nextStoreBarcode(products: Pick<Product, "barcode">[], issued: r
   return body + ean13CheckDigit(body);
 }
 
+/** 다음 매장용 바코드부터 n개 (같은 규칙으로 차례로) */
+export function nextStoreBarcodes(products: Pick<Product, "barcode">[], issued: readonly string[], n: number): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) out.push(nextStoreBarcode(products, [...issued, ...out]));
+  return out;
+}
+
+/** 직접 정한 바코드 번호 정리 — 숫자·영문·- 만, 3~30자 (아니면 null) */
+export function cleanBarcodeInput(v: string | null | undefined): string | null {
+  const s = (v ?? "").trim().replace(/\s+/g, "");
+  return /^[0-9A-Za-z-]{3,30}$/.test(s) ? s : null;
+}
+
 export function hostOf(url: string | null | undefined): string | null {
   if (!url) return null;
   try {

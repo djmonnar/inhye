@@ -1,5 +1,6 @@
 import type {
   BarcodeIssue,
+  BarcodeIssueInput,
   AiProductDraft,
   AiReport,
   AppUser,
@@ -94,7 +95,7 @@ export interface DataStore {
   /** 상품 없이 만든 매장용 바코드 (최근 것부터) — v10 전 DB면 빈 목록 */
   listBarcodeIssues(): Promise<BarcodeIssue[]>;
   /** 새 매장용 바코드 만들기 — 상품 바코드·이미 만든 번호와 안 겹치게 번호를 정해 기록해요 (지우기는 없어요: 지운 번호가 다시 나가면 이미 붙인 라벨과 겹쳐서) */
-  issueBarcode(input: { name: string | null; price: number | null; memo?: string | null }): Promise<BarcodeIssue>;
+  issueBarcodes(input: BarcodeIssueInput): Promise<BarcodeIssue[]>;
   listPrintJobs(which: "pending" | "recent"): Promise<PrintJob[]>;
   addPrintJobs(items: PrintRequest[], requestedBy: string): Promise<void>;
   /** Atomically takes waiting jobs (pending → printing) so two stations never double-print. */

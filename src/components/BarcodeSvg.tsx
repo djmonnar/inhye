@@ -4,9 +4,16 @@ import JsBarcode from "jsbarcode";
 import { useEffect, useRef } from "react";
 import { isValidEan13 } from "@/lib/format";
 
+/** 8자리 EAN-8 검사 숫자가 맞는지 (안 맞으면 EAN-8로 못 그려서 CODE128로) */
+function isValidEan8(code: string): boolean {
+  if (!/^\d{8}$/.test(code)) return false;
+  const sum = [...code.slice(0, 7)].reduce((n, d, i) => n + Number(d) * (i % 2 === 0 ? 3 : 1), 0);
+  return (10 - (sum % 10)) % 10 === Number(code[7]);
+}
+
 export function barcodeFormat(code: string): "EAN13" | "EAN8" | "CODE128" {
   if (isValidEan13(code)) return "EAN13";
-  if (/^\d{8}$/.test(code)) return "EAN8";
+  if (isValidEan8(code)) return "EAN8";
   return "CODE128";
 }
 

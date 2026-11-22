@@ -71,6 +71,17 @@ export interface BarcodeIssue {
   created_at: string;
 }
 
+/** 바코드 만들기 — code를 주면 그 번호 하나, 없으면 다음 매장용 번호(200…)로 count개 */
+export interface BarcodeIssueInput {
+  name: string | null;
+  price: number | null;
+  memo?: string | null;
+  /** 직접 정한 번호 (숫자·영문·-, 3~30자) */
+  code?: string | null;
+  /** 자동 번호로 몇 개 (1~50) */
+  count?: number;
+}
+
 export type ProductInput = Omit<
   Product,
   "id" | "created_at" | "updated_at" | "kiosk_synced_at" | "kiosk_changed_at"
