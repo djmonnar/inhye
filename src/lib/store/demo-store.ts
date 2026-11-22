@@ -1,6 +1,7 @@
 import { createStore, get, set } from "idb-keyval";
 import { setRemember, getRemember } from "../supabase";
 import type {
+  BarcodeIssue,
   AppUser,
   Order,
   PriceInput,
@@ -14,6 +15,7 @@ import type {
   SupplierInput,
 } from "../types";
 import { kstToday, tidyOrder } from "../day";
+import { nextStoreBarcode } from "../format";
 import { buildShipNotice, isShipNoticeAsk, shipNoticeNote } from "../shipNotice";
 import { StoreError, type DataStore } from "./types";
 
@@ -444,6 +446,26 @@ export function createDemoStore(): DataStore {
 
     async deleteMember() {
       throw new StoreError("체험 모드에서는 사용할 수 없어요.");
+    },
+
+    async listBarcodeIssues() {
+      return (await load<BarcodeIssue[]>("barcodeIssues", [])).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    },
+
+    async issueBarcode(input) {
+      const issues = await load<BarcodeIssue[]>("barcodeIssues", []);
+      const products = await load<Product[]>("products", []);
+      const row: BarcodeIssue = {
+        id: crypto.randomUUID(),
+        code: nextStoreBarcode(products, issues.map((i) => i.code)),
+        name: input.name?.trim() || null,
+        price: input.price ?? null,
+        memo: input.memo?.trim() || null,
+        product_id: null,
+        created_at: new Date().toISOString(),
+      };
+      await save("barcodeIssues", [...issues, row]);
+      return row;
     },
 
     async listPrintJobs(which) {

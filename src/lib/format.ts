@@ -135,12 +135,11 @@ export function isValidEan13(code: string): boolean {
 
 /**
  * Next in-store EAN-13 (prefix 200 = 매장 내부용 번호 대역, never clashes with
- * manufacturer barcodes).
+ * manufacturer barcodes). `issued` = 상품 없이 만든 바코드 번호들(v10) — 그 번호도 피해요.
  */
-export function nextStoreBarcode(products: Pick<Product, "barcode">[]): string {
+export function nextStoreBarcode(products: Pick<Product, "barcode">[], issued: readonly string[] = []): string {
   let max = 0;
-  for (const p of products) {
-    const b = p.barcode;
+  for (const b of [...products.map((p) => p.barcode), ...issued]) {
     if (b && /^200\d{10}$/.test(b)) max = Math.max(max, Number(b.slice(3, 12)));
   }
   const body = `200${String(max + 1).padStart(9, "0")}`;

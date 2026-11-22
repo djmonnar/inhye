@@ -57,6 +57,20 @@ export interface Product {
   updated_at: string;
 }
 
+/** 상품 없이 만든 매장용 바코드 (스키마 v10) — 번호가 겹치지 않게 기록해 둬요 */
+export interface BarcodeIssue {
+  id: string;
+  code: string;
+  /** 라벨에 찍을 이름 (선택) */
+  name: string | null;
+  /** 라벨에 찍을 가격 (선택) */
+  price: number | null;
+  memo: string | null;
+  /** 나중에 상품에 붙이면 */
+  product_id: string | null;
+  created_at: string;
+}
+
 export type ProductInput = Omit<
   Product,
   "id" | "created_at" | "updated_at" | "kiosk_synced_at" | "kiosk_changed_at"

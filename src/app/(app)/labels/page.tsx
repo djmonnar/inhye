@@ -4,6 +4,7 @@ import { Printer, Search, Send, Sparkles, Usb, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { BarcodeMaker, isIssueItem, issueAsProduct } from "@/components/BarcodeMaker";
 import { LabelFace, LabelPrintPortal, PresetPicker, buildUsbJobs, readPref, usePrintSettings, UsbSettingsPanel, writePref } from "@/components/labels";
 import { useAuth, useToast } from "@/components/providers";
 import { toInput } from "@/components/ProductForm";
@@ -11,7 +12,7 @@ import { Loading, PageHeader, ProductThumb, Segmented } from "@/components/ui";
 import { IS_DEMO } from "@/lib/config";
 import { isWebBarcode, nextStoreBarcode, searchText } from "@/lib/format";
 import { renderLabelCanvas, renderTestCanvas, type LabelStyle } from "@/lib/labelCanvas";
-import { useProducts, useRefresh } from "@/lib/queries";
+import { useBarcodeIssues, useProducts, useRefresh } from "@/lib/queries";
 import { store } from "@/lib/store";
 import { buildTsplJob, canvasToMono, concatJobs } from "@/lib/tspl";
 import { deviceLabel, getPrinter, sendToPrinter, usbAvailable } from "@/lib/usbPrinter";
@@ -24,6 +25,8 @@ function LabelsInner() {
   const refresh = useRefresh();
   const { user } = useAuth();
   const { data: products = [], isLoading } = useProducts();
+  // 상품 없이 만든 바코드(v10)도 상품처럼 같이 뽑아요
+  const { data: issues = [] } = useBarcodeIssues();
   const [copies, setCopies] = useState<Record<string, number>>({});
   const [q, setQ] = useState("");
   const [style, setStyle] = useState<LabelStyle>("label");
@@ -60,9 +63,10 @@ function LabelsInner() {
   }, [params]);
 
   const size = { w: preset.w, h: preset.h };
-  const selected = products.filter((p) => copies[p.id] > 0);
+  const pool = useMemo(() => [...products, ...issues.map(issueAsProduct)], [products, issues]);
+  const selected = pool.filter((p) => copies[p.id] > 0);
   // 바코드가 없거나 웹 주소(QR)인 상품 — 매장용 바코드를 만들어 줘요
-  const missingBarcode = selected.filter((p) => !p.barcode || isWebBarcode(p.barcode));
+  const missingBarcode = selected.filter((p) => !isIssueItem(p) && (!p.barcode || isWebBarcode(p.barcode)));
   const total = selected.reduce((n, p) => n + copies[p.id], 0);
   const results = useMemo(() => {
     const needle = searchText(q);
@@ -124,14 +128,21 @@ function LabelsInner() {
   }
 
   async function sendToLaptop() {
+    // 노트북 인쇄 대기열은 상품에 묶여 있어서, 상품 없이 만든 바코드는 노트북에서 직접 뽑아요
+    const real = selected.filter((p) => !isIssueItem(p));
+    if (!real.length) {
+      toast("상품 없이 만든 바코드는 노트북에서 이 화면을 열어 바로 인쇄해 주세요", "sad");
+      return;
+    }
+    if (real.length < selected.length) toast("상품 없이 만든 바코드는 빼고 보낼게요 (노트북에서 직접 인쇄)", "wink");
     setSending(true);
     try {
       await store().addPrintJobs(
-        selected.map((p) => ({ product_id: p.id, copies: copies[p.id], style })),
+        real.map((p) => ({ product_id: p.id, copies: copies[p.id], style })),
         user?.display_name ?? "",
       );
       await refresh("print-jobs");
-      toast(`${total}장 노트북으로 보냈어요!`, "wow");
+      toast(`${real.reduce((n, p) => n + copies[p.id], 0)}장 노트북으로 보냈어요!`, "wow");
       setCopies({});
     } catch (e) {
       toast(e instanceof Error ? e.message : "보내지 못했어요", "sad");
@@ -144,8 +155,9 @@ function LabelsInner() {
     setFixing(true);
     try {
       let pool = [...products];
+      const issued = (await store().listBarcodeIssues().catch(() => [])).map((i) => i.code);
       for (const p of missingBarcode) {
-        const code = nextStoreBarcode(pool);
+        const code = nextStoreBarcode(pool, issued);
         const saved = await store().saveProduct({ ...toInput(p), barcode: code }, p.id);
         pool = pool.map((x) => (x.id === p.id ? saved : x));
       }
@@ -287,6 +299,8 @@ function LabelsInner() {
             )}
           </section>
         )}
+
+        <BarcodeMaker issues={issues} copies={copies} setCopies={setCopies} sendMode={method === "send"} />
 
         {/* 상품 고르기 */}
         <section className="card p-4">

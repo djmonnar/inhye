@@ -119,8 +119,8 @@ export function LabelFace({ p, preset, show, style }: { p: Product; preset: Pres
   if (style === "price") {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center overflow-hidden px-[2mm] text-center text-black">
-        {show.name && <div className={`line-clamp-2 font-semibold leading-tight ${small ? "text-[7pt]" : "text-[9pt]"}`}>{p.name}</div>}
-        {show.price && <div className={`font-cute leading-none ${small ? "text-[14pt]" : "text-[20pt]"}`}>{won(p.sale_price)}</div>}
+        {show.name && p.name.trim() !== "" && <div className={`line-clamp-2 font-semibold leading-tight ${small ? "text-[7pt]" : "text-[9pt]"}`}>{p.name}</div>}
+        {show.price && p.sale_price > 0 && <div className={`font-cute leading-none ${small ? "text-[14pt]" : "text-[20pt]"}`}>{won(p.sale_price)}</div>}
         {show.barcode && p.barcode && (
           <BarcodeSvg value={p.barcode} height={small ? 14 : 20} width={1} fontSize={8} displayValue={false} className="mt-[0.5mm] max-h-[6mm] max-w-full" />
         )}
@@ -129,13 +129,13 @@ export function LabelFace({ p, preset, show, style }: { p: Product; preset: Pres
   }
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-[0.6mm] overflow-hidden px-[1.5mm] py-[1mm] text-center text-black">
-      {show.name && <div className={`line-clamp-1 w-full font-semibold leading-tight ${small ? "text-[6.5pt]" : "text-[8pt]"}`}>{p.name}</div>}
+      {show.name && p.name.trim() !== "" && <div className={`line-clamp-1 w-full font-semibold leading-tight ${small ? "text-[6.5pt]" : "text-[8pt]"}`}>{p.name}</div>}
       {show.barcode && p.barcode ? (
         <BarcodeSvg value={p.barcode} height={small ? 26 : 40} width={1.3} fontSize={small ? 9 : 11} className="max-h-[70%] max-w-full" />
       ) : show.barcode ? (
         <div className="text-[6pt] text-gray-400">바코드 없음</div>
       ) : null}
-      {show.price && <div className={`font-bold leading-none ${small ? "text-[8pt]" : "text-[10pt]"}`}>{won(p.sale_price)}</div>}
+      {show.price && p.sale_price > 0 && <div className={`font-bold leading-none ${small ? "text-[8pt]" : "text-[10pt]"}`}>{won(p.sale_price)}</div>}
     </div>
   );
 }

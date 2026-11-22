@@ -439,7 +439,11 @@ export function ProductForm({ product, initial }: { product?: Product; initial?:
                   <button
                     type="button"
                     className="btn-ghost btn-sm text-berry-600"
-                    onClick={() => set("barcode", nextStoreBarcode(products))}
+                    onClick={async () => {
+                      // 상품 없이 만든 바코드 번호(v10)도 피해요
+                      const issued = await store().listBarcodeIssues().catch(() => []);
+                      set("barcode", nextStoreBarcode(products, issued.map((i) => i.code)));
+                    }}
                   >
                     <Sparkles size={16} /> {f.barcode ? "매장용 바코드로 바꾸기" : "매장용 바코드 자동 만들기"}
                   </button>

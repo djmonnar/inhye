@@ -82,6 +82,9 @@ export async function renderLabelCanvas(
   const pad = Math.round(1.5 * DOTS_PER_MM);
   const inner = W - pad * 2;
   const price = won(p.sale_price);
+  // 이름이 비었거나 가격이 0원이면 안 찍어요 (상품 없이 만든 바코드 라벨 등) — 그만큼 바코드가 커져요
+  const showName = show.name && p.name.trim() !== "";
+  const showPrice = show.price && p.sale_price > 0;
 
   const nameSize = Math.max(16, Math.round(H * (style === "price" ? 0.12 : 0.1)));
   const priceSize = Math.max(18, Math.round(H * (style === "price" ? 0.3 : 0.13)));
@@ -105,7 +108,7 @@ export async function renderLabelCanvas(
   let top = pad;
   let bottom = H - pad;
 
-  if (show.name) {
+  if (showName) {
     const f = fitText(ctx, p.name, nameSize, inner);
     ctx.font = `700 ${f.size}px ${FONT}`;
     ctx.fillText(f.text, W / 2, top + f.size * 0.92);
@@ -121,7 +124,7 @@ export async function renderLabelCanvas(
         bottom -= bc.height + Math.round(DOTS_PER_MM * 0.8);
       }
     }
-    if (show.price) {
+    if (showPrice) {
       const f = fitText(ctx, price, priceSize, inner);
       ctx.font = `800 ${f.size}px ${FONT}`;
       const mid = (top + bottom) / 2;
@@ -130,7 +133,7 @@ export async function renderLabelCanvas(
     return canvas;
   }
 
-  if (show.price) {
+  if (showPrice) {
     const f = fitText(ctx, price, priceSize, inner);
     ctx.font = `800 ${f.size}px ${FONT}`;
     ctx.fillText(f.text, W / 2, bottom - f.size * 0.08);

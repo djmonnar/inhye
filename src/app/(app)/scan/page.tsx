@@ -10,8 +10,8 @@ import { useToast } from "@/components/providers";
 import { KIND_LABEL } from "@/components/SupplierSheet";
 import { Loading, PageHeader, ProductThumb, Segmented, StockBadge } from "@/components/ui";
 import { toInput } from "@/components/ProductForm";
-import { ensureUrl, isWebBarcode, needsKioskSync, num, searchText, WEB_BARCODE_MSG, won } from "@/lib/format";
-import { useProducts, useRefresh, useSupplierMap } from "@/lib/queries";
+import { ensureUrl, isWebBarcode, needsKioskSync, num, searchText, shortDate, WEB_BARCODE_MSG, won } from "@/lib/format";
+import { useBarcodeIssues, useProducts, useRefresh, useSupplierMap } from "@/lib/queries";
 import { store } from "@/lib/store";
 import type { Product } from "@/lib/types";
 import { useWedgeScanner } from "@/lib/useWedgeScanner";
@@ -92,6 +92,7 @@ function ScanInner() {
   const toast = useToast();
   const refresh = useRefresh();
   const { data: products, isLoading } = useProducts();
+  const { data: issues = [] } = useBarcodeIssues();
   const suppliers = useSupplierMap();
   const [mode, setMode] = useState<Mode>("find");
   const [camera, setCamera] = useState(true);
@@ -273,6 +274,15 @@ function ScanInner() {
                 <>
                   <p className="mt-2 font-cute text-lg">앱에 없는 바코드예요</p>
                   <p className="font-mono text-sm text-ink-soft">{result.code}</p>
+                  {(() => {
+                    const issued = issues.find((i) => i.code === result.code);
+                    return issued ? (
+                      <p className="mt-1 rounded-xl bg-matcha-100 px-2 py-1 text-xs text-matcha-700">
+                        라벨 화면에서 상품 없이 만든 바코드예요{issued.name ? ` · ‘${issued.name}’` : ""} ({shortDate(issued.created_at)}). 빅솔론 상품에 이 번호를 넣었다면
+                        아래에서 그 상품에 붙여 주세요.
+                      </p>
+                    ) : null;
+                  })()}
                   <AttachBarcode
                     code={result.code}
                     products={products ?? []}

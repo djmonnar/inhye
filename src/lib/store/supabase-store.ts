@@ -1,9 +1,11 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { IMAGE_BUCKET, SUPABASE_URL } from "../config";
 import { shiftDay, tidyOrder } from "../day";
+import { nextStoreBarcode } from "../format";
 import { blobToDataUrl } from "../image";
 import { loginEmail, setRemember, supabase } from "../supabase";
 import type {
+  BarcodeIssue,
   AiProductDraft,
   AiReport,
   AppUser,
@@ -355,6 +357,40 @@ export function createSupabaseStore(): DataStore {
       const { data, error } = await q;
       if (error) fail(error);
       return data as PrintJob[];
+    },
+
+    async listBarcodeIssues() {
+      const { data, error } = await sb.from("barcode_issues").select("*").order("created_at", { ascending: false }).limit(300);
+      if (error) {
+        // v10 전 DB(표 없음)면 빈 목록 — 상품 바코드 만들기는 그대로 돼요
+        if (error.code === "PGRST205" || error.code === "42P01") return [];
+        fail(error);
+      }
+      return data as BarcodeIssue[];
+    },
+
+    async issueBarcode(input) {
+      // 누르는 순간 가장 큰 번호를 다시 봐요. 두 기기가 동시에 누르면 한쪽이 겹침(23505) → 다시 계산
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const [prod, iss] = await Promise.all([
+          sb.from("products").select("barcode").like("barcode", "200%").order("barcode", { ascending: false }).limit(1),
+          sb.from("barcode_issues").select("code").like("code", "200%").order("code", { ascending: false }).limit(1),
+        ]);
+        if (prod.error) fail(prod.error);
+        if (iss.error) fail(iss.error);
+        const code = nextStoreBarcode(
+          (prod.data ?? []) as { barcode: string | null }[],
+          ((iss.data ?? []) as { code: string }[]).map((r) => r.code),
+        );
+        const { data, error } = await sb
+          .from("barcode_issues")
+          .insert({ code, name: input.name?.trim() || null, price: input.price ?? null, memo: input.memo?.trim() || null })
+          .select("*")
+          .single();
+        if (!error) return data as BarcodeIssue;
+        if (error.code !== "23505") fail(error);
+      }
+      throw new StoreError("바코드를 만들지 못했어요. 한 번 더 눌러 주세요.");
     },
 
     async addPrintJobs(items, requestedBy) {

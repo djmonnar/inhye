@@ -90,7 +90,8 @@ export default function ProductDetailPage() {
     if (!product || fixingCode) return;
     setFixingCode(true);
     try {
-      await store().saveProduct({ ...toInput(product), barcode: nextStoreBarcode(allProducts) }, product.id);
+      const issued = await store().listBarcodeIssues().catch(() => []);
+      await store().saveProduct({ ...toInput(product), barcode: nextStoreBarcode(allProducts, issued.map((i) => i.code)) }, product.id);
       await refresh("products");
       toast("매장용 바코드로 바꿨어요! 라벨을 뽑아 붙이고 빅솔론에 반영해 주세요", "wow");
     } catch (e) {

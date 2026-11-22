@@ -54,7 +54,7 @@ create trigger on_auth_user_created
 create or replace function public.app_status() returns json
 language sql stable security definer set search_path = public as $$
   select json_build_object(
-    'version', 9,
+    'version', 10,
     'has_admin', exists (select 1 from public.profiles where role = 'admin')
   );
 $$;
@@ -310,6 +310,37 @@ begin
 end $$;
 
 grant execute on function public.claim_print_jobs(integer) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 5-1-2. 상품 없이 만든 매장용 바코드 (v10)
+--   빅솔론에 상품을 먼저 등록할 때 바코드만 먼저 만들어 붙여요. 만든 번호를 여기 남겨서
+--   나중에 다른 상품이 같은 번호(200…)를 받지 않게 해요. 이름·가격은 라벨에 찍을 글(선택).
+-- ---------------------------------------------------------------------
+create table if not exists public.barcode_issues (
+  id uuid primary key default gen_random_uuid(),
+  code text not null unique,
+  name text,
+  price integer check (price is null or price >= 0),
+  memo text,
+  product_id uuid references public.products (id) on delete set null,
+  created_by uuid default auth.uid() references auth.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists barcode_issues_created_idx on public.barcode_issues (created_at desc);
+
+alter table public.barcode_issues enable row level security;
+grant select, insert, update, delete on public.barcode_issues to authenticated;
+
+drop policy if exists "barcode issues read" on public.barcode_issues;
+create policy "barcode issues read" on public.barcode_issues for select to authenticated using (public.is_member());
+drop policy if exists "barcode issues insert" on public.barcode_issues;
+create policy "barcode issues insert" on public.barcode_issues for insert to authenticated with check (public.is_member());
+drop policy if exists "barcode issues update" on public.barcode_issues;
+create policy "barcode issues update" on public.barcode_issues for update to authenticated
+  using (public.is_member()) with check (public.is_member());
+drop policy if exists "barcode issues delete" on public.barcode_issues;
+create policy "barcode issues delete" on public.barcode_issues for delete to authenticated using (public.is_admin());
 
 -- ---------------------------------------------------------------------
 -- 5-2. POS(빅솔론) 매출 연동
