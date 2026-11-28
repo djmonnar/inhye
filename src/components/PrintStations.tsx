@@ -15,8 +15,10 @@ import type { PrintStation } from "@/lib/types";
 export const STATION_KEY = "popo.stationId";
 /** 폰에서 라벨을 보낼 노트북 id (보내는 쪽) */
 const SEND_KEY = "popo.sendStation";
-/** 노트북이 이만큼 안에 알렸으면 ‘켜져 있음’ */
-export const STATION_ONLINE_MS = 75_000;
+/** 이 노트북에서 ‘자동 인쇄’를 켜 뒀는지 — 화면을 다시 열어도 이어서 켜져요 */
+export const AUTO_KEY = "popo.stationAuto";
+/** 노트북이 이만큼 안에 알렸으면 ‘켜져 있음’ (창이 뒤에 있으면 크롬이 1분에 한 번으로 늦춰서 넉넉히) */
+export const STATION_ONLINE_MS = 150_000;
 /** 노트북이 ‘켜져 있어요’를 알리는 간격 */
 export const STATION_BEAT_MS = 30_000;
 
@@ -73,7 +75,7 @@ export function StationStatus({ station }: { station: PrintStation }) {
     <p className={`rounded-2xl px-3 py-2 text-xs ${on ? "bg-matcha-100 text-matcha-700" : "bg-butter-100 text-butter-700"}`}>
       {on
         ? `🟢 ${station.name} · 자동 인쇄 켜져 있어요. 보내면 바로 나와요`
-        : `⚪ ${station.name} · 꺼져 있어요${station.last_seen_at ? ` (마지막 ${relTime(station.last_seen_at)})` : ""}. 보내 두면 노트북에서 인쇄 스테이션을 켤 때 나와요`}
+        : `⚪ ${station.name} · 꺼져 있어요${station.last_seen_at ? ` (마지막 ${relTime(station.last_seen_at)})` : ""}. 노트북에서 인쇄 스테이션 화면을 열고 ‘자동 인쇄’를 켜 주세요. 보내 두면 그때 나와요`}
     </p>
   );
 }

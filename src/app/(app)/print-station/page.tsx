@@ -19,7 +19,7 @@ import {
 } from "@/components/labels";
 import { issueAsProduct } from "@/components/BarcodeMaker";
 import { Mascot } from "@/components/Mascot";
-import { STATION_BEAT_MS, STATION_KEY } from "@/components/PrintStations";
+import { AUTO_KEY, STATION_BEAT_MS, STATION_KEY } from "@/components/PrintStations";
 import { useToast } from "@/components/providers";
 import { PageHeader, ProductThumb, Segmented, Toggle } from "@/components/ui";
 import { APP_NAME, IS_DEMO } from "@/lib/config";
@@ -96,12 +96,20 @@ export default function PrintStationPage() {
     const beat = () => void store().updatePrintStation(station.id, { seen: true }).catch(() => {});
     beat();
     const t = setInterval(beat, STATION_BEAT_MS);
-    return () => clearInterval(t);
+    // 창을 다시 앞으로 가져오면 바로 한 번 (뒤에 있는 동안 크롬이 타이머를 늦춰요)
+    const onVisible = () => document.visibilityState === "visible" && beat();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [auto, station]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- per-device station prefs exist only after mount
     setStationId(readPref(STATION_KEY));
+    // 이 노트북에서 자동 인쇄를 켜 뒀으면 화면을 다시 열어도 이어서 켜요
+    if (readPref(AUTO_KEY) === "1") setAuto(true);
     setUsbOk(usbAvailable());
     if (readPref("popo.stationEngine") === "usb" && usbAvailable()) setEngine("usb");
     void getPrinter(false).then((d) => d && setDevice(d)).catch(() => {});
@@ -327,7 +335,11 @@ export default function PrintStationPage() {
                 {busy ? "인쇄 중..." : waitingSheets ? `대기 ${waitingSheets}장` : "대기 없음"}
               </p>
               <p className="text-sm text-ink-soft">
-                {auto ? "자동 인쇄 켜짐 · 폰에서 보내면 바로 나와요" : "자동 인쇄를 켜면 들어오는 대로 뽑아요"}
+                {auto
+                  ? "자동 인쇄 켜짐 · 폰에서 보내면 바로 나와요"
+                  : station
+                    ? "자동 인쇄를 켜야 폰에 🟢(켜져 있음)으로 보이고 들어오는 대로 뽑아요"
+                    : "자동 인쇄를 켜면 들어오는 대로 뽑아요"}
               </p>
             </div>
           </div>
@@ -336,6 +348,7 @@ export default function PrintStationPage() {
               checked={auto}
               onChange={(v) => {
                 setAuto(v);
+                writePref(AUTO_KEY, v ? "1" : "0");
                 if (v) chime();
               }}
               label="자동 인쇄"
@@ -400,6 +413,9 @@ export default function PrintStationPage() {
                 </li>
                 <li>크롬을 모두 닫고, 그 아이콘으로 이 화면을 열어 ‘자동 인쇄’ 켜기</li>
                 <li>노트북 전원 설정에서 전원 연결 시 ‘절전 안 함’</li>
+                <li>
+                  크롬 설정 › 성능 › 메모리 절약 › <b>항상 활성 상태로 유지할 사이트</b>에 이 주소 추가 (오래 뒤에 두면 크롬이 창을 잠재워서 ‘꺼져 있어요’가 돼요)
+                </li>
               </ol>
               <p className="mt-2 text-xs text-ink-soft">이 설정 없이도 돼요. 그땐 인쇄할 때마다 인쇄 창이 떠서 Enter만 누르면 돼요.</p>
             </details>
