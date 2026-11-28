@@ -26,10 +26,10 @@ import { APP_NAME, IS_DEMO } from "@/lib/config";
 import { relTime } from "@/lib/format";
 import { j } from "@/lib/josa";
 import { renderTestCanvas } from "@/lib/labelCanvas";
-import { usePrintJobs, usePrintStations, useProducts, useRefresh } from "@/lib/queries";
+import { useBarcodeIssues, usePrintJobs, usePrintStations, useProducts, useRefresh } from "@/lib/queries";
 import { store } from "@/lib/store";
 import { buildTsplJob, canvasToMono, concatJobs } from "@/lib/tspl";
-import type { PrintJob } from "@/lib/types";
+import type { PrintJob, Product } from "@/lib/types";
 import { deviceLabel, getPrinter, sendToPrinter, usbAvailable } from "@/lib/usbPrinter";
 
 type Engine = "browser" | "usb";
@@ -55,6 +55,13 @@ function chime() {
   }
 }
 
+/** 대기열 한 줄이 뽑을 것 — 상품, 또는 상품 없이 만든 바코드(v12) */
+function jobTarget(j: PrintJob, products: Map<string, Product>, issues: Map<string, Product>): Product | undefined {
+  if (j.product_id) return products.get(j.product_id);
+  if (j.issue_id) return issues.get(j.issue_id);
+  return undefined;
+}
+
 /** 크기 확인용 테스트 한 장 (라벨 인쇄 화면과 같은 테두리 그림) */
 const SIZE_TEST = issueAsProduct({ id: "size-test", code: "", name: "", price: null, memo: null, product_id: null, created_at: "" });
 
@@ -62,6 +69,7 @@ export default function PrintStationPage() {
   const toast = useToast();
   const refresh = useRefresh();
   const { data: products = [] } = useProducts();
+  const { data: issueList = [] } = useBarcodeIssues();
   const [engine, setEngine] = useState<Engine>("browser");
   const [auto, setAuto] = useState(false);
   const settings = usePrintSettings(engine === "browser");
@@ -84,6 +92,7 @@ export default function PrintStationPage() {
   const busyRef = useRef(false);
   const runRef = useRef<() => Promise<void>>(async () => {});
   const byId = new Map(products.map((p) => [p.id, p]));
+  const issueById = new Map(issueList.map((i) => [i.id, issueAsProduct(i)]));
   const waiting = pending.filter((j) => j.status === "pending");
   const waitingSheets = waiting.reduce((n, j) => n + j.copies, 0);
 
@@ -164,8 +173,13 @@ export default function PrintStationPage() {
       jobs = await store().claimPrintJobs(station?.id);
       if (!jobs.length) return;
       const fresh = new Map((await store().listProducts()).map((p) => [p.id, p]));
-      const ready = jobs.filter((j) => fresh.has(j.product_id));
-      const gone = jobs.filter((j) => !fresh.has(j.product_id)).map((j) => j.id);
+      // 상품 없이 만든 바코드도 뽑아요 (v12)
+      const freshIssues = jobs.some((j) => j.issue_id)
+        ? new Map((await store().listBarcodeIssues()).map((i) => [i.id, issueAsProduct(i)]))
+        : new Map<string, Product>();
+      const target = (j: PrintJob) => jobTarget(j, fresh, freshIssues);
+      const ready = jobs.filter((j) => target(j));
+      const gone = jobs.filter((j) => !target(j)).map((j) => j.id);
       if (gone.length) await store().finishPrintJobs(gone, false, "상품이 삭제됐어요");
       if (!ready.length) return;
 
@@ -173,14 +187,14 @@ export default function PrintStationPage() {
         const dev = device ?? (await getPrinter(false));
         if (!dev) throw new Error("USB 프린터가 연결되지 않았어요. ‘연결’을 눌러 주세요.");
         const data = await buildUsbJobs(
-          ready.map((j) => ({ p: fresh.get(j.product_id)!, style: j.style, copies: j.copies })),
+          ready.map((j) => ({ p: target(j)!, style: j.style, copies: j.copies })),
           { w: preset.w, h: preset.h },
           show,
           usb,
         );
         await sendToPrinter(dev, concatJobs(data));
       } else {
-        const items = ready.flatMap((j) => Array.from({ length: j.copies }, () => ({ p: fresh.get(j.product_id)!, style: j.style })));
+        const items = ready.flatMap((j) => Array.from({ length: j.copies }, () => ({ p: target(j)!, style: j.style })));
         // 라벨을 프린터 해상도 그림으로 먼저 그려서 꽉 채워 인쇄해요
         const images = await renderLabelImages(items, { w: preset.w, h: preset.h }, show, nudge);
         flushSync(() => {
@@ -213,7 +227,11 @@ export default function PrintStationPage() {
   }, [auto, waiting.length, pending]);
 
   async function retry(job: PrintJob) {
-    await store().addPrintJobs([{ product_id: job.product_id, copies: job.copies, style: job.style }], job.requested_by_name ?? "", job.station_id ?? station?.id);
+    await store().addPrintJobs(
+      [{ ...(job.product_id ? { product_id: job.product_id } : { issue_id: job.issue_id ?? undefined }), copies: job.copies, style: job.style }],
+      job.requested_by_name ?? "",
+      job.station_id ?? station?.id,
+    );
     void refresh("print-jobs");
   }
 
@@ -431,12 +449,12 @@ export default function PrintStationPage() {
           ) : (
             <ul className="divide-y-2 divide-dashed divide-line">
               {pending.map((j) => {
-                const p = byId.get(j.product_id);
+                const p = jobTarget(j, byId, issueById);
                 return (
                   <li key={j.id} className="flex items-center gap-3 py-2">
                     {p ? <ProductThumb product={p} className="h-11 w-11" frame="rounded-xl border-2" /> : <span className="h-11 w-11" />}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">{p?.name ?? "상품 불러오는 중"}</p>
+                      <p className="truncate text-sm font-semibold">{p ? p.name || `바코드 ${p.barcode}` : "상품 불러오는 중"}</p>
                       <p className="text-xs text-ink-soft">
                         {j.style === "price" ? "가격표" : "라벨"} × {j.copies} · {j.requested_by_name || "누군가"} · {relTime(j.created_at)}
                       </p>
@@ -465,7 +483,11 @@ export default function PrintStationPage() {
                     {j.status === "done" ? "완료" : "실패"}
                   </span>
                   <span className="min-w-0 flex-1 truncate">
-                    {byId.get(j.product_id)?.name ?? "삭제된 상품"} × {j.copies}
+                    {(() => {
+                      const p = jobTarget(j, byId, issueById);
+                      return p ? p.name || `바코드 ${p.barcode}` : "삭제된 상품";
+                    })()}{" "}
+                    × {j.copies}
                     {j.error && <span className="block truncate text-xs text-danger">{j.error}</span>}
                   </span>
                   <span className="text-xs text-ink-faint">{relTime(j.printed_at)}</span>

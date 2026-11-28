@@ -495,7 +495,8 @@ export function createDemoStore(): DataStore {
       const now = new Date().toISOString();
       for (const i of items) {
         jobs.push({
-          ...i, id: crypto.randomUUID(), status: "pending", requested_by_name: requestedBy, error: null,
+          copies: i.copies, style: i.style, product_id: i.product_id ?? null, issue_id: i.issue_id ?? null,
+          id: crypto.randomUUID(), status: "pending", requested_by_name: requestedBy, error: null,
           created_at: now, claimed_at: null, printed_at: null, station_id: stationId ?? null,
         });
       }

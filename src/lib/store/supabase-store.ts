@@ -423,11 +423,23 @@ export function createSupabaseStore(): DataStore {
 
     async addPrintJobs(items, requestedBy, stationId) {
       if (!items.length) return;
-      const { error } = await sb
-        .from("print_jobs")
+      const rows = items.map((i) => ({
+        copies: i.copies,
+        style: i.style,
+        requested_by_name: requestedBy,
+        ...(i.product_id ? { product_id: i.product_id } : {}),
+        // 상품 없이 만든 바코드일 때만 그 칸을 보내요 (v12 전 DB에서도 상품 라벨은 보내지게)
+        ...(i.issue_id ? { issue_id: i.issue_id } : {}),
         // 노트북을 골랐을 때만 그 칸을 보내요 (v11 전 DB에서도 보내지게)
-        .insert(items.map((i) => ({ ...i, requested_by_name: requestedBy, ...(stationId ? { station_id: stationId } : {}) })));
-      if (error) fail(error);
+        ...(stationId ? { station_id: stationId } : {}),
+      }));
+      const { error } = await sb.from("print_jobs").insert(rows);
+      if (error) {
+        if (items.some((i) => i.issue_id) && (error.code === "PGRST204" || error.code === "42703" || error.code === "23502")) {
+          throw new StoreError("상품 없이 만든 바코드를 노트북으로 보내려면 DB 업데이트가 필요해요. 설정 화면(/setup)에서 ‘앱에서 바로 실행’을 눌러 주세요.");
+        }
+        fail(error);
+      }
     },
 
     async claimPrintJobs(stationId) {

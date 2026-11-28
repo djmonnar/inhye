@@ -261,7 +261,10 @@ export type PrintStatus = "pending" | "printing" | "done" | "failed";
 
 export interface PrintJob {
   id: string;
-  product_id: string;
+  /** 상품 라벨이면 상품 id, 상품 없이 만든 바코드면 null (v12) */
+  product_id: string | null;
+  /** 상품 없이 만든 바코드 (v12, barcode_issues.id) */
+  issue_id?: string | null;
   copies: number;
   style: PrintStyle;
   status: PrintStatus;
@@ -282,8 +285,10 @@ export interface PrintStation {
   created_at: string;
 }
 
+/** 인쇄 대기열에 넣을 것 — 상품(product_id) 또는 상품 없이 만든 바코드(issue_id, v12) 하나 */
 export interface PrintRequest {
-  product_id: string;
+  product_id?: string;
+  issue_id?: string;
   copies: number;
   style: PrintStyle;
 }

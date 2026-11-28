@@ -54,7 +54,7 @@ create trigger on_auth_user_created
 create or replace function public.app_status() returns json
 language sql stable security definer set search_path = public as $$
   select json_build_object(
-    'version', 11,
+    'version', 12,
     'has_admin', exists (select 1 from public.profiles where role = 'admin')
   );
 $$;
@@ -384,6 +384,12 @@ create policy "barcode issues update" on public.barcode_issues for update to aut
   using (public.is_member()) with check (public.is_member());
 drop policy if exists "barcode issues delete" on public.barcode_issues;
 create policy "barcode issues delete" on public.barcode_issues for delete to authenticated using (public.is_admin());
+
+-- 상품 없이 만든 바코드도 노트북으로 보내요 (v12): 인쇄 대기열 한 줄 = 상품 하나 또는 만든 바코드 하나
+alter table public.print_jobs alter column product_id drop not null;
+alter table public.print_jobs add column if not exists issue_id uuid references public.barcode_issues (id) on delete cascade;
+alter table public.print_jobs drop constraint if exists print_jobs_target_check;
+alter table public.print_jobs add constraint print_jobs_target_check check (product_id is not null or issue_id is not null);
 
 -- ---------------------------------------------------------------------
 -- 5-2. POS(빅솔론) 매출 연동

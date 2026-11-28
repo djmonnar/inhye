@@ -56,13 +56,10 @@ export function BarcodeMaker({
   issues,
   copies,
   setCopies,
-  sendMode,
 }: {
   issues: BarcodeIssue[];
   copies: Record<string, number>;
   setCopies: (fn: (c: Record<string, number>) => Record<string, number>) => void;
-  /** ‘노트북으로’ 보내기를 고른 상태 — 상품 없는 바코드는 보낼 수 없어서 안내해요 */
-  sendMode: boolean;
 }) {
   const toast = useToast();
   const refresh = useRefresh();
@@ -223,12 +220,6 @@ export function BarcodeMaker({
             <Copy size={14} /> {last.length === 1 ? "번호 복사" : "번호 모두 복사"}
           </button>
         </div>
-      )}
-
-      {sendMode && (
-        <p className="rounded-2xl bg-butter-100 px-3 py-2 text-xs text-butter-700">
-          상품 없이 만든 바코드는 ‘노트북으로’ 보낼 수 없어요. 노트북에서 이 화면을 열어 아래 ‘최근 만든 바코드’에서 바로 인쇄해 주세요.
-        </p>
       )}
 
       {issues.length > 0 && (

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
-import { BarcodeMaker, isIssueItem, issueAsProduct } from "@/components/BarcodeMaker";
+import { BarcodeMaker, ISSUE_PREFIX, isIssueItem, issueAsProduct } from "@/components/BarcodeMaker";
 import { StationPicker, useSendStation } from "@/components/PrintStations";
 import { BrowserFitPanel, LabelFace, LabelPrintPortal, PresetPicker, buildUsbJobs, labelKey, printNow, readPref, renderLabelImages, usePrintSettings, UsbSettingsPanel, writePref } from "@/components/labels";
 import { useAuth, useToast } from "@/components/providers";
@@ -148,22 +148,21 @@ function LabelsInner() {
   }
 
   async function sendToLaptop() {
-    // 노트북 인쇄 대기열은 상품에 묶여 있어서, 상품 없이 만든 바코드는 노트북에서 직접 뽑아요
-    const real = selected.filter((p) => !isIssueItem(p));
-    if (!real.length) {
-      toast("상품 없이 만든 바코드는 노트북에서 이 화면을 열어 바로 인쇄해 주세요", "sad");
-      return;
-    }
-    if (real.length < selected.length) toast("상품 없이 만든 바코드는 빼고 보낼게요 (노트북에서 직접 인쇄)", "wink");
+    if (!selected.length) return;
     setSending(true);
     try {
+      // 상품 없이 만든 바코드도 같이 보내요 (v12)
       await store().addPrintJobs(
-        real.map((p) => ({ product_id: p.id, copies: copies[p.id], style })),
+        selected.map((p) =>
+          isIssueItem(p)
+            ? { issue_id: p.id.slice(ISSUE_PREFIX.length), copies: copies[p.id], style }
+            : { product_id: p.id, copies: copies[p.id], style },
+        ),
         user?.display_name ?? "",
         sendStation.target?.id,
       );
       await refresh("print-jobs");
-      toast(`${real.reduce((n, p) => n + copies[p.id], 0)}장 노트북으로 보냈어요!`, "wow");
+      toast(`${total}장 노트북으로 보냈어요!`, "wow");
       setCopies({});
     } catch (e) {
       toast(e instanceof Error ? e.message : "보내지 못했어요", "sad");
@@ -342,7 +341,7 @@ function LabelsInner() {
           </section>
         )}
 
-        <BarcodeMaker issues={issues} copies={copies} setCopies={setCopies} sendMode={method === "send"} />
+        <BarcodeMaker issues={issues} copies={copies} setCopies={setCopies} />
 
         {/* 상품 고르기 */}
         <section className="card p-4">
