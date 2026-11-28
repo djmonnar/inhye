@@ -31,7 +31,9 @@ function LabelsInner() {
   const { user } = useAuth();
   const { data: products = [], isLoading } = useProducts();
   // 상품 없이 만든 바코드(v10)도 상품처럼 같이 뽑아요
-  const { data: issues = [] } = useBarcodeIssues();
+  const { data: allIssues = [] } = useBarcodeIssues();
+  // 목록에서 지운 바코드(v13)는 안 보여요 — 번호 정할 땐 store가 전부 봐요
+  const issues = useMemo(() => allIssues.filter((i) => !i.hidden_at), [allIssues]);
   const [copies, setCopies] = useState<Record<string, number>>({});
   const [q, setQ] = useState("");
   const [style, setStyle] = useState<LabelStyle>("label");

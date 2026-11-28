@@ -449,6 +449,11 @@ export function createDemoStore(): DataStore {
       throw new StoreError("체험 모드에서는 사용할 수 없어요.");
     },
 
+    async hideBarcodeIssue(id) {
+      const list = await load<BarcodeIssue[]>("barcodeIssues", []);
+      await save("barcodeIssues", list.map((i) => (i.id === id ? { ...i, hidden_at: new Date().toISOString() } : i)));
+    },
+
     async listBarcodeIssues() {
       return (await load<BarcodeIssue[]>("barcodeIssues", [])).sort((a, b) => b.created_at.localeCompare(a.created_at));
     },

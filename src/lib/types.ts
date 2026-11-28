@@ -69,6 +69,8 @@ export interface BarcodeIssue {
   /** 나중에 상품에 붙이면 */
   product_id: string | null;
   created_at: string;
+  /** 목록에서 지운 때 (v13) — 번호는 계속 ‘쓴 번호’로 남아요 */
+  hidden_at?: string | null;
 }
 
 /** 바코드 만들기 — code를 주면 그 번호 하나, 없으면 다음 매장용 번호(200…)로 count개 */

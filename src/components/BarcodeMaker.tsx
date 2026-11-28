@@ -1,9 +1,9 @@
 "use client";
 
-import { Copy, Minus, Plus, Sparkles } from "lucide-react";
+import { Copy, Minus, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { readPref, writePref } from "@/components/labels";
-import { useToast } from "@/components/providers";
+import { useAuth, useToast } from "@/components/providers";
 import { MoneyInput } from "@/components/ui";
 import { cleanBarcodeInput, shortDate, STORE_CODE_LENGTHS, won, type StoreCodeLength } from "@/lib/format";
 import { useRefresh } from "@/lib/queries";
@@ -63,6 +63,8 @@ export function BarcodeMaker({
 }) {
   const toast = useToast();
   const refresh = useRefresh();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [name, setName] = useState("");
   const [price, setPrice] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -123,6 +125,25 @@ export function BarcodeMaker({
       toast(code.includes("\n") ? "번호를 모두 복사했어요 (한 줄에 하나씩)" : "번호를 복사했어요. 빅솔론 상품 바코드 칸에 붙여 넣으세요", "wink");
     } catch {
       toast("복사하지 못했어요. 번호를 보고 직접 넣어 주세요", "sad");
+    }
+  }
+
+  /** 목록에서 지우기 (관리자) — 번호는 ‘쓴 번호’로 남겨서 다른 상품이 다시 받지 않아요 */
+  async function hide(i: BarcodeIssue) {
+    const label = i.name ? `‘${i.name}’ 바코드(${i.code})` : `바코드 ${i.code}`;
+    if (!window.confirm(`목록에서 지울까요?\n${label}\n\n이 번호는 다시 쓰지 않아요 (이미 붙인 라벨과 겹치지 않게).`)) return;
+    try {
+      await store().hideBarcodeIssue(i.id);
+      setCopies((c) => {
+        const next = { ...c };
+        delete next[key(i)];
+        return next;
+      });
+      setLast((l) => l.filter((x) => x.id !== i.id));
+      await refresh("barcode-issues");
+      toast("목록에서 지웠어요", "wink");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "지우지 못했어요", "sad");
     }
   }
 
@@ -242,6 +263,11 @@ export function BarcodeMaker({
                   <button type="button" className="btn-ghost btn-sm h-8 w-8 px-0" aria-label={`${i.code} 번호 복사`} onClick={() => copy(i.code)}>
                     <Copy size={14} />
                   </button>
+                  {isAdmin && (
+                    <button type="button" className="btn-ghost btn-sm h-8 w-8 px-0 text-ink-faint" aria-label={`${i.code} 지우기`} onClick={() => void hide(i)}>
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                   <div className="flex items-center gap-1">
                     <button type="button" className="btn-soft btn-sm h-8 w-8 px-0" aria-label="한 장 빼기" disabled={n === 0} onClick={() => setN(i, n - 1)}>
                       <Minus size={14} />

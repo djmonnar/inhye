@@ -360,6 +360,11 @@ export function createSupabaseStore(): DataStore {
       return data as PrintJob[];
     },
 
+    async hideBarcodeIssue(id) {
+      const { error } = await sb.from("barcode_issues").update({ hidden_at: new Date().toISOString() }).eq("id", id);
+      if (error) fail(error);
+    },
+
     async listBarcodeIssues() {
       const { data, error } = await sb.from("barcode_issues").select("*").order("created_at", { ascending: false }).limit(300);
       if (error) {

@@ -95,8 +95,10 @@ export interface DataStore {
   /** "pending" = waiting or being printed; "recent" = finished (newest first). */
   /** 상품 없이 만든 매장용 바코드 (최근 것부터) — v10 전 DB면 빈 목록 */
   listBarcodeIssues(): Promise<BarcodeIssue[]>;
-  /** 새 매장용 바코드 만들기 — 상품 바코드·이미 만든 번호와 안 겹치게 번호를 정해 기록해요 (지우기는 없어요: 지운 번호가 다시 나가면 이미 붙인 라벨과 겹쳐서) */
+  /** 새 매장용 바코드 만들기 — 상품 바코드·이미 만든 번호와 안 겹치게 번호를 정해 기록해요 (완전히 지우진 않아요: 지운 번호가 다시 나가면 이미 붙인 라벨과 겹쳐서 — 목록에서만 숨겨요) */
   issueBarcodes(input: BarcodeIssueInput): Promise<BarcodeIssue[]>;
+  /** 만든 바코드를 목록에서 지우기 (관리자, v13) — 숨기기만 해서 번호는 다시 나가지 않아요 */
+  hideBarcodeIssue(id: string): Promise<void>;
   listPrintJobs(which: "pending" | "recent"): Promise<PrintJob[]>;
   /** stationId = 보낼 노트북 (없으면 아무 노트북이나) */
   addPrintJobs(items: PrintRequest[], requestedBy: string, stationId?: string | null): Promise<void>;

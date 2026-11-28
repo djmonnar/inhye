@@ -54,7 +54,7 @@ create trigger on_auth_user_created
 create or replace function public.app_status() returns json
 language sql stable security definer set search_path = public as $$
   select json_build_object(
-    'version', 12,
+    'version', 13,
     'has_admin', exists (select 1 from public.profiles where role = 'admin')
   );
 $$;
@@ -390,6 +390,23 @@ alter table public.print_jobs alter column product_id drop not null;
 alter table public.print_jobs add column if not exists issue_id uuid references public.barcode_issues (id) on delete cascade;
 alter table public.print_jobs drop constraint if exists print_jobs_target_check;
 alter table public.print_jobs add constraint print_jobs_target_check check (product_id is not null or issue_id is not null);
+
+-- 만든 바코드 목록에서 지우기 (v13): 줄은 남기고 숨겨요 — 번호는 계속 ‘쓴 번호’라서 다른 상품이 다시 받지 않아요.
+--   숨기기(지우기)는 관리자만 (다른 고치기는 그대로 직원도)
+alter table public.barcode_issues add column if not exists hidden_at timestamptz;
+
+create or replace function public.barcode_issue_guard() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.hidden_at is distinct from old.hidden_at and not public.is_admin() then
+    raise exception '바코드 지우기는 관리자만 할 수 있어요';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists barcode_issue_guard on public.barcode_issues;
+create trigger barcode_issue_guard before update on public.barcode_issues
+  for each row execute function public.barcode_issue_guard();
 
 -- ---------------------------------------------------------------------
 -- 5-2. POS(빅솔론) 매출 연동
