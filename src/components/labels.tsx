@@ -429,6 +429,17 @@ export function BrowserFitPanel({ settings, onTest, busy }: { settings: ReturnTy
         </li>
         <li>아래 테스트 1장 → 테두리가 라벨 가장자리에 맞으면 끝</li>
       </ol>
+      <p className="mt-2 font-semibold text-ink">이렇게 나오면</p>
+      <ul className="mt-1 list-disc space-y-1 pl-5 text-ink-soft">
+        <li>
+          <b className="text-ink">양옆이 6mm쯤 비고 전체가 70%쯤 작게</b> → 인쇄 창 여백이 ‘기본값/최소’예요. <b>여백 없음</b>으로 (그래도 같으면 ‘맞춤
+          설정’에서 위·아래·왼쪽·오른쪽 모두 0)
+        </li>
+        <li>
+          <b className="text-ink">여러 장 뽑으면 아래로 내려가 번호가 라벨 사이에 걸림</b> → FEED 길게(라벨 길이 다시 익히기), 드라이버 용지 세로 {preset.h}mm ·
+          용지 종류 ‘간격 있는 라벨’ · 간격 2~3mm 확인
+        </li>
+      </ul>
       <button type="button" className="btn-soft btn-sm mt-3 w-full" disabled={busy} onClick={onTest}>
         📏 크기 확인용 테스트 1장 뽑기 ({size}mm)
       </button>
