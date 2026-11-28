@@ -420,12 +420,14 @@ export function BrowserFitPanel({ settings, onTest, busy }: { settings: ReturnTy
       <summary className="cursor-pointer list-none font-cute text-[15px]">📏 라벨 위치·크기 맞추기 (작게·한쪽에·밀려 나오면)</summary>
       <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-ink-soft">
         <li>
-          윈도우 설정 › 프린터 › Xprinter › <b>인쇄 기본 설정</b> › 용지(Page Setup) › <b>새로 만들기</b>: 가로 {preset.w} · 세로 {preset.h}mm → 그 용지
-          고르고 확인. <b className="text-ink">이게 안 맞으면 라벨이 작게 줄거나 반쯤 내려가서 나와요.</b>
+          윈도우 설정 › 프린터 › Xprinter › <b>인쇄 기본 설정</b> › 용지(Page Setup) › <b>새로 만들기</b>(또는 ‘USER’ 고치기): 이름 ‘라벨 {preset.w}x
+          {preset.h}’, 가로 {preset.w} · 세로 {preset.h}mm → 확인. 송장용 용지(20센치송장 등)는 그대로 두세요.{" "}
+          <b className="text-ink">이게 안 맞으면 라벨이 작게 줄거나 반쯤 내려가서 나와요.</b>
         </li>
         <li>프린터 FEED 버튼을 길게 눌러 라벨 사이 간격을 다시 익히게 해요 (라벨 몇 장이 그냥 나와요)</li>
         <li>
-          크롬 인쇄 창 ‘설정 더보기’: 프린터 Xprinter · 용지 크기 <b>{size}</b> · 여백 <b>없음</b> · 배율 <b>기본값</b> · 머리글/바닥글 끄기
+          크롬을 닫았다 다시 열고, 인쇄 창 ‘설정 더보기’: 프린터 Xprinter · 용지 크기 <b>방금 만든 {size}</b> · 여백 <b>없음</b> · 배율 <b>기본값</b>(맞춤 100도
+          같아요) · 머리글/바닥글 끄기
         </li>
         <li>아래 테스트 1장 → 테두리가 라벨 가장자리에 맞으면 끝</li>
       </ol>
@@ -434,6 +436,9 @@ export function BrowserFitPanel({ settings, onTest, busy }: { settings: ReturnTy
         <li>
           <b className="text-ink">양옆이 6mm쯤 비고 전체가 70%쯤 작게</b> → 인쇄 창 여백이 ‘기본값/최소’예요. <b>여백 없음</b>으로 (그래도 같으면 ‘맞춤
           설정’에서 위·아래·왼쪽·오른쪽 모두 0)
+        </li>
+        <li>
+          <b className="text-ink">한 장이 라벨 두 칸에 걸쳐 나오거나 빈 칸이 끼어요</b> → 인쇄 창 용지 크기가 {size}가 아니에요 (목록에 없으면 1번부터)
         </li>
         <li>
           <b className="text-ink">여러 장 뽑으면 아래로 내려가 번호가 라벨 사이에 걸림</b> → FEED 길게(라벨 길이 다시 익히기), 드라이버 용지 세로 {preset.h}mm ·
