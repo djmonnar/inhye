@@ -420,8 +420,8 @@ export function BrowserFitPanel({ settings, onTest, busy }: { settings: ReturnTy
       <summary className="cursor-pointer list-none font-cute text-[15px]">📏 라벨 위치·크기 맞추기 (작게·한쪽에·밀려 나오면)</summary>
       <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-ink-soft">
         <li>
-          윈도우 설정 › 프린터 › Xprinter › <b>인쇄 기본 설정</b> › 용지(Page Setup) › <b>새로 만들기</b>(또는 ‘USER’ 고치기): 이름 ‘라벨 {preset.w}x
-          {preset.h}’, 가로 {preset.w} · 세로 {preset.h}mm → 확인. 송장용 용지(20센치송장 등)는 그대로 두세요.{" "}
+          윈도우 설정 › 프린터 › Xprinter › <b>인쇄 기본 설정</b> › <b>페이지 설정</b> 탭 › 용지 <b>새로 만들기</b>: 이름 ‘라벨 {preset.w}x{preset.h}’, 유형 ‘다이컷
+          라벨’, 너비 {preset.w} · <b>높이 {preset.h}mm</b>(처음엔 14로 돼 있어요), 라이너 0 → 확인 → 그 용지 고르고 적용. 송장용 용지(20센치송장 등)는 그대로 두세요.{" "}
           <b className="text-ink">이게 안 맞으면 라벨이 작게 줄거나 반쯤 내려가서 나와요.</b>
         </li>
         <li>프린터 FEED 버튼을 길게 눌러 라벨 사이 간격을 다시 익히게 해요 (라벨 몇 장이 그냥 나와요)</li>
